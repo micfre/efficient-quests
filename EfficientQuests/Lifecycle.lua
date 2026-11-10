@@ -126,8 +126,8 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
         advice.eligibleQuestIDs = remaining
         if #remaining < #ids then qualify(advice, "Some associated quests are complete.") end
     end
-    if advice.kind == "technique" and advice.questID and context.quests[advice.questID]
-        and context.quests[advice.questID].phase == "ready" then
+    if advice.kind == "technique" and advice.questID
+        and context.questPhase(advice.questID) == "ready" then
         local text = string.lower(advice.text)
         if not text:find("turn in", 1, true) and not text:find("turn-in", 1, true)
             and not text:find("hand in", 1, true) and not text:find("after", 1, true)

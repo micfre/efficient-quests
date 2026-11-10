@@ -194,7 +194,12 @@ C_QuestLog.GetNextWaypoint = function(id)
   if id == 102 then return 1, 0.9, 0.5 end
   if id == 103 then return 1, 0.41, 0.5 end
 end
-hints = EfficientQuests.GetHints('Levels')
+EfficientQuests_RegisterGuide('ReadyRanking', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,2 Apples] for [QC102].
+[G40,50 Elwynn Forest] Buy [CI43,2 Oranges] for [QC103].
+]], 'Author')
+hints = EfficientQuests.GetHints('ReadyRanking')
 assert(hints[1].questID == 102, 'an unclassified waypoint must not establish turn-in proximity')
 print('ok - unclassified waypoints do not establish turn-in proximity')
 C_QuestLog.GetNextWaypoint = nil
