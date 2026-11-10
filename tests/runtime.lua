@@ -91,3 +91,59 @@ context = EfficientQuests.GetContext()
 assert(context.professions.mining == true and context.professions.alchemy == nil,
   'known professions should be available while absent skills remain unknown')
 print('ok - profession observations preserve unknowns')
+
+-- At login the core reconciles addons that declare the guide marker against
+-- the guides that actually registered and exposes each mismatch as a warning.
+local function clearGuides()
+  for key in pairs(EfficientQuests.guides) do EfficientQuests.guides[key] = nil end
+end
+clearGuides()
+C_AddOns = {
+  GetNumAddOns = function() return 3 end,
+  GetAddOnInfo = function(index)
+    return ({ 'EfficientQuests_Paired', 'EfficientQuests_Silent', 'Unrelated_Tool' })[index]
+  end,
+  GetAddOnMetadata = function(name, field)
+    if field == 'X-EfficientQuests-Guide' and name ~= 'Unrelated_Tool' then return '1' end
+  end,
+}
+EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired]', 'Paired Author')
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+local warnings = EfficientQuests.GetGuideWarnings()
+assert(#warnings == 1, 'a fully matching set apart from one missing guide must warn once')
+assert(warnings[1]:find('EfficientQuests_Silent', 1, true) and warnings[1]:find('did not register', 1, true),
+  'a declared guide that did not register should produce its own warning line')
+print('ok - declared guide that never registers warns at login')
+
+EfficientQuests_RegisterGuide('EfficientQuests_Rogue', '[N Rogue]', 'Rogue Author')
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+warnings = EfficientQuests.GetGuideWarnings()
+assert(#warnings == 2, 'both mismatch kinds must produce their own warning')
+local rogueWarning, silentWarning
+for _, warning in ipairs(warnings) do
+  if warning:find('EfficientQuests_Rogue', 1, true) then rogueWarning = warning end
+  if warning:find('EfficientQuests_Silent', 1, true) then silentWarning = warning end
+end
+assert(silentWarning and silentWarning:find('did not register', 1, true),
+  'the declared-but-unregistered warning must stay distinct')
+assert(rogueWarning and rogueWarning:find('without declaring', 1, true),
+  'a guide that registers without declaring the marker must warn distinctly')
+print('ok - registered guide without the marker warns at login')
+
+clearGuides()
+EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired again]', 'Paired Author')
+C_AddOns.GetAddOnMetadata = function(name, field)
+  if name == 'EfficientQuests_Paired' and field == 'X-EfficientQuests-Guide' then return '1' end
+end
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+assert(#EfficientQuests.GetGuideWarnings() == 0,
+  'a matching declared and registered set must produce no warnings')
+print('ok - matching declared and registered set stays silent')
+
+clearGuides()
+EfficientQuests_RegisterGuide('EfficientQuests_Opaque', '[N Opaque]', 'Opaque Author')
+C_AddOns = nil
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+assert(#EfficientQuests.GetGuideWarnings() == 0,
+  'a missing addon-list service must not fabricate warnings')
+print('ok - absent addon-list service reconciles nothing')

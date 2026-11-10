@@ -345,3 +345,38 @@ assert(not flightWording[1].text:find('Ride south', 1, true),
 assert(flightWording[1].text:find('Northgate Keep', 1, true),
   'the named flight point stays visible with its advice')
 print('ok - flight point wording and fortress names are distinguished')
+
+-- A guide plugin registers under its own addon name as the registry key, one
+-- call per chapter, and the list metadata serves the settings page through
+-- the addon-list service.
+local plugin = 'EfficientQuests_ExampleGuide'
+EfficientQuests_RegisterGuide(plugin, [[
+[N Greenfield 1-5]
+[G1,2 Greenfield] Buy [CI42,3 Apples].
+]], 'Example Author')
+EfficientQuests_RegisterGuide(plugin, [[
+[N Greenfield 5-9]
+[G2,3 Greenfield] Buy [CI43,2 Bread].
+]], 'Example Author')
+C_AddOns = { GetAddOnMetadata = function(name, field)
+  if name == plugin and field == 'Title' then return 'Example Guide' end
+end }
+local list = EfficientQuests.GetGuideList()
+local pluginEntry, auditEntry
+for _, entry in ipairs(list) do
+  if entry.key == plugin then pluginEntry = entry end
+  if entry.key == 'Audit' then auditEntry = entry end
+end
+assert(pluginEntry, 'a guide registered under a plugin addon name must be listed')
+assert(pluginEntry.name == 'Example Guide', 'the display name comes from the plugin manifest title')
+assert(pluginEntry.author == 'Example Author', 'the author comes from the first registered chapter')
+assert(pluginEntry.chapters == 2 and #EfficientQuests.guides[plugin] == 2,
+  'each registration call must append one chapter under the plugin addon name')
+assert(auditEntry, 'every registered guide stays listed')
+assert(auditEntry.name == 'Audit', 'a guide without manifest metadata falls back to its key')
+assert(auditEntry.author == 'reference' and auditEntry.chapters == 1,
+  'list metadata matches the registered tuple')
+for index = 2, #list do
+  assert(list[index - 1].key < list[index].key, 'the guide list is sorted by key')
+end
+print('ok - plugin guide list metadata and chapter append')
