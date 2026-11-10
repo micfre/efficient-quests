@@ -21,6 +21,10 @@ function EfficientQuests.GetContext()
     end
     if C_Map and C_Map.GetBestMapForUnit then
         result.zoneID = C_Map.GetBestMapForUnit("player")
+        if result.zoneID and C_Map.GetMapInfo then
+            local mapInfo = C_Map.GetMapInfo(result.zoneID)
+            if mapInfo then result.zoneName = mapInfo.name end
+        end
         if result.zoneID and C_Map.GetPlayerMapPosition then
             local position = C_Map.GetPlayerMapPosition(result.zoneID, "player")
             if position and position.GetXY then
