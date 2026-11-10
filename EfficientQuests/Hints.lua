@@ -145,25 +145,6 @@ local function prepare(advice, context, provider, localEvidence, distances)
             if bands.giver and (not giverBand or bands.giver < giverBand) then giverBand = bands.giver end
             if bands.target and (not targetBand or bands.target < targetBand) then targetBand = bands.target end
         end
-        -- The native next waypoint follows the quest's current phase. Only
-        -- use it for a known ready quest, in the same client map frame.
-        local quest = context.quests[id]
-        local phase = quest and quest.phase
-        if not phase and context.isAccepted(id) and C_QuestLog and C_QuestLog.IsComplete then
-            if C_QuestLog.IsComplete(id) then phase = 'ready' end
-        end
-        if phase == 'ready' and context.zoneID and context.position and C_QuestLog
-            and C_QuestLog.GetNextWaypoint and C_Map and C_Map.GetMapWorldSize then
-            local map, x, y = C_QuestLog.GetNextWaypoint(id)
-            local width, height = C_Map.GetMapWorldSize(context.zoneID)
-            if map == context.zoneID and type(x) == 'number' and x >= 0 and x <= 1
-                and type(y) == 'number' and y >= 0 and y <= 1
-                and type(width) == 'number' and width > 0 and type(height) == 'number' and height > 0 then
-                local dx, dy = (x - context.position.x) * width, (y - context.position.y) * height
-                local band = math.floor(math.sqrt(dx * dx + dy * dy) / 250)
-                if not targetBand or band < targetBand then targetBand = band end
-            end
-        end
         local level = questLevel(provider, id, context)
         if level and context.level then
             local distance = math.abs(level - context.level)

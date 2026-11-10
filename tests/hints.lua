@@ -187,8 +187,8 @@ C_QuestLog.GetNextWaypoint = function(id)
   if id == 103 then return 1, 0.41, 0.5 end
 end
 hints = EfficientQuests.GetHints('Levels')
-assert(hints[1].questID == 103, 'ready quests rank by current turn-in waypoint, not source order')
-print('ok - ready quests compare current turn-in waypoints')
+assert(hints[1].questID == 102, 'an unclassified waypoint must not establish turn-in proximity')
+print('ok - unclassified waypoints do not establish turn-in proximity')
 C_QuestLog.GetNextWaypoint = nil
 C_QuestLog.IsOnQuest = function() return false end
 EfficientQuests_RegisterGuide('Opportunity', [[
