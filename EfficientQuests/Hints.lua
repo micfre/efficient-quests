@@ -208,6 +208,76 @@ local function duplicateKey(advice, originalText)
         advice.location and advice.location.coordinateSystem or ""}, "\31")
 end
 
+-- A separate quest and a matching item do not prove consumption. Recognize
+-- only a direct, quantified source assertion about that exact quest's use.
+local function consumptionEvidence(advice, context)
+    if advice.kind ~= 'supply' or not advice.verifiedItemID or not advice.itemSourceName
+        or not advice.questID or not advice.quantity or not advice._ranking.localEvidence
+        or context.isAccepted(advice.questID) ~= true then return false end
+    for _, condition in ipairs(advice.conditions or {}) do
+        if condition ~= 'Quest restrictions may be incomplete.' then return false end
+    end
+    local source = string.lower(advice.sourceText or ''):gsub('%s+', ' '):gsub('[%.!]%s*$', '')
+    source = source:gsub('^%s*%[g[^%]]+%]%s*', '')
+    local name = string.lower(advice.itemSourceName)
+    local assertion = '; all ' .. advice.quantity .. ' ' .. string.lower(advice.itemSourceName)
+        .. ' are consumed by that quest'
+    local expected = 'buy [ci' .. advice.verifiedItemID .. ',' .. advice.quantity .. ' ' .. name
+        .. '] for [qc' .. advice.questID .. ']' .. assertion
+    return source == expected
+end
+
+local function aggregateConsumptions(output, context, provider, distances)
+    local groups = {}
+    for _, advice in ipairs(output) do
+        if consumptionEvidence(advice, context) and advice.location and advice.location.zone then
+            local key = table.concat({tostring(advice.verifiedItemID), string.lower(advice.location.zone),
+                tostring(advice.location.x or ''), tostring(advice.location.y or ''),
+                tostring(advice.location.coordinateSystem or '')}, '\31')
+            groups[key] = groups[key] or {}
+            table.insert(groups[key], advice)
+        end
+    end
+    local removed = {}
+    for _, group in pairs(groups) do
+        local byQuest, ids = {}, {}
+        for _, advice in ipairs(group) do
+            local old = byQuest[advice.questID]
+            if not old then
+                ids[#ids + 1] = advice.questID
+                byQuest[advice.questID] = advice
+            elseif advice.quantity > old.quantity then
+                byQuest[advice.questID] = advice
+            end
+        end
+        if #ids > 1 then
+            table.sort(ids)
+            local lead, total, parts, sources = group[1], 0, {}, {}
+            for _, id in ipairs(ids) do
+                local requirement = byQuest[id]
+                total = total + requirement.quantity
+                parts[#parts + 1] = requirement.quantity .. ' for quest #' .. id
+            end
+            for _, advice in ipairs(group) do
+                for _, source in ipairs(advice.sources or {}) do sources[#sources + 1] = source end
+                if advice ~= lead then removed[advice] = true end
+            end
+            lead.questID, lead.questIDs, lead.eligibleQuestIDs = nil, ids, ids
+            lead.association, lead.quantity, lead.sources = 'quests', total, sources
+            lead.conditions = lead.conditions or {}
+            lead.conditions[#lead.conditions + 1] = 'Guide states separate consumptions: ' .. table.concat(parts, '; ') .. '.'
+            lead.text = 'Buy ' .. total .. ' ' .. lead.itemSourceName
+            EfficientQuests.ApplyLifecycle(lead, context, provider)
+            lead.uncertain = true
+            lead.text = lead.text .. ' (if the guide’s stated uses apply)'
+            prepare(lead, context, provider, true, distances, lead.text)
+        end
+    end
+    local result = {}
+    for _, advice in ipairs(output) do if not removed[advice] then result[#result + 1] = advice end end
+    return result
+end
+
 -- Returns ordered advice and, when setup is incomplete, a status code. The
 -- package is explicit so independent authors are never silently merged.
 function EfficientQuests.GetHints(packageName)
@@ -240,6 +310,7 @@ function EfficientQuests.GetHints(packageName)
             end
         end
     end
+    output = aggregateConsumptions(output, context, provider, distances)
     table.sort(output, before)
     for _, advice in ipairs(output) do advice._ranking = nil end
     return output

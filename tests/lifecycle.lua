@@ -159,3 +159,60 @@ EfficientQuests_RegisterGuide('TimedSupplies', [[
 local timed = EfficientQuests.GetHints('TimedSupplies')
 assert(#timed == 2 and timed[1].text:find('now', 1, true), 'current opportunity remains first after inventory wording changes')
 print('ok - inventory wording preserves available-now ranking')
+-- Distinct explicit consumptions are guide assertions, not inferred from quest IDs.
+local active = {[201]=true,[202]=true}
+C_QuestLog.IsOnQuest = function(id) return active[id] == true end
+C_QuestLog.GetNumQuestLogEntries = function() return 2,2 end
+C_QuestLog.GetInfo = function(index) return ({ {questID=201,level=10}, {questID=202,level=10} })[index] end
+carried, bank = 2, 0
+EfficientQuests_RegisterGuide('IndependentExplicit', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC201]; all 3 Apples are consumed by that quest.
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC202]; all 5 Apples are consumed by that quest.
+]], 'Author')
+local combined = EfficientQuests.GetHints('IndependentExplicit')
+assert(#combined == 1 and combined[1].quantity == 8, 'explicit independent consumptions combine')
+assert(combined[1].text:find('8',1,true) and combined[1].text:find('6',1,true), 'combined hint reports total and carried shortage')
+assert(combined[1].uncertain and combined[1].text:find('if the guide',1,true), 'source claims remain conditional instead of verified gameplay facts')
+local explanation = table.concat(combined[1].conditions, ' ')
+assert(explanation:find('201',1,true) and explanation:find('202',1,true) and explanation:find('3',1,true) and explanation:find('5',1,true), 'explanation attributes each guide-stated use')
+active[201] = false
+C_QuestLog.GetNumQuestLogEntries = function() return 1,1 end
+C_QuestLog.GetInfo = function() return {questID=202,level=10} end
+eventHandler(nil, 'QUEST_TURNED_IN', 201)
+local remaining = EfficientQuests.GetHints('IndependentExplicit')
+assert(#remaining == 1 and remaining[1].quantity == 5, 'turn-in recalculates remaining independent minimum')
+print('ok - explicit independent consumptions sum with breakdown and recalculate')
+active[201] = true
+C_QuestLog.GetNumQuestLogEntries = function() return 2,2 end
+C_QuestLog.GetInfo = function(index) return ({ {questID=201,level=10}, {questID=202,level=10} })[index] end
+EfficientQuests_RegisterGuide('ConditionalConsumption', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC201]; only if it is winter; all 3 Apples are consumed by that quest.
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC202]; all 5 Apples are consumed by that quest.
+]], 'Author')
+local conditional = EfficientQuests.GetHints('ConditionalConsumption')
+assert(#conditional == 2, 'conditions in guide prose must not disappear in aggregation')
+print('ok - unparsed guide conditions prevent aggregation')
+EfficientQuests_RegisterGuide('RepeatedConsumption', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,2 Apples] for [QC201]; all 2 Apples are consumed by that quest.
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC201]; all 3 Apples are consumed by that quest.
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC202]; all 5 Apples are consumed by that quest.
+]], 'Author')
+local repeated = EfficientQuests.GetHints('RepeatedConsumption')
+assert(#repeated == 1 and repeated[1].quantity == 8 and #repeated[1].sources == 3,
+ 'repeated mentions of one quest contribute only its largest stated minimum')
+LibQuestieDB.Item.Get = function() return 'Other item' end
+local unverified = EfficientQuests.GetHints('IndependentExplicit')
+assert(#unverified == 2, 'unverified item identity prevents aggregation')
+print('ok - repeated and unverified requirements do not inflate totals')
+LibQuestieDB.Item.Get = function(id,key) if id == 42 and key == 'name' then return 'Apples' end end
+EfficientQuests_RegisterGuide('DistinctSuppliers', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC201]; all 3 Apples are consumed by that quest.
+[G60,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC202]; all 5 Apples are consumed by that quest.
+]], 'Author')
+local suppliers = EfficientQuests.GetHints('DistinctSuppliers')
+assert(#suppliers == 2, 'different source locations must not collapse to one opportunity')
+print('ok - distinct locations remain distinct opportunities')
