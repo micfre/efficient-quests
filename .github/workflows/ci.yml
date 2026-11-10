@@ -12,12 +12,9 @@ jobs:
         uses: actions/checkout@v4
       - name: Run the Lua suites in Docker
         run: |
-          docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/runtime.lua
-          docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/guide.lua
-          docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/hints.lua
-          docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/lifecycle.lua
-          docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/ui.lua
-          docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/manifest.lua
+          for suite in runtime guide hints lifecycle ui manifest; do
+            docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua "tests/$suite.lua"
+          done
       - name: Run the bridge suite
         run: sh tests/bridge.sh
       - name: Run the Python suites

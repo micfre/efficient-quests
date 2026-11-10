@@ -70,7 +70,7 @@ def zip_folder(folder, arc_root, dest):
     return dest
 
 
-def plugin_version(plugin_folder, plugin):
+def plugin_version(plugin_folder):
     """Read the built plugin's version from its extraction-audit report."""
     report = json.loads(
         (plugin_folder / build_guide.AUDIT_REPORT).read_text(encoding="utf-8"))
@@ -151,7 +151,7 @@ def main():
             plugin = entry["plugin"]
             folder = builds / plugin
             dest = zip_folder(folder, plugin, args.output
-                              / (plugin + "-" + plugin_version(folder, plugin) + ".zip"))
+                              / (plugin + "-" + plugin_version(folder) + ".zip"))
             zips.append(dest.name)
             print("Guide zip: " + str(dest))
         print("Release zips in " + str(args.output) + ": " + ", ".join(zips))

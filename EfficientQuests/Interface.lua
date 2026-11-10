@@ -400,9 +400,12 @@ function EQ.RefreshInterface()
     if hint.id and data.dismissed[hint.id] then dismissedEntries[#dismissedEntries + 1] = hint end
   end
   local statusText
-  if staleGuide then statusText = L.unavailable
-  elseif problem == 'missing' then statusText = L.missing
+  -- A provider problem outranks the stale-guide note, matching the order
+  -- of the /eq status service: with both present, the two surfaces must
+  -- name the same problem.
+  if problem == 'missing' then statusText = L.missing
   elseif problem == 'incompatible' then statusText = L.incompatible
+  elseif staleGuide then statusText = L.unavailable
   elseif problem == 'guide' then
     if not guide and next(EQ.guides) then statusText = L.choose
     else statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide end

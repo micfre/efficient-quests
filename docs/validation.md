@@ -28,6 +28,15 @@ After the change, we verified everything offline again from the worktree of tick
 - The bridge suite is the new seam at the top of the stack. It builds a synthetic fixture guide with the real builder and loads the generated plugin next to the real core addon in the headless harness. It asserts registration through the real hook, the settings guide list, the hints, and the login reconciliation.
 - The in-client checks below are updated to the plugin flow. IC-1 expects version 0.2.0.
 
+## Code-review round 2 update
+
+The branch `fix/code-review-round-2` holds the fixes for the second code-review round of [spec #15](https://github.com/micfre/efficient-quests/issues/15), on 2026-11-10. After the fixes, we ran every offline command again. All suites pass: 132 Lua checks and 34 Python tests. These changes affect this record:
+
+- The window status now reports a missing or incompatible provider before the note about a removed guide. This is the order of `/eq status`. The `ui` suite drives both surfaces with both problems present at once.
+- The guide list takes the author from the plugin manifest when no chapter carries an author. The `guide` suite covers the fallback through the addon-list stub.
+- The plugin manifest copies the `Title` field of the source package verbatim. When the source declares no title, the builder derives the title from the plugin name. The builder tests and the bridge suite cover both paths.
+- The extraction gate fails closed. WATCH is the only advisory severity. Every other severity fails the build. A severity that a future audit adds also fails the build. See the [buildbook](buildbook.md) for the gate rules.
+
 ## What earlier rounds left open
 
 Each implementation round recorded the checks that it was unable to do. In total, these checks are open:
@@ -112,7 +121,7 @@ Each scenario row in the acceptance table of the specification maps to offline e
 | Player activates a hint or a supporting link | `ui`: "quest, map and verified item links use existing interfaces", expansion | Offline |
 | Player dismisses a hint and later restores it | `ui`: dismissal and restore without damage to other hints | Offline (scoping per character as above) |
 | No tips match | `ui`: "valid empty results hide advice and keep settings available" | Offline |
-| Guide or provider is missing or incompatible | `runtime`: the statuses for a missing provider, a missing guide with the pointer to the releases page, and an incompatible provider, plus the reconciliation warnings. `ui`: "missing provider is distinct from an empty hint body". | Offline |
+| Guide or provider is missing or incompatible | `runtime`: the statuses for a missing provider, a missing guide with the pointer to the releases page, and an incompatible provider, plus the reconciliation warnings. `ui`: "missing provider is distinct from an empty hint body", "the provider problem outranks the stale-guide note everywhere". | Offline |
 | A guide plugin is installed, chosen, or removed | `ui`: "the only installed guide is auto-selected and listed in settings", "several guides wait for an explicit choice instead of a default", "picking a row selects that guide for this character", "a removed guide falls back to the selection rule with a note". `bridge`: "the built plugin surfaces in the settings guide list". | Offline |
 | The real Guidelime is optionally present | `manifest`: Guidelime and Questie are not declared. Python builder suite: the plugin manifest declares its dependency on the core addon only, and the plugin registers only with Efficient Quests. | Partial. Nobody tested real coexistence in a client. See IC-4. |
 | Integrated tracker changes width, font, color, height, or position | `ui`: "Flare tracker geometry and backdrop", "tracker appearance and width changes are followed", font follow, "tracker scaling is reflected in the integrated width" | Offline (simulated tracker) |

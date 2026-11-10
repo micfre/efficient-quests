@@ -62,7 +62,7 @@ The builder writes `dist/<plugin>/` with these files:
 
 The generated manifest declares `Dependencies: EfficientQuests`. This is load-order critical. The registration hook of the core addon must exist before `Guides.lua` runs. The manifest also declares:
 
-- `Title`, the display name. Underscores become spaces.
+- `Title`, the display name. The builder copies the `Title` field of the source package verbatim. When the source declares no title, the plugin name is used and its underscores become spaces.
 - `Version`, the source package version plus the `build_suffix` of the catalog entry.
 - `X-EfficientQuests-Guide: 1`, the marker the core reads at login.
 - `X-EfficientQuests-API: 1`, a reserved marker for a future contract change. The addon emits it and never reads it.
@@ -74,7 +74,7 @@ With `--date` pinned, a rebuild of the same source is byte-identical. The same i
 
 The build fails when the package TOC lists no files, lists a file outside the package, contains no registration calls, or declares no version. A failed gate leaves no plugin folder behind.
 
-The extraction audit needs Lua 5.1. The builder prefers `lua5.1`, then `lua`, both from the PATH. With neither, it runs the audit under Docker with the image `nickblah/lua:5.1`. Set the environment variable `EQ_AUDIT_LUA` to force one interpreter command.
+The extraction audit needs Lua 5.1. The builder prefers `lua5.1`, then `lua`, both from the PATH. With neither, it runs the audit under Docker with the image `nickblah/lua:5.1`. Set the environment variable `EQ_AUDIT_LUA` to force one interpreter command, or `EQ_LUA_IMAGE` to use a different Docker image. The bridge script `tests/bridge.sh` picks its Lua by the same convention.
 
 ## Gates
 
@@ -83,7 +83,7 @@ Every build runs the extraction audit (`tools/audit_extraction.lua`) over the pl
 The build fails when:
 
 - The audit extracts no advice record from any character context.
-- The audit reports a safety finding. A safety finding is any severity except WATCH. The failing severities are ROUTE, SPOILER, DANGLING, TAGS, QUANTITY, NAME, QUEST, and ERROR. They mean that route or narrative prose, malformed text, unstripped markup, or a lost quantity, item name, or quest link reached the visible text. WATCH stays advisory. It flags phrases that need human eyes but are often mechanical.
+- The audit reports a finding whose severity is not advisory. WATCH is the only advisory severity. Every other severity fails the build. The severities ROUTE, SPOILER, DANGLING, TAGS, QUANTITY, NAME, QUEST, and ERROR mean that route or narrative prose, malformed text, unstripped markup, or a lost quantity, item name, or quest link reached the visible text. A severity that a future audit adds also fails the build. The screen never lets an unknown problem pass. WATCH stays advisory. It flags phrases that need human eyes but are often mechanical.
 
 The build warns when the audit withheld more than half of the candidate advice lines. The reviewed corpora withheld 18 percent (TUG) and 44 percent (Bethink) of their candidate lines. A majority withheld signals a guide that the extraction mostly cannot read.
 

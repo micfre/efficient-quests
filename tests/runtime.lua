@@ -78,8 +78,8 @@ context = EfficientQuests.GetContext()
 assert(context.isAccepted(103) == nil, 'incomplete log must not imply unaccepted')
 print('ok - hidden quests can be checked without treating unknown as false')
 -- With no guide registered, the setup status names a declared guide
--- plugin that failed to register instead of the generic pointer.
-EfficientQuests.guides.Example = nil
+-- plugin that failed to register instead of the generic pointer. The
+-- fresh load simulates the session in which the plugin never registered.
 C_AddOns = {
   GetNumAddOns = function() return 1 end,
   GetAddOnInfo = function() return 'EfficientQuests_Declared' end,
@@ -87,7 +87,7 @@ C_AddOns = {
     if field == 'X-EfficientQuests-Guide' then return '1' end
   end,
 }
-handlers.OnEvent(nil, 'PLAYER_LOGIN')
+loadAddon()
 local statusMessage = status()
 assert(statusMessage:find('EfficientQuests_Declared', 1, true) and statusMessage:find('did not register', 1, true),
   'a declared guide that did not register should be named in the setup status')
@@ -108,10 +108,8 @@ print('ok - profession observations preserve unknowns')
 
 -- At login the core reconciles addons that declare the guide marker against
 -- the guides that actually registered and exposes each mismatch as a warning.
-local function clearGuides()
-  for key in pairs(EfficientQuests.guides) do EfficientQuests.guides[key] = nil end
-end
-clearGuides()
+-- Every scenario starts from a fresh load, so each session registers only the
+-- guides the scenario needs.
 C_AddOns = {
   GetNumAddOns = function() return 3 end,
   GetAddOnInfo = function(index)
@@ -121,6 +119,7 @@ C_AddOns = {
     if field == 'X-EfficientQuests-Guide' and name ~= 'Unrelated_Tool' then return '1' end
   end,
 }
+loadAddon()
 EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired]', 'Paired Author')
 handlers.OnEvent(nil, 'PLAYER_LOGIN')
 local warnings = EfficientQuests.GetGuideWarnings()
@@ -149,7 +148,7 @@ assert(setup:find('EfficientQuests_Rogue', 1, true) and setup:find('without decl
 assert(not setup:find('Ready', 1, true), 'a setup with mismatch warnings must not report ready')
 print('ok - mismatch warnings surface in the setup status')
 
-clearGuides()
+loadAddon()
 EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired again]', 'Paired Author')
 C_AddOns.GetAddOnMetadata = function(name, field)
   if name == 'EfficientQuests_Paired' and field == 'X-EfficientQuests-Guide' then return '1' end
@@ -161,7 +160,7 @@ print('ok - matching declared and registered set stays silent')
 assert(status():find('Ready', 1, true), 'a reconciled setup must still report ready')
 print('ok - reconciled setup reports ready')
 
-clearGuides()
+loadAddon()
 EfficientQuests_RegisterGuide('EfficientQuests_Opaque', '[N Opaque]', 'Opaque Author')
 C_AddOns = nil
 handlers.OnEvent(nil, 'PLAYER_LOGIN')

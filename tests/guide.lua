@@ -358,19 +358,34 @@ EfficientQuests_RegisterGuide(plugin, [[
 [N Greenfield 5-9]
 [G2,3 Greenfield] Buy [CI43,2 Bread].
 ]], 'Example Author')
+EfficientQuests_RegisterGuide('EfficientQuests_Nameless', [[
+[N Greenfield]
+Buy bread.
+]])
+EfficientQuests_RegisterGuide('EfficientQuests_Anonymous', [[
+[N Greenfield]
+Buy water.
+]])
 C_AddOns = { GetAddOnMetadata = function(name, field)
   if name == plugin and field == 'Title' then return 'Example Guide' end
+  if name == 'EfficientQuests_Nameless' and field == 'Author' then return 'Manifest Author' end
 end }
 local list = EfficientQuests.GetGuideList()
-local pluginEntry, auditEntry
+local pluginEntry, auditEntry, namelessEntry, anonymousEntry
 for _, entry in ipairs(list) do
   if entry.key == plugin then pluginEntry = entry end
   if entry.key == 'Audit' then auditEntry = entry end
+  if entry.key == 'EfficientQuests_Nameless' then namelessEntry = entry end
+  if entry.key == 'EfficientQuests_Anonymous' then anonymousEntry = entry end
 end
 assert(pluginEntry, 'a guide registered under a plugin addon name must be listed')
 assert(pluginEntry.name == 'Example Guide', 'the display name comes from the plugin manifest title')
 assert(pluginEntry.author == 'Example Author', 'the author comes from the first registered chapter')
-assert(pluginEntry.chapters == 2 and #EfficientQuests.guides[plugin] == 2,
+assert(namelessEntry and namelessEntry.author == 'Manifest Author',
+  'the author falls back to the plugin manifest when no chapter carries one')
+assert(anonymousEntry and anonymousEntry.author == nil,
+  'a guide with no chapter author and no manifest author lists none')
+assert(pluginEntry.chapters == 2,
   'each registration call must append one chapter under the plugin addon name')
 assert(auditEntry, 'every registered guide stays listed')
 assert(auditEntry.name == 'Audit', 'a guide without manifest metadata falls back to its key')

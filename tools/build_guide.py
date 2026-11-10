@@ -29,7 +29,8 @@ and author are copied byte-for-byte; the builder never interprets guide markup.
 Manifest fields: `Dependencies: EfficientQuests` (load-order critical),
 `X-EfficientQuests-Guide: 1` (the core reads it at login),
 `X-EfficientQuests-API: 1` (reserved API marker; emitted, never read),
-`Title:` (display name; underscores become spaces), `Version:` (source version
+`Title:` (the source package's own title verbatim; when the source declares
+none, the plugin name with underscores as spaces), `Version:` (source version
 plus the catalog build suffix), and provenance: source name, source version,
 source checksum, and build date. The source checksum is the sha256 over each
 TOC-listed file's name, digest, and the TOC itself, in TOC order. Rebuilds are
@@ -46,11 +47,14 @@ the built plugin itself and writes a per-guide report,
 `<plugin>/extraction-audit.json`, into the plugin folder. The audit needs a
 Lua 5.1 interpreter: the builder uses `lua5.1` or `lua` from the PATH when
 present, otherwise Docker with the same image the Lua suites use. Set
-EQ_AUDIT_LUA to force a specific interpreter command. The gate fails the
+EQ_AUDIT_LUA to force a specific interpreter command, or EQ_LUA_IMAGE to
+override the Docker image. tests/bridge.sh follows the same convention.
+The gate fails the
 build (and leaves no plugin folder) when the audit extracts no advice record
-from any character context or reports a safety finding (every audit severity
-except the advisory WATCH); it warns when more than half of the candidate
-advice lines were withheld.
+from any character context or reports a finding with any severity outside
+the advisory set (WATCH only; the screen fails closed, so a severity the
+builder does not know also fails); it warns when more than half of the
+candidate advice lines were withheld.
 """
 import argparse
 import hashlib
@@ -72,10 +76,21 @@ LICENSE_NAMES = {"license", "license.txt", "licence", "licence.txt", "copying", 
 
 AUDIT_TOOL = "tools/audit_extraction.lua"
 AUDIT_REPORT = "extraction-audit.json"
-AUDIT_IMAGE = "nickblah/lua:5.1"
+DEFAULT_LUA_IMAGE = "nickblah/lua:5.1"
 LUA_INTERPRETERS = ("lua5.1", "lua")
 AUDIT_TIMEOUT = 300
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def lua_image():
+    """The Docker image for the Lua suites; EQ_LUA_IMAGE overrides it.
+
+    The builder and tests/bridge.sh follow one convention for running Lua:
+    EQ_AUDIT_LUA forces an interpreter command, otherwise lua5.1, then lua,
+    from the PATH, otherwise Docker with the image named by EQ_LUA_IMAGE
+    (default nickblah/lua:5.1).
+    """
+    return os.environ.get("EQ_LUA_IMAGE") or DEFAULT_LUA_IMAGE
 
 # One pass over every registration call, in file and call order. The author
 # argument is optional; text and author are captured as raw bytes so the
@@ -221,7 +236,7 @@ def compose_toc(package_name, plugin, fields, plugin_version, checksum, date):
             lines.append("## " + name + ": " + value)
 
     field("Interface", fields.get("interface"))
-    lines.append("## Title: " + plugin.replace("_", " "))
+    lines.append("## Title: " + (fields.get("title") or plugin.replace("_", " ")))
     field("Notes", fields.get("notes"))
     field("Author", fields.get("author"))
     lines.append("## Version: " + plugin_version)
@@ -252,15 +267,22 @@ def audit_command(plugin):
     """Build the command line that runs the audit over a built plugin folder.
 
     A Lua 5.1 interpreter on the PATH (lua5.1, then lua; or the command in
-    EQ_AUDIT_LUA) is preferred. Without one, the audit runs under Docker with
-    the same image the Lua suites use: the worktree is mounted at /w and the
-    plugin, when it lives outside the worktree, is mounted at /eqout.
+    EQ_AUDIT_LUA) is preferred. The forced command runs from the repository
+    root with a repository-relative plugin path, so the same value works as
+    a plain interpreter or as a docker-style command. Without one, the audit
+    runs under Docker with the image named by EQ_LUA_IMAGE (default
+    nickblah/lua:5.1, the same image the Lua suites use): the worktree is
+    mounted at /w and the plugin, when it lives outside the worktree, is
+    mounted at /eqout.
     """
     plugin = plugin.resolve()
     tail = [AUDIT_TOOL, None, "--json"]
     forced = os.environ.get("EQ_AUDIT_LUA")
     if forced:
-        tail[1] = str(plugin)
+        try:
+            tail[1] = str(plugin.relative_to(REPO_ROOT))
+        except ValueError:
+            tail[1] = str(plugin)
         return shlex.split(forced) + tail, REPO_ROOT
     for interpreter in LUA_INTERPRETERS:
         if shutil.which(interpreter):
@@ -275,7 +297,7 @@ def audit_command(plugin):
             inside = "/eqout/" + plugin.name
         tail[1] = inside
         return (["docker", "run", "--rm"] + mounts
-                + ["--workdir", "/w", AUDIT_IMAGE, "lua"] + tail), REPO_ROOT
+                + ["--workdir", "/w", lua_image(), "lua"] + tail), REPO_ROOT
     raise ValueError("No Lua 5.1 interpreter or Docker found; the extraction"
                      " audit cannot run. Install lua5.1 or Docker, or set EQ_AUDIT_LUA.")
 
@@ -309,33 +331,35 @@ def _detail(completed, limit=400):
     return " ".join(note.split())[:limit]
 
 
-# The audit severities that fail a build. Everything the audit calls a
-# safety finding trips the screen: ROUTE and SPOILER mean the addon showed
-# prose its own route and narrative screens were meant to withhold, DANGLING
-# and TAGS mean malformed text or unstripped markup reached the hint, and
-# QUANTITY, NAME, and QUEST mean the visible text lost a quantity, an item
-# name, or a quest link. ERROR means ExtractGuide itself failed. WATCH is
-# the one severity kept out: it flags phrases that need human eyes but are
+# The audit severities that stay advisory in the report. The screen fails
+# closed: every other severity trips the gate, including one a future
+# audit adds, so an unknown problem can never pass silently. Of today's
+# severities, ROUTE and SPOILER mean the addon showed prose its own route
+# and narrative screens were meant to withhold, DANGLING and TAGS mean
+# malformed text or unstripped markup reached the hint, QUANTITY, NAME,
+# and QUEST mean the visible text lost a quantity, an item name, or a
+# quest link, and ERROR means ExtractGuide itself failed. WATCH is the
+# one severity kept out: it flags phrases that need human eyes but are
 # often mechanical, and the reviewed corpus shipped with accepted WATCH
 # entries, so it stays advisory in the report.
-SAFETY_SEVERITIES = ("ROUTE", "SPOILER", "DANGLING", "TAGS",
-                     "QUANTITY", "NAME", "QUEST", "ERROR")
+ADVISORY_SEVERITIES = ("WATCH",)
 
 
 def evaluate_gates(audit):
     """Turn one audit result into build failures and warnings.
 
     Failures: the audit extracted no advice record from any character
-    context, or a safety-screen severity was reported. Warnings: more than
-    half of the candidate advice lines were withheld. The reviewed corpora
-    withheld 18% (TUG) and 44% (Bethink) of their candidate lines, so a
-    majority withheld signals a guide the extraction mostly cannot read.
+    context, or a finding carried any severity outside the advisory set.
+    Warnings: more than half of the candidate advice lines were withheld.
+    The reviewed corpora withheld 18% (TUG) and 44% (Bethink) of their
+    candidate lines, so a majority withheld signals a guide the
+    extraction mostly cannot read.
     """
     failures = []
     if audit["advice_records"] == 0:
         failures.append("the audit extracted no advice records from any context")
     for finding in audit["findings"]:
-        if finding["severity"] in SAFETY_SEVERITIES:
+        if finding["severity"] not in ADVISORY_SEVERITIES:
             failures.append("safety finding [%s] %s %s: %s"
                             % (finding["severity"], finding["where"],
                                finding["id"], finding["detail"]))
@@ -368,7 +392,7 @@ def compose_report(plugin, package_name, fields, plugin_version, date, audit):
             "findings": audit["findings"],
             "findings_by_severity": audit["findings_by_severity"],
         },
-        "gates": {"safety_screen": list(SAFETY_SEVERITIES),
+        "gates": {"advisory_severities": list(ADVISORY_SEVERITIES),
                   "failures": failures, "warnings": warnings},
     }
 
