@@ -199,3 +199,25 @@ local encounter = EfficientQuests.ExtractGuide('EncounterMechanic', {})
 assert(#encounter == 1 and encounter[1].association == 'zone', 'TUG encounter preparation survives without invented quest association')
 assert(encounter[1].text:find('full health', 1, true) and encounter[1].text:find('Elite ghost', 1, true), 'encounter and precaution remain together')
 print('ok - practical encounter details remain available as uncertain zone advice')
+EfficientQuests_RegisterGuide('CompactItem', [[
+[N Shopping List]
+Buy [CI2592,300Wool Cloth]
+]], 'reference')
+local compactItem = EfficientQuests.ExtractGuide('CompactItem', {})
+assert(#compactItem == 1 and compactItem[1].itemID == 2592 and compactItem[1].quantity == 300, 'TUG compact item tags retain identifier and quantity')
+assert(compactItem[1].text:find('300 Wool Cloth', 1, true), 'TUG compact item tags retain a useful item name')
+print('ok - TUG compact item tags do not discard the name')
+EfficientQuests_RegisterGuide('TUGRoutePressure', [[
+[N Desolace]
+[G1,2 Desolace] Youll get two more chances to buy them.
+LAST CHANCE to buy your missing Stranglethorn Pages.
+]], 'reference')
+assert(#EfficientQuests.ExtractGuide('TUGRoutePressure', {}) == 0, 'route-relative shopping pressure must not become stand-alone advice')
+print('ok - TUG route-relative shopping pressure is excluded')
+EfficientQuests_RegisterGuide('TUGMismatch', [[
+[N Shopping List]
+Buy [CI2725,1 Green Hills of Stranglethorn - Page 10]
+]], 'reference')
+local mismatch = EfficientQuests.ExtractGuide('TUGMismatch', {})
+assert(mismatch[1].itemID == 2725 and mismatch[1].itemSourceName == 'Green Hills of Stranglethorn - Page 10', 'provider can compare the source label with its identifier')
+print('ok - conflicting guide identifiers can be checked against their source labels')
