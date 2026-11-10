@@ -222,6 +222,21 @@ class GuardTests(BuilderFixture):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("Version", result.stderr)
 
+    def test_uniquely_named_toc_is_used_when_dirname_toc_is_absent(self):
+        """Bethink ships Guidelime_Bethink_Camelot.toc, not Guidelime_Bethink.toc."""
+        self.toc.rename(self.source / "GuideLime_Fixture_Camelot.toc")
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue((self.out / self.plugin_name / "Guides.lua").is_file())
+
+    def test_ambiguous_tocs_are_rejected(self):
+        self.toc.rename(self.source / "GuideLime_Fixture_Camelot.toc")
+        (self.source / "GuideLime_Fixture_Modern.toc").write_bytes(
+            b"## Version: 1.28\r\nlisted.lua\r\n")
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("toc", result.stderr.lower())
+
 
 class CatalogTests(unittest.TestCase):
     """The shipped catalog must stay valid and list the ticket's two guides."""

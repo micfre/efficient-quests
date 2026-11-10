@@ -36,7 +36,7 @@ TOC-listed file's name, digest, and the TOC itself, in TOC order. Rebuilds are
 byte-identical when `--date` pins the build date.
 
 A license file found in the package root (LICENSE, LICENCE, COPYING, with or
-without .txt) is copied into the plugin unchanged.
+without .txt, matched case-insensitively) is copied into the plugin unchanged.
 
 The build fails when the TOC lists no files, lists a file outside the package,
 contains no registration calls, or declares no version.
@@ -101,11 +101,28 @@ def load_catalog(path):
     return entries
 
 
-def parse_toc(package):
-    """Return (raw toc bytes, metadata fields, listed files) from the package TOC."""
-    toc = package / (package.name + ".toc")
-    if not toc.is_file():
+def locate_toc(package):
+    """Find the package TOC: <dirname>.toc, else the sole .toc in the root.
+
+    Bethink ships only Guidelime_Bethink_Camelot.toc, so the directory name
+    alone cannot identify the TOC. Several candidates are an error.
+    """
+    exact = package / (package.name + ".toc")
+    if exact.is_file():
+        return exact
+    candidates = sorted(p for p in package.iterdir() if p.is_file() and p.suffix == ".toc")
+    if len(candidates) == 1:
+        return candidates[0]
+    if not candidates:
         raise ValueError("The guide's TOC file is missing.")
+    raise ValueError("The guide package has several TOC files ("
+                     + ", ".join(p.name for p in candidates)
+                     + "); pass the package with one <dirname>.toc.")
+
+
+def parse_toc(package):
+    """Return (toc name, raw toc bytes, metadata fields, listed files)."""
+    toc = locate_toc(package)
     raw = toc.read_bytes()
     text = raw.decode("utf-8-sig")
     fields, files = {}, []
@@ -130,7 +147,7 @@ def parse_toc(package):
         files.append((normalized, path))
     if not files:
         raise ValueError("The guide TOC lists no files.")
-    return raw, fields, files
+    return toc.name, raw, fields, files
 
 
 def extract_calls(files):
@@ -211,13 +228,13 @@ def compose_wrapper(plugin, calls):
 
 
 def build(source, entry, output, date):
-    raw, fields, files = parse_toc(source)
+    toc_name, raw, fields, files = parse_toc(source)
     if not fields.get("version"):
         raise ValueError("The source TOC declares no ## Version.")
     calls = extract_calls(files)
     plugin = entry["plugin"]
     plugin_version = fields["version"] + entry["build_suffix"]
-    checksum = source_checksum(source.name + ".toc", raw, files)
+    checksum = source_checksum(toc_name, raw, files)
     toc = compose_toc(source.name, plugin, fields, plugin_version, checksum, date)
     wrapper = compose_wrapper(plugin, calls)
 
