@@ -77,6 +77,23 @@ C_QuestLog.IsOnQuest = nil
 context = EfficientQuests.GetContext()
 assert(context.isAccepted(103) == nil, 'incomplete log must not imply unaccepted')
 print('ok - hidden quests can be checked without treating unknown as false')
+-- With no guide registered, the setup status names a declared guide
+-- plugin that failed to register instead of the generic pointer.
+EfficientQuests.guides.Example = nil
+C_AddOns = {
+  GetNumAddOns = function() return 1 end,
+  GetAddOnInfo = function() return 'EfficientQuests_Declared' end,
+  GetAddOnMetadata = function(name, field)
+    if field == 'X-EfficientQuests-Guide' then return '1' end
+  end,
+}
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+local statusMessage = status()
+assert(statusMessage:find('EfficientQuests_Declared', 1, true) and statusMessage:find('did not register', 1, true),
+  'a declared guide that did not register should be named in the setup status')
+assert(not statusMessage:find('releases', 1, true),
+  'the generic releases pointer must not hide the specific broken plugin')
+print('ok - unregistered declared guide is named in status')
 handlers.OnEvent(nil, 'QUEST_TURNED_IN', 105)
 context = EfficientQuests.GetContext()
 assert(context.completedQuestIDs[105], 'observed turn-in should be remembered')
