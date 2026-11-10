@@ -408,10 +408,16 @@ local function build()
   end
   frame:SetSize(340, 46); frame:SetMovable(true); frame:EnableMouse(true)
   frame:RegisterForDrag('LeftButton'); frame:SetClampedToScreen(true)
-  frame:SetScript('OnDragStart', function(self) if not trackerFor(character().display) then self:StartMoving() end end)
+  local dragging = false
+  frame:SetScript('OnDragStart', function(self)
+    if not trackerFor(character().display) then dragging = true; self:StartMoving() end
+  end)
   frame:SetScript('OnHide', function() closeItemTooltip() end)
   frame:SetScript('OnDragStop', function(self)
+    if not dragging then return end
+    dragging = false
     self:StopMovingOrSizing()
+    if trackerFor(character().display) then return end
     local point, _, relativePoint, x, y = self:GetPoint()
     character().display.position = {point=point, relativePoint=relativePoint, x=x, y=y}
   end)

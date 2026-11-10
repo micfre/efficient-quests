@@ -119,9 +119,10 @@ Buy at the auction house now, if you did not get them yet: 1 Bronze tube. Gooey 
 Go further into Uldaman whilst keeping left, then turn right.
 ]], 'reference')
 local audit = EfficientQuests.ExtractGuide('Audit', {})
-assert(#audit == 2, 'ambiguous multi-item and route prose is withheld rather than misrepresented')
+assert(#audit == 3, 'reviewed shopping advice remains while route prose is withheld')
 assert(audit[1].text:find('1 Bronze Tube', 1, true), 'stated single item quantity remains in hint')
 assert(audit[2].text:find('6 Gooey Spider Leg', 1, true), 'stated multi-item quantity remains in hint')
+assert(audit[3].text:find('if you did not get them yet', 1, true) and audit[3].text:find('8 Murloc Fin', 1, true), 'conditional list is complete')
 print('ok - reviewed TUG shopping excerpts preserve quantities and avoid route fragments')
 EfficientQuests_RegisterGuide('HordeAudit', [[
 [N 32 Gnomeregan]
