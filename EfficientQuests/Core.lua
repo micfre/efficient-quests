@@ -81,6 +81,8 @@ local function status()
         return "QuestieDB is missing. Install and enable the QuestieDB addon."
     end
     if not next(guides) then
+        local warnings = EfficientQuests.GetGuideWarnings()
+        if #warnings > 0 then return table.concat(warnings, " ") end
         return "No guide plugin is registered. Install one from github.com/micfre/efficient-quests/releases."
     end
     local _, problem = EfficientQuests.GetProvider()
