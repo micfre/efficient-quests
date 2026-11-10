@@ -78,6 +78,10 @@ C_QuestLog.GetQuestsOnMap = function() return {
  {questID=102,mapID=1,x=0.9,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
  {questID=103,mapID=1,x=0.41,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
 } end
+hints = EfficientQuests.GetHints('Unknown')
+assert(#hints == 1 and hints[1].questID == 103 and hints[1].uncertain,
+  'an unlocated quest tip may appear when a current-phase quest marker is local, while its own location stays uncertain')
+print('ok - current-phase local markers support unlocated quest advice with uncertainty')
 hints = EfficientQuests.GetHints('Levels')
 assert(hints[1].questID == 103, 'nearby available quest start ranks above remote quest start')
 print('ok - current map quest start proximity')
@@ -93,6 +97,10 @@ assert(hints[1].questID == 103, 'active quests use objective POIs and ignore the
 C_QuestLog.IsComplete = function(id) return id == 102 end
 hints = EfficientQuests.GetHints('Levels')
 assert(hints[1].questID == 103, 'ready quests must not use obsolete objective POIs')
+C_QuestLog.IsComplete = function(id) return id == 103 end
+hints = EfficientQuests.GetHints('Unknown')
+assert(#hints == 0, 'an obsolete objective marker must not locate unplaced ready-quest advice')
+C_QuestLog.IsComplete = function(id) return id == 102 end
 print('ok - active and ready phases do not reuse obsolete locations')
 C_Map.GetMapChildrenInfo = nil
 EfficientQuests_RegisterGuide('UnknownSubzone', [[
