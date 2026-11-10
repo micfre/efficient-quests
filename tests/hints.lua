@@ -176,3 +176,37 @@ end
 hints = EfficientQuests.GetHints('Restrictions')
 assert(#hints == 1 and hints[1].questID == 101, 'race masks above 32 bits retain eligible Skyborne')
 print('ok - class and large race masks respect character restrictions')
+
+UnitRace = function() return 'Human', 'Human', 1 end
+LibQuestieDB.Quest.Get = function(id, key) if key == 'questLevel' then return 10 end end
+C_QuestLog.IsOnQuest = function() return true end
+C_QuestLog.IsComplete = function() return true end
+C_QuestLog.GetQuestsOnMap = function() return {} end
+C_QuestLog.GetNextWaypoint = function(id)
+  if id == 102 then return 1, 0.9, 0.5 end
+  if id == 103 then return 1, 0.41, 0.5 end
+end
+hints = EfficientQuests.GetHints('Levels')
+assert(hints[1].questID == 102, 'an unclassified waypoint must not establish turn-in proximity')
+print('ok - unclassified waypoints do not establish turn-in proximity')
+C_QuestLog.GetNextWaypoint = nil
+C_QuestLog.IsOnQuest = function() return false end
+EfficientQuests_RegisterGuide('Opportunity', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy a candle later.
+[G40,50 Elwynn Forest] Buy a lantern now.
+]], 'Author')
+hints = EfficientQuests.GetHints('Opportunity')
+assert(#hints == 2 and hints[1].text:find('lantern'), 'a stated opportunity available now outranks a later opportunity')
+print('ok - present opportunities precede later ones after primary priorities')
+C_Map.GetMapChildrenInfo = nil
+EfficientQuests_RegisterGuide('LocalFirst', [[
+[N Unmapped]
+[G40,50 Unknown Place] Use a torch for [QC101].
+[G40,50 Elwynn Forest] Buy a candle.
+]], 'Author')
+focus = 101
+hints = EfficientQuests.GetHints('LocalFirst')
+assert(#hints == 2 and hints[1].text:find('candle'), 'known local advice precedes uncertain remote focus')
+assert(hints[2].uncertain, 'unknown location remains available with uncertainty')
+print('ok - known local advice precedes advice with uncertain location')
