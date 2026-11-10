@@ -83,7 +83,7 @@ Every build runs the extraction audit (`tools/audit_extraction.lua`) over the pl
 The build fails when:
 
 - The audit extracts no advice record from any character context.
-- The audit reports a safety finding. A safety finding is any severity except WATCH. The failing severities are ROUTE, SPOILER, DANGLING, TAGS, QUANTITY, NAME, QUEST, and ERROR. They mean that route or narrative prose, malformed text, unstripped markup, or a lost quantity, item name, or quest link reached the visible text. WATCH stays advisory. It flags phrases that need human eyes but are often mechanical.
+- The audit reports a finding whose severity is not advisory. WATCH is the only advisory severity. Every other severity fails the build. The severities ROUTE, SPOILER, DANGLING, TAGS, QUANTITY, NAME, QUEST, and ERROR mean that route or narrative prose, malformed text, unstripped markup, or a lost quantity, item name, or quest link reached the visible text. A severity that a future audit adds also fails the build. The screen never lets an unknown problem pass. WATCH stays advisory. It flags phrases that need human eyes but are often mechanical.
 
 The build warns when the audit withheld more than half of the candidate advice lines. The reviewed corpora withheld 18 percent (TUG) and 44 percent (Bethink) of their candidate lines. A majority withheld signals a guide that the extraction mostly cannot read.
 

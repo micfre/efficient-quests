@@ -309,6 +309,48 @@ class AuditGateTests(BuilderFixture):
                          ["low yield: the audit withheld 3 of 4 candidate advice lines"])
 
 
+class GateScreenTests(unittest.TestCase):
+    """The safety screen fails closed at the evaluate_gates seam.
+
+    The audit tool has a closed severity vocabulary, so a severity name
+    that the builder does not know yet cannot come out of a real audit
+    run. That unknown name is exactly what the screen must catch, so the
+    screen is proven here against a synthetic finding.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(TOOL.parent))
+        cls.build_guide = __import__("build_guide")
+
+    @classmethod
+    def tearDownClass(cls):
+        sys.path.remove(str(TOOL.parent))
+
+    def audit_with(self, severity):
+        return {"guides": 1, "lines": 1, "advice_records": 1,
+                "records_by_kind": {}, "associations": {}, "per_context": {},
+                "findings_by_severity": {severity: 1},
+                "findings": [{"severity": severity, "where": "Guides.lua:1",
+                              "id": "G1", "detail": "synthetic finding"}],
+                "candidate_lines": 4, "withheld_lines": 1}
+
+    def test_unknown_severity_fails_the_safety_screen(self):
+        failures, _ = self.build_guide.evaluate_gates(self.audit_with("FUTURE"))
+        self.assertTrue(failures,
+                        "a severity the builder does not know must fail the build")
+
+    def test_watch_stays_advisory(self):
+        failures, _ = self.build_guide.evaluate_gates(self.audit_with("WATCH"))
+        self.assertEqual(failures, [])
+
+    def test_report_names_the_advisory_severities(self):
+        report = self.build_guide.compose_report(
+            "EfficientQuests_X", "GuideLime_X", {"version": "1"}, "1-eq1",
+            BUILD_DATE, self.audit_with("WATCH"))
+        self.assertEqual(report["gates"]["advisory_severities"], ["WATCH"])
+
+
 class CatalogTests(unittest.TestCase):
     """The shipped catalog must stay valid and list the ticket's two guides."""
 
