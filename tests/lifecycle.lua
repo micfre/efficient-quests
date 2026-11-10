@@ -224,3 +224,76 @@ EfficientQuests_RegisterGuide('DistinctSuppliers', [[
 local suppliers = EfficientQuests.GetHints('DistinctSuppliers')
 assert(#suppliers == 2, 'different source locations must not collapse to one opportunity')
 print('ok - distinct locations remain distinct opportunities')
+-- Intended consumption before turn-in is observed from quest-log item
+-- objectives plus a coincident fall in the carried count, never from wording.
+local objectives = {}
+C_QuestLog.GetQuestObjectives = function(id) return objectives[id] end
+objectives[201] = {{text='Apples used: 0/5', type='item', finished=false, numFulfilled=0, numRequired=5}}
+carried, bank = 5, 0
+EfficientQuests_RegisterGuide('IntendedConsumption', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC201].
+]], 'Author')
+local function consumed() local hints=EfficientQuests.GetHints('IntendedConsumption'); return hints[1] end
+assert(consumed() and consumed().text:lower():find('keep at least 5', 1, true),
+  'an accepted quest keeps its supply advice before any consumption')
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+carried = 3
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+assert(consumed() and consumed().text:lower():find('acquire 2', 1, true),
+  'a carried decrease without objective progress is not consumption')
+objectives[201][1].numFulfilled = 5
+objectives[201][1].finished = true
+carried = 0
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+assert(not consumed(), 'supplies consumed as intended are removed before turn-in')
+eventHandler(nil, 'QUEST_ACCEPTED', 201)
+assert(consumed() and consumed().text:lower():find('acquire 5', 1, true),
+  'accepting the quest again restores its supply requirement')
+print('ok - intended consumption is observed before turn-in')
+objectives[202] = {{text='Apples: 0/3', type='item', finished=false, numFulfilled=0, numRequired=3}}
+EfficientQuests_RegisterGuide('CollectionKeep', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC202].
+]], 'Author')
+local function collected() local hints=EfficientQuests.GetHints('CollectionKeep'); return hints[1] end
+carried = 0
+assert(collected() and collected().text:lower():find('acquire 3', 1, true),
+  'a collection quest still asks for its supplies')
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+objectives[202][1].numFulfilled = 3
+objectives[202][1].finished = true
+carried = 3
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+assert(collected() and collected().text:lower():find('keep at least 3', 1, true),
+  'collected items are retained through the objective, not consumed')
+print('ok - collecting quest items is not consumption')
+objectives[201] = {{text='Apples used: 0/3', type='item', finished=false, numFulfilled=0, numRequired=3}}
+objectives[202] = {{text='Apples: 0/5', type='item', finished=false, numFulfilled=0, numRequired=5}}
+carried = 8
+local combinedBefore = EfficientQuests.GetHints('IndependentExplicit')
+assert(#combinedBefore == 1 and combinedBefore[1].quantity == 8,
+  'explicit independent consumptions still combine before any use')
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+objectives[201][1].numFulfilled = 3
+objectives[201][1].finished = true
+carried = 5
+eventHandler(nil, 'QUEST_LOG_UPDATE')
+local recalculated = EfficientQuests.GetHints('IndependentExplicit')
+assert(#recalculated == 1 and recalculated[1].quantity == 5,
+  'observed consumption recalculates the combined minimum before turn-in')
+print('ok - consumption observations recalculate combined minima')
+EfficientQuests_RegisterGuide('FlightHere', [[
+[N Elwynn Forest]
+[G40,50 Stormwind] Get the flightpath here.
+]], 'Author')
+assert(#EfficientQuests.GetHints('FlightHere') == 0,
+  'a learned path identified by its guide location is suppressed')
+EfficientQuests_RegisterGuide('FlightZoneHere', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Get the flightpath here.
+]], 'Author')
+local zoneFlight = EfficientQuests.GetHints('FlightZoneHere')
+assert(#zoneFlight == 1 and zoneFlight[1].text:find('if you have not already learned', 1, true),
+  'a guide location that is not an observed node stays conditional')
+print('ok - flight identity can come from the guide location tag')

@@ -43,6 +43,9 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("QUEST_TURNED_IN")
+events:RegisterEvent("QUEST_ACCEPTED")
+events:RegisterEvent("QUEST_LOG_UPDATE")
+events:RegisterEvent("QUEST_WATCH_UPDATE")
 events:RegisterEvent("BANKFRAME_OPENED")
 events:RegisterEvent("BANKFRAME_CLOSED")
 events:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
@@ -54,6 +57,10 @@ events:SetScript("OnEvent", function(_, event, questID)
         EfficientQuestsCharacter = EfficientQuestsCharacter or {}
         SLASH_EFFICIENTQUESTS1 = "/eq"
         SlashCmdList.EFFICIENTQUESTS = showStatus
+    elseif event == "QUEST_ACCEPTED" and type(questID) == "number" then
+        if EfficientQuests.ForgetConsumption then EfficientQuests.ForgetConsumption(questID) end
+    elseif event == "QUEST_LOG_UPDATE" or event == "QUEST_WATCH_UPDATE" then
+        if EfficientQuests.ObserveConsumption then EfficientQuests.ObserveConsumption() end
     elseif event == "TAXIMAP_OPENED" then
         EfficientQuests.taxiOpen = true
         if EfficientQuests.ObserveTaxiNodes then EfficientQuests.ObserveTaxiNodes() end
