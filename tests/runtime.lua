@@ -39,7 +39,7 @@ print('ok - incompatible provider status')
 local entity = { Get = function() end }
 LibQuestieDB = { RequireContract = function(version) return version == 1 end,
   Quest = entity, Npc = entity, Item = entity, Object = entity }
-assert(status():find('processing', 1, true), 'valid provider should pass setup check')
+assert(status():find('Ready', 1, true), 'valid provider should pass setup check')
 C_QuestLog = {
   GetNumQuestLogEntries = function() return 3, 2 end,
   GetInfo = function(index)
