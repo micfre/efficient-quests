@@ -151,24 +151,29 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
             if not levelDistance or distance < levelDistance then levelDistance = distance end
         end
     end
-    -- An unknown location is not evidence that a focused quest is locally useful.
-    local localFocus = focused and localEvidence == true
+    -- Confirmed advice zones are stronger evidence than quest activity: a
+    -- local marker or turn-in never confirms where the advice itself applies.
+    local tier = localEvidence == true and 2 or (localEvidence == "quest" and 1 or 0)
+    local localFocus = focused and tier >= 1
     advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
-    if localEvidence == nil then advice.uncertain = true end
+    if tier == 0 then advice.uncertain = true end
     local words = string.lower(originalText or advice.text or '')
     -- Only a direct unqualified purchase instruction establishes timing.
     -- Other prose remains unknown; do not infer timing from acceptance alone.
-    local availableNow = localEvidence == true and not advice.uncertain
+    local availableNow = tier == 2 and not advice.uncertain
         and words:match('^buy [^,;]+ now[%.!]*$') ~= nil
         and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true)
-    advice._ranking = {localEvidence=localEvidence == true, focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance, availableNow=availableNow}
+    advice._ranking = {localEvidence=tier, focused=localFocus,
+        accepted=accepted and tier >= 1, giverBand=giverBand, targetBand=targetBand,
+        levelDistance=levelDistance, availableNow=availableNow}
     return advice
 end
 
 local function before(a, b)
     local x, y = a._ranking, b._ranking
-    if x.localEvidence ~= y.localEvidence then return x.localEvidence end
+    -- Confirmed local advice, then quest-activity support, then the rest.
+    if x.localEvidence ~= y.localEvidence then return x.localEvidence > y.localEvidence end
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
     for _, field in ipairs({"giverBand", "targetBand"}) do
@@ -299,7 +304,7 @@ function EfficientQuests.GetHints(packageName)
         if unlocated and eligible then
             for _, id in ipairs(advice.eligibleQuestIDs or advice.questIDs or {}) do
                 if distances[id] then
-                    locality, unlocated = true, false
+                    locality, unlocated = "quest", false
                     advice.uncertain = true
                     advice.conditions = advice.conditions or {}
                     table.insert(advice.conditions, 'Quest activity is local; the advice location is not confirmed.')

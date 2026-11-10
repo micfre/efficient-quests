@@ -274,3 +274,22 @@ EfficientQuests_RegisterGuide('UnsafeLootNote', [[
 ]], 'Synthetic')
 assert(#EfficientQuests.GetHints('UnsafeLootNote') == 0, 'unrecognized extra context is not presented as safe camera advice')
 print('ok - camera technique does not admit unreviewed added prose')
+
+-- A current-phase quest marker supports unlocated advice, but it never
+-- confirms where the advice itself applies.
+C_QuestLog.IsOnQuest = function(id) return id == 102 end
+C_QuestLog.IsComplete = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=102, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('MarkerTier', [[
+[N Shopping List]
+Use a net for [QC102].
+[G40,50 Elwynn Forest] Buy a candle.
+]], 'Author')
+local tiered = EfficientQuests.GetHints('MarkerTier')
+assert(#tiered == 2, 'both supported hints remain visible')
+assert(tiered[1].text:find('candle', 1, true), 'a confirmed advice zone outranks local quest activity')
+assert(tiered[2].questID == 102 and tiered[2].uncertain,
+  'marker-supported advice stays uncertain about its own location')
+print('ok - quest markers do not outrank confirmed local advice')
