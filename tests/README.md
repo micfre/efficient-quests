@@ -13,7 +13,7 @@ sh tests/bridge.sh
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The Lua tests load the addon files and simulate the game, QuestieDB, and FlareUI. Each suite except `tests/manifest.lua` loads the addon through the shared `tests/addon.lua` loader, which runs the files in the TOC's order, and every suite remains individually runnable. The manifest suite instead reads the shipped manifest text and the files the manifest lists. It checks the declared version and dependencies, and it rejects leftover mentions of removed addons. They cover guide extraction, setup status, player context, local relevance and ranking, supply and consumption observations, flight-path observations, and interface actions. The Python tests exercise the guide plugin builder. The builder tests use synthetic guide packages in a temporary folder. No third-party guide text is committed.
+The Lua tests load the addon files and simulate the game, QuestieDB, and FlareUI. Each suite except `tests/manifest.lua` loads the addon through the shared `tests/addon.lua` loader, which runs the files in the TOC's order, and every suite remains individually runnable. The manifest suite instead reads the shipped manifest text and the files the manifest lists. It checks the declared version and dependencies, and it rejects leftover mentions of removed addons. They cover guide extraction, setup status, player context, local relevance and ranking, supply and consumption observations, flight-path observations, and interface actions. The Python tests exercise the guide plugin builder and the release tool. The builder tests use synthetic guide packages in a temporary folder. No third-party guide text is committed.
 
 The bridge suite connects the builder to the addon. The command `sh tests/bridge.sh` builds the synthetic fixture package in `tests/fixtures/GuideLime_Fixture_One` with the real builder and its own test catalog. The suite then loads the generated plugin folder next to the addon, in the order that the plugin manifest lists, and it asserts the plugin's guides through the addon's public interfaces. The script runs the build with Python on the host. It then runs the Lua suite with `lua5.1`, or in the Docker image `nickblah/lua:5.1` when no `lua5.1` is installed. The Docker image has no Python, so the build always runs on the host. The build output stays under `dist/`, which Git ignores.
 
@@ -22,7 +22,7 @@ The bridge suite connects the builder to the addon. The command `sh tests/bridge
 `tools/release.py` builds a release. It zips the core addon and every catalog guide whose distribution flag is on. Each shipped guide zip holds the built plugin folder with its `extraction-audit.json` report and its license file inside. A guide whose flag is off is built for the log but gets no zip. The command needs the directory that holds the source packages. The repository does not contain them. One run from the repository root:
 
 ```sh
-python3 tools/release.py --sources ../prior_art --date 2026-11-10
+python3 tools/release.py --sources prior_art --date 2026-11-10
 ```
 
 The release fails before it writes anything when a distributable source package is missing or a guide fails its build gate. Zips land in `dist/`, which Git ignores. The same `--date` gives the same zips byte for byte.
