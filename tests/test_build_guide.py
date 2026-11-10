@@ -79,7 +79,7 @@ class BuildOutputTests(BuilderFixture):
         toc = (self.out / self.plugin_name / (self.plugin_name + ".toc")).read_text()
         expected = {
             "Interface": "16001",
-            "Title": "EfficientQuests FixtureOne",
+            "Title": "Fixture Guide",
             "Notes": "Fixture notes",
             "Author": "Fixture Author",
             "Version": "1.28-eq1",
@@ -100,6 +100,12 @@ class BuildOutputTests(BuilderFixture):
         self.assertEqual(file_lines, ["Guides.lua"])
         self.assertNotIn("OptionalDeps", toc)
         self.assertNotIn("Guidelime,", toc)
+
+    def test_title_falls_back_to_derived_name_when_source_declares_none(self):
+        self.toc.write_bytes(self.toc.read_bytes().replace(b"## Title: Fixture Guide\r\n", b""))
+        self.assertEqual(self.build().returncode, 0)
+        toc = (self.out / self.plugin_name / (self.plugin_name + ".toc")).read_text()
+        self.assertIn("## Title: EfficientQuests FixtureOne", toc)
 
     def test_wrapper_replays_calls_verbatim(self):
         self.assertEqual(self.build().returncode, 0)
