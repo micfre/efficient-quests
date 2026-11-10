@@ -22,4 +22,4 @@ The supplied TUG TOC lists 80 guide files. A targeted search found no two distin
 
 ## Flight-path observations
 
-Flight-path observations follow the same positive-evidence rule. A learned-path reminder is suppressed only for a uniquely matching observed taxi node in the current map and an explicit acquisition instruction. Missing or unreachable nodes are not evidence of an unlearned path. A guide location name or an incidental place name does not by itself identify a taxi node.
+Flight-path observations follow the same positive-evidence rule. A learned-path reminder is suppressed only for an explicitly acquired path that is identified by either the sentence's destination phrase or — when the sentence names no destination — the advice's own guide location tag, matched exactly and uniquely against an observed taxi node on the current map. Missing or unreachable nodes are not evidence of an unlearned path. A guide location name or an incidental place name does not by itself identify a taxi node.

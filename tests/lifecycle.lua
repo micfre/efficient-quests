@@ -283,3 +283,17 @@ local recalculated = EfficientQuests.GetHints('IndependentExplicit')
 assert(#recalculated == 1 and recalculated[1].quantity == 5,
   'observed consumption recalculates the combined minimum before turn-in')
 print('ok - consumption observations recalculate combined minima')
+EfficientQuests_RegisterGuide('FlightHere', [[
+[N Elwynn Forest]
+[G40,50 Stormwind] Get the flightpath here.
+]], 'Author')
+assert(#EfficientQuests.GetHints('FlightHere') == 0,
+  'a learned path identified by its guide location is suppressed')
+EfficientQuests_RegisterGuide('FlightZoneHere', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Get the flightpath here.
+]], 'Author')
+local zoneFlight = EfficientQuests.GetHints('FlightZoneHere')
+assert(#zoneFlight == 1 and zoneFlight[1].text:find('if you have not already learned', 1, true),
+  'a guide location that is not an observed node stays conditional')
+print('ok - flight identity can come from the guide location tag')

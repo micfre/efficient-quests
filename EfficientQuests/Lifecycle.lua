@@ -148,7 +148,21 @@ local function knownFlight(advice, context)
         or text:match('flight%s*path%s+at%s+(.+)')
         or text:match('flight%s*path%s+in%s*:%s*(.+)')
         or text:match('flight%s*path%s+in%s+(.+)')
-    if not destination then return false end
+    if not destination then
+        -- Without a named destination in the sentence, the guide's own
+        -- location tag can identify the path: an exact, unique observed
+        -- node name on the current map.
+        local zone = advice.location and advice.location.zone
+        if type(zone) ~= "string" or zone == "" then return false end
+        local zoneMatches = 0
+        for _, node in pairs(paths) do
+            if node.mapID == context.zoneID and type(node.name) == "string"
+                and string.lower(node.name) == string.lower(zone) then
+                zoneMatches = zoneMatches + 1
+            end
+        end
+        return zoneMatches == 1
+    end
     for _, node in pairs(paths) do
         if node.mapID == context.zoneID and type(node.name) == "string" then
             local name = string.lower(node.name)
