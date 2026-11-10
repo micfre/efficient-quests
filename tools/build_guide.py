@@ -46,7 +46,11 @@ the built plugin itself and writes a per-guide report,
 `<plugin>/extraction-audit.json`, into the plugin folder. The audit needs a
 Lua 5.1 interpreter: the builder uses `lua5.1` or `lua` from the PATH when
 present, otherwise Docker with the same image the Lua suites use. Set
-EQ_AUDIT_LUA to force a specific interpreter command.
+EQ_AUDIT_LUA to force a specific interpreter command. The gate fails the
+build (and leaves no plugin folder) when the audit extracts no advice record
+from any character context or reports a safety finding (every audit severity
+except the advisory WATCH); it warns when more than half of the candidate
+advice lines were withheld.
 """
 import argparse
 import hashlib
@@ -75,8 +79,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # One pass over every registration call, in file and call order. The author
 # argument is optional; text and author are captured as raw bytes so the
-# replay stays byte-for-byte. This mirrors the patterns in
-# tools/audit_extraction.lua (lines 79 and 83).
+# replay stays byte-for-byte. This mirrors the source-format patterns in
+# tools/audit_extraction.lua (callPatterns).
 CALL = re.compile(rb'Guidelime\.registerGuide\s*\(\s*\[\[(.*?)\]\]\s*(?:,\s*"([^"]*)")?', re.S)
 
 REQUIRED_ENTRY_FIELDS = ("source_package", "plugin", "license", "distribute", "build_suffix")
