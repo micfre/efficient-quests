@@ -19,7 +19,7 @@ The branch `fix/code-review-round` holds the fixes for the code-review findings 
 
 ## Plugin flow update
 
-The tickets #16 through #23 of [spec #15](https://github.com/micfre/efficient-quests/issues/15) replaced the in-place adaptation flow. Guides now ship as plugin folders that maintainers build offline. The core addon reconciles the addons that declare the guide marker against the guides that registered, offers guide selection in the settings, and reports the new setup states. The old adaptation tool and its checksum manifest are deleted.
+The tickets #16 through #23 of [spec #15](https://github.com/micfre/efficient-quests/issues/15) replaced the in-place adaptation flow. Guides now ship as plugin folders that maintainers build offline. At login, the core addon reconciles the addons that declare the guide marker against the guides that registered. The settings offer guide selection, and the status service reports the new setup states. The old adaptation tool and its checksum manifest are deleted.
 
 After the change, we verified everything offline again from the worktree of ticket #24. The six Lua suites, the bridge suite, and the Python suites pass. In total, 131 Lua checks and 30 Python tests pass. The commands and the results are in the next section. The CI workflow runs the same set on every push and pull request, plus a release dry-run over synthetic fixtures that proves the license gate.
 

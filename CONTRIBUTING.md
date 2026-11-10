@@ -1,6 +1,6 @@
 # Contributing
 
-The work is planned in [issue #15](https://github.com/micfre/efficient-quests/issues/15): guide plugins built offline by maintainers replaced the old in-place adaptation flow. The [MVP specification](docs/specs/efficient-quests-mvp.md) is the superseded background for the first version. Changes should preserve player choice, clearly distinguish uncertain information, and support both same-faction and shared quests.
+The work is planned in [issue #15](https://github.com/micfre/efficient-quests/issues/15): guide plugins built offline by maintainers replaced the old in-place adaptation flow. The [MVP specification](docs/specs/efficient-quests-mvp.md) is the superseded background for the first version. Changes must preserve player choice, clearly distinguish uncertain information, and support both same-faction and shared quests.
 
 Discuss substantial changes in an issue before implementation. For pull requests, describe the player-facing change and how it was validated, including the Forever client build for any in-game checks.
 
