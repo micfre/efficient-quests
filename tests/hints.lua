@@ -212,11 +212,11 @@ assert(hints[2].uncertain, 'unknown location remains available with uncertainty'
 print('ok - known local advice precedes advice with uncertain location')
 EfficientQuests_RegisterGuide('WestfallShopping', [[
 [N Elwynn Forest]
-[G40,50 Elwynn Forest] Buy at the auction house now, if you did not get them yet: 1 Bronze tube. Gooey Spider Legs (you need 6 total) and 8 Murloc Fin.
+[G40,50 Elwynn Forest] Buy these if they are missing: 1 Copper Flask. Yellow Seeds (you need 6 total) and 8 Blue Petals.
 ]], 'TUG')
 hints = EfficientQuests.GetHints('WestfallShopping')
-assert(#hints == 1 and hints[1].text:find('6 total', 1, true) and hints[1].text:find('8 Murloc Fin', 1, true), 'shopping list preserves all quantities under the original condition')
-assert(hints[1].text:find('if you did not get them yet', 1, true), 'shopping list retains the original condition')
+assert(#hints == 1 and hints[1].text:find('6 total', 1, true) and hints[1].text:find('8 Blue Petals', 1, true), 'shopping list preserves all quantities under the original condition')
+assert(hints[1].text:find('if they are missing', 1, true), 'shopping list retains the original condition')
 print('ok - TUG multi-item shopping condition and quantities remain together')
 EfficientQuests_RegisterGuide('UnlocatedCrowd', [[
 [N Shopping List]
