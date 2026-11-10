@@ -102,3 +102,77 @@ EfficientQuests_RegisterGuide('UnknownSubzone', [[
 hints = EfficientQuests.GetHints('UnknownSubzone')
 assert(#hints == 1 and hints[1].uncertain, 'unmapped subzones must not be treated as remote')
 print('ok - unmapped name mismatch remains uncertain')
+C_Map.GetMapChildrenInfo = function() return {{mapID=1,name='Elwynn Forest',mapType=3,parentMapID=100},{mapID=2,name='Duskwood',mapType=3,parentMapID=100},{mapID=3,name='Goldshire',mapType=4,parentMapID=1}} end
+C_QuestLog.IsOnQuest = function(id) return id == 101 end
+focus = 101
+EfficientQuests_RegisterGuide('Supplier', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI333,1 Apple] for [QC101].
+[G40,50 Duskwood] Use a hammer for [QC101].
+]], 'Author')
+hints = EfficientQuests.GetHints('Supplier')
+assert(#hints == 1 and hints[1].itemID == 333 and hints[1].relevance == 'focused quest', 'local supplier remains relevant for remote focused quest')
+print('ok - local preparation for a remote focused quest')
+focus = nil
+C_QuestLog.IsOnQuest = function() return false end
+EfficientQuests_RegisterGuide('Sources', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI334,1 Candle].
+[G40,50 Elwynn Forest] Buy [CI334,1 Candle].
+[G70,50 Elwynn Forest] Buy [CI334,1 Candle].
+]], 'Author')
+hints = EfficientQuests.GetHints('Sources')
+assert(#hints == 2, 'same advice at distinct supplier locations remains distinct')
+assert(hints[1].sources and #hints[1].sources == 2, 'deduplication retains each original source')
+print('ok - deduplication preserves original sources and different locations')
+LibQuestieDB.Quest.Get = function(id, key) if key == 'questLevel' then return ({[102]=10, [103]=20})[id] end end
+C_QuestLog.IsOnQuest = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+ {questID=102,mapID=1,x=0.9,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
+ {questID=103,mapID=1,x=0.41,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
+} end
+hints = EfficientQuests.GetHints('Levels')
+assert(hints[1].questID == 103, 'start proximity precedes level proximity')
+focus = 102
+hints = EfficientQuests.GetHints('Levels')
+assert(hints[1].questID == 102, 'focused quest precedes start proximity')
+print('ok - proximity and focus take precedence over lower ranking signals')
+focus = nil
+UnitRace = function() return 'Human', 'Human', 1 end
+UnitClass = function() return 'Warrior', 'WARRIOR', 1 end
+LibQuestieDB.RequireContract = function(n) return n <= 4 end
+LibQuestieDB.Enum = {raceMaskById={[1]=1}, classKeys={WARRIOR=1}}
+LibQuestieDB.Quest.Get = function(id, key)
+  if key == 'requiredRaces' then return ({[101]=2,[102]=1,[103]=3})[id] end
+  if key == 'requiredClasses' then return 0 end
+  return 10
+end
+EfficientQuests_RegisterGuide('Restrictions', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC101].
+[G40,50 Elwynn Forest] Use a net for [QC102].
+[G40,50 Elwynn Forest] Use a rope for [QC103].
+]], 'Author')
+hints = EfficientQuests.GetHints('Restrictions')
+assert(#hints == 2 and hints[1].questID ~= 101 and hints[2].questID ~= 101
+  and hints[1].questID ~= hints[2].questID,
+ 'exclude race-restricted advice while keeping applicable and shared quests')
+print('ok - provider race restrictions retain shared quests')
+LibQuestieDB.Quest.Get = function(id, key)
+  if key == 'requiredRaces' then return 0 end
+  if key == 'requiredClasses' then return id == 101 and 2 or 0 end
+  return 10
+end
+hints = EfficientQuests.GetHints('Restrictions')
+assert(#hints == 2 and hints[1].questID ~= 101 and hints[2].questID ~= 101,
+ 'known class restrictions must exclude unsuitable advice')
+UnitRace = function() return 'Skyborne', 'Skyborne', 95 end
+LibQuestieDB.Enum.raceMaskById[95] = 4294967296
+LibQuestieDB.Quest.Get = function(id, key)
+  if key == 'requiredRaces' then return id == 101 and 4294967296 or 1 end
+  if key == 'requiredClasses' then return 0 end
+  return 10
+end
+hints = EfficientQuests.GetHints('Restrictions')
+assert(#hints == 1 and hints[1].questID == 101, 'race masks above 32 bits retain eligible Skyborne')
+print('ok - class and large race masks respect character restrictions')

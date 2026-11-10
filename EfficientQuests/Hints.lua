@@ -58,6 +58,45 @@ local function questLevel(provider, id, context)
     if type(value) == "number" and value > 0 then return value end
 end
 
+local function hasContract(provider, version)
+    local ok, supported = pcall(provider.RequireContract, version)
+    return ok and supported == true
+end
+
+local function allows(mask, characterBit)
+    if type(mask) ~= "number" or mask < 0 then return nil end
+    if mask == 0 then return true end
+    if type(characterBit) ~= "number" or characterBit <= 0 then return nil end
+    return math.floor(mask / characterBit) % 2 == 1
+end
+
+-- Filter only confirmed explicit quest associations. Unknown or missing
+-- restrictions remain conditional; tentative textual links are never facts.
+local function eligibleQuests(advice, context, provider)
+    if not advice.questIDs or #advice.questIDs == 0 then return true end
+    local eligible, uncertain = {}, false
+    local enums = provider.Enum or {}
+    local raceBit = hasContract(provider, 3) and enums.raceMaskById and enums.raceMaskById[context.raceID]
+    local classBit = hasContract(provider, 4) and enums.classKeys and enums.classKeys[context.class]
+    for _, id in ipairs(advice.questIDs) do
+        local race = allows(provider.Quest.Get(id, "requiredRaces"), raceBit)
+        local class = allows(provider.Quest.Get(id, "requiredClasses"), classBit)
+        if race ~= false and class ~= false then
+            eligible[#eligible + 1] = id
+            if race == nil or class == nil then uncertain = true end
+        end
+    end
+    if #eligible == 0 then return false end
+    advice.eligibleQuestIDs = eligible
+    if #eligible < #advice.questIDs then uncertain = true end
+    if uncertain then
+        advice.uncertain = true
+        advice.conditions = advice.conditions or {}
+        table.insert(advice.conditions, "Quest restrictions may be incomplete.")
+    end
+    return true
+end
+
 -- Client map POIs already carry their UI-map frame. QuestieDB AreaIDs do not,
 -- so do not compare provider spawn coordinates to the player position here.
 local function mapBands(context)
@@ -98,7 +137,7 @@ end
 
 local function prepare(advice, context, provider, localEvidence, distances)
     local focused, accepted, levelDistance, giverBand, targetBand = false, false, nil, nil, nil
-    for _, id in ipairs(advice.questIDs or {}) do
+    for _, id in ipairs(advice.eligibleQuestIDs or advice.questIDs or {}) do
         if id == context.focusedQuestID then focused = true end
         if context.isAccepted(id) then accepted = true end
         local bands = distances[id]
@@ -147,7 +186,10 @@ local function duplicateKey(advice)
     table.sort(ids)
     return table.concat({string.lower(advice.text), table.concat(ids, ","),
         table.concat(advice.conditions or {}, "|"), advice.location and advice.location.zone or "",
-        tostring(advice.itemID or ""), tostring(advice.quantity or "")}, "\31")
+        tostring(advice.itemID or ""), tostring(advice.quantity or ""),
+        tostring(advice.location and advice.location.x or ""),
+        tostring(advice.location and advice.location.y or ""),
+        advice.location and advice.location.coordinateSystem or ""}, "\31")
 end
 
 -- Returns ordered advice and, when setup is incomplete, a status code. The
@@ -162,11 +204,16 @@ function EfficientQuests.GetHints(packageName)
     local output, seen = {}, {}
     for _, advice in ipairs(candidates) do
         local locality = localStatus(advice, context)
-        if locality ~= false then
+        if locality ~= false and eligibleQuests(advice, context, provider) then
             local key = duplicateKey(advice)
+            local source = {id=advice.id, chapter=advice.chapter, sourceText=advice.sourceText,
+                sourceAuthor=advice.sourceAuthor, location=advice.location}
             if not seen[key] then
-                seen[key] = true
+                advice.sources = {source}
+                seen[key] = advice
                 output[#output + 1] = prepare(advice, context, provider, locality, distances)
+            else
+                table.insert(seen[key].sources, source)
             end
         end
     end
