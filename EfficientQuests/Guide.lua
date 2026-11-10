@@ -64,7 +64,41 @@ local function addUnknown(to, from)
   for _, item in ipairs(from) do to[#to + 1] = item end
 end
 
+-- A preposition such as "for" can introduce a run of quest tags ("for [QC1],
+-- [QC2] and [QC3]"). Replacing that whole run with a standalone reference
+-- keeps the shortened text readable instead of leaving dangling punctuation.
+local function resolveQuestLists(line)
+  local out, position = {}, 1
+  while true do
+    local start, finish = line:find('%f[%a]for%f[%A]', position)
+    if not start then break end
+    out[#out + 1] = line:sub(position, start - 1)
+    local tagStart = finish + 1 + #(line:match('^%s*', finish + 1) or '')
+    if not tagStart then
+      out[#out + 1] = line:sub(start, finish)
+      position = finish + 1
+    else
+      local count, cursor = 0, tagStart
+      while true do
+        local tag = line:match('^%[QC%d+[^%]]*%]', cursor)
+        if not tag then break end
+        count = count + 1
+        cursor = cursor + #tag
+        local separator = line:match('^[%s,]*and[%s,]*', cursor)
+          or line:match('^[%s,]*', cursor) or ''
+        if not line:match('^%[QC', cursor + #separator) then break end
+        cursor = cursor + #separator
+      end
+      out[#out + 1] = count == 1 and 'for this quest' or 'for these quests'
+      position = cursor
+    end
+  end
+  out[#out + 1] = line:sub(position)
+  return table.concat(out)
+end
+
 local function readable(line)
+  line = resolveQuestLists(line)
   line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
   line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
   line = line:gsub('at%s*%[TAR%d+%]', ' ')
@@ -315,9 +349,6 @@ function EQ.ExtractGuide(packageName, context)
                 if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
               end
               local quest = #quests == 1 and quests[1] or nil
-              if quest and excerpt:match('for%s*%[QC%d+[^%]]*%]%s*[%.!]?%s*$') then
-                text = text:gsub('for%s*([%.!]?)%s*$', 'for this quest%1')
-              end
               local unknown = {}
               addUnknown(unknown, chapterUnknown)
               addUnknown(unknown, lineUnknown)

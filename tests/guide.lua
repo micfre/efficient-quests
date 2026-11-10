@@ -241,3 +241,27 @@ EfficientQuests_RegisterGuide('NarrativeReason', [[
 assert(#EfficientQuests.ExtractGuide('NarrativeReason', {}) == 0,
   'unsupported narrative explanations must not be displayed as advice or source context')
 print('ok - narrative causal explanation is withheld')
+
+EfficientQuests_RegisterGuide('QuestTagLists', [[
+[N Greenfield]
+[G1,2 Greenfield] Buy [CI42,3 Apples] for [QC101], [QC102], and [QC103].
+[G1,2 Greenfield] Defeat the bandit leader for [QC104], then return to the camp before dark.
+[G1,2 Greenfield] Collect eight reagents for [QC105] before leaving the grove.
+[G1,2 Greenfield] Buy [CI42,5 Apples] for [QC101].
+[G1,2 Greenfield] Collect a token and a badge for [QC106] and [QC107] before leaving the hall.
+]], 'synthetic')
+local lists = EfficientQuests.ExtractGuide('QuestTagLists', {})
+assert(#lists == 5, 'quest-tag lists with practical verbs remain available')
+assert(not lists[1].text:find('for ,', 1, true) and not lists[1].text:find('for  ', 1, true),
+  'a quest-tag list must not leave dangling punctuation')
+assert(lists[1].text:find('for these quests', 1, true), 'multiple quest tags resolve to a plural reference')
+assert(#lists[1].questIDs == 3 and lists[1].association == 'quests', 'tag list quests are all retained')
+assert(lists[2].text:find('for this quest, then return', 1, true),
+  'a single tag followed by more prose keeps its punctuation')
+assert(lists[3].text:find('for this quest before leaving', 1, true),
+  'a single tag followed by a condition keeps its meaning')
+assert(lists[4].text == 'Buy 5 Apples for this quest.',
+  'a trailing single quest tag keeps its established wording')
+assert(lists[5].text:find('for these quests before leaving', 1, true),
+  'two tags joined by and resolve to a plural reference')
+print('ok - quest-tag lists render as standalone references')
