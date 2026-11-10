@@ -327,3 +327,26 @@ local proximity = EfficientQuests.GetHints('TurnInProximity')
 assert(#proximity == 2, 'both ready-quest advice stays visible')
 assert(proximity[1].questID == 104, 'a local provider turn-in outranks a remote turn-in')
 print('ok - provider turn-in spawns give ready quests a local distance signal')
+EfficientQuests_RegisterGuide('TurnInSupport', [[
+[N Turn-ins]
+Buy [CI70,2 Vials] for [QC104].
+]], 'Author')
+local supported = EfficientQuests.GetHints('TurnInSupport')
+assert(#supported == 1 and supported[1].uncertain,
+  'a local turn-in supports unlocated ready-quest advice with uncertainty')
+local reasons = table.concat(supported[1].conditions or {}, ' ')
+assert(reasons:find('turn-in is in this zone', 1, true),
+  'the condition names the turn-in evidence rather than a quest marker')
+print('ok - unlocated ready-quest advice cites the local turn-in')
+LibQuestieDB.Support = nil
+assert(#EfficientQuests.GetHints('TurnInSupport') == 0,
+  'without the zone bridge the turn-in location stays unknown')
+LibQuestieDB.Support = {Get=function(name)
+  if name == 'ZoneDB' then
+    return {private={areaIdToUiMapId='return {[12]=1,[13]=2}',
+      areaIdToUiMapIdOverride='return {}'}} end
+end}
+C_QuestLog.IsComplete = function(id) return id ~= 104 end
+local activeOnly = EfficientQuests.GetHints('TurnInSupport')
+assert(#activeOnly == 0, 'an active quest does not reuse its finisher location')
+C_QuestLog.IsComplete = function() return true end
