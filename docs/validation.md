@@ -17,11 +17,22 @@ The branch `fix/code-review-round` holds the fixes for the code-review findings 
 - Taxi-node observations keep the raw state from the client. A state that the enum of the client names as unlearned is explicit negative evidence. See the [consumption evidence note](consumption-evidence.md). The check IC-16 below reflects this.
 - The dismissed category of the settings restores dismissed hints one at a time. Restoring all of them stays as a secondary action.
 
+## Plugin flow update
+
+The tickets #16 through #23 of [spec #15](https://github.com/micfre/efficient-quests/issues/15) replaced the in-place adaptation flow. Guides now ship as plugin folders that maintainers build offline. The core addon reconciles the addons that declare the guide marker against the guides that registered, offers guide selection in the settings, and reports the new setup states. The old adaptation tool and its checksum manifest are deleted.
+
+After the change, we verified everything offline again from the worktree of ticket #24. The six Lua suites, the bridge suite, and the Python suites pass. In total, 131 Lua checks and 30 Python tests pass. The commands and the results are in the next section. The CI workflow runs the same set on every push and pull request, plus a release dry-run over synthetic fixtures that proves the license gate.
+
+- The guide plugins are built by `tools/build_guide.py` and released by `tools/release.py`. The Python tests drive both tools as commands over synthetic fixture packages. This is the builder-artifact seam.
+- The sixth Lua suite, `tests/manifest.lua`, reads the shipped manifest text and the files it lists. It pins version 0.2.0 and the QuestieDB requirement, and it rejects leftover mentions of Guidelime and Questie.
+- The bridge suite is the new seam at the top of the stack. It builds a synthetic fixture guide with the real builder and loads the generated plugin next to the real core addon in the headless harness. It asserts registration through the real hook, the settings guide list, the hints, and the login reconciliation.
+- The in-client checks below are updated to the plugin flow. IC-1 expects version 0.2.0.
+
 ## What earlier rounds left open
 
 Each implementation round recorded the checks that it was unable to do. In total, these checks are open:
 
-- No Forever build ever loaded the runtime scaffold (#2), the adaptation tool (#3), or the provider adapter (#4). Nobody verified loading, provider capabilities, or coexistence with the real Guidelime in a client.
+- No Forever build ever loaded the runtime scaffold (#2), the guide loading of the first rounds (#3), or the provider adapter (#4). Nobody verified loading, provider capabilities, or coexistence with the real Guidelime in a client. The adaptation tool named in the earlier rounds is deleted. The guide plugin builder replaced it. No client has loaded a built plugin either.
 - The extraction (#5, #11) is a heuristic filter. We audited it against the full installed TUG 1.28 and Bethink 1.0.5 corpora and found zero safety findings. We do not claim coverage of arbitrary prose, and some categories of prose stay withheld. See the [extraction audit](tug-extraction-audit.md).
 - Ranking (#6, #12) needs a client for these items: the real Forever map hierarchy and area names, the behavior of `GetQuestsOnMap` and `ReadyForTurnIn`, the `GetMapWorldSize` values for the distance bands, the placement of the QuestieDB spawn conversions, and the movement polling.
 - Supplies and lifecycle (#7, #13): We checked the real bank semantics, the taxi semantics, and the real field shapes of the quest-log objectives offline, against documentation only. The survival of a quest through turn-in, and the classification of flights, partly depend on the wording of the guide.
@@ -33,16 +44,18 @@ Each implementation round recorded the checks that it was unable to do. In total
 
 ### Commands and results
 
-The host has no Lua interpreter. For this reason, the Lua suites ran in Docker with Lua 5.1.5 (image `nickblah/lua:5.1`). On a host that has Lua, use the `lua5.1` commands in the [test guide](../tests/README.md).
+The host has no Lua interpreter. For this reason, the Lua suites ran in Docker with Lua 5.1.5 (image `nickblah/lua:5.1`). On a host that has Lua, use the `lua5.1` commands in the [test guide](../tests/README.md). The CI workflow runs the same commands.
 
-In this round, we ran these commands from the root of the worktree:
+In the plugin-flow round, we ran these commands from the root of the worktree:
 
 ```sh
-docker run --rm -v /tmp/opencode/eq-wt-10:/w -w /w nickblah/lua:5.1 lua tests/runtime.lua
-docker run --rm -v /tmp/opencode/eq-wt-10:/w -w /w nickblah/lua:5.1 lua tests/guide.lua
-docker run --rm -v /tmp/opencode/eq-wt-10:/w -w /w nickblah/lua:5.1 lua tests/hints.lua
-docker run --rm -v /tmp/opencode/eq-wt-10:/w -w /w nickblah/lua:5.1 lua tests/lifecycle.lua
-docker run --rm -v /tmp/opencode/eq-wt-10:/w -w /w nickblah/lua:5.1 lua tests/ui.lua
+docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/runtime.lua
+docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/guide.lua
+docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/hints.lua
+docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/lifecycle.lua
+docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/ui.lua
+docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/manifest.lua
+sh tests/bridge.sh
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
@@ -50,14 +63,16 @@ Every command exited with code 0 and reported no failures:
 
 | Command | Result |
 | --- | --- |
-| `tests/runtime.lua` | 11 checks passed. They cover setup status without optional addons, context collection, native focus, uncertainty for a collapsed log, status of an unadapted guide, turn-in versus abandonment, and professions. |
-| `tests/guide.lua` | 28 checks passed. They cover registration, chapter applicability, associations, uncertainty, screening for routes and spoilers, the reviewed TUG formats, and extraction of flights and techniques. |
-| `tests/hints.lua` | 28 checks passed. They cover the local relevance tiers, ranking by focus and acceptance, proximity of markers and turn-ins, symmetric levels, restrictions, stability, and timing. |
-| `tests/lifecycle.lua` | 26 checks passed. They cover acquire and keep wording, freshness of the bank, observation of consumption, turn-in, flight observations, combining, and deduplication. |
-| `tests/ui.lua` | 10 checks passed. They cover the compact view, paging, links, dismissal and restore, the empty state, display settings, the simulated Flare tracker geometry, and the fallback. |
-| Python `test_adapt_guide.py` | 2 tests passed (Python 3.12.3). They cover repeatable adaptation and detection of updates. |
+| `tests/runtime.lua` | 17 checks passed. They cover the setup status for a missing provider, a missing guide with the pointer to the releases page, and an incompatible provider; the login reconciliation warnings for a declared guide that did not register and a registered guide without the marker; context collection, native focus, uncertainty for a collapsed log, turn-in versus abandonment, and professions. |
+| `tests/guide.lua` | 29 checks passed. They cover registration, chapter applicability, associations, uncertainty, screening for routes and spoilers, the reviewed TUG formats, extraction of flights and techniques, the plugin guide list metadata with chapter append, and item-bearing objective directives. |
+| `tests/hints.lua` | 34 checks passed. They cover the local relevance tiers, ranking by focus and acceptance, proximity of markers and turn-ins, symmetric levels, restrictions, stability, timing, and the differential precedence tests. |
+| `tests/lifecycle.lua` | 27 checks passed. They cover acquire and keep wording, freshness of the bank, observation of consumption, turn-in, flight observations, combining, and deduplication. |
+| `tests/ui.lua` | 15 checks passed. They cover the compact view, paging, links, dismissal and restore, the empty state, display settings, the simulated Flare tracker geometry, the fallback, and the guide selection rule: auto-selection of the only installed guide, an explicit choice between several, and the fallback after removal. |
+| `tests/manifest.lua` | 4 checks passed. They pin the manifest version 0.2.0, the required QuestieDB dependency, the optional FlareUI dependency, and the absence of Guidelime and Questie from the manifest and the shipped files. |
+| `sh tests/bridge.sh` | 5 checks passed. The built plugin loads its own manifest file list after the core, reconciles at login and reports ready, surfaces in the settings guide list, supplies verbatim advice through `GetHints`, and a plugin that stops declaring the marker is named in the status. |
+| Python `test_build_guide.py` and `test_release.py` | 30 tests passed (Python 3.12.3). They cover the plugin builder and the release tool: manifest fields, the wrapper, the license copy, the catalog rules, the gate failures as exit codes, and the license gate of the release. |
 
-We did not run the extraction audit (`tools/audit_extraction.lua`) again in this round. The audit reads an installed third-party guide package, and the repository contains no such package. The recorded results come from the #11 audit round, where we reproduced them. For TUG 1.28, the audit found 903 advice records, zero safety findings, and 23 of 127 candidate lines withheld. For Bethink 1.0.5, it found 2144 records, zero safety findings, and 362 of 828 lines withheld. See the [extraction audit](tug-extraction-audit.md), which includes a correction note. A synthetic regression test in `tests/guide.lua` or `tests/hints.lua` covers each fix that the audit drove. Those suites passed in this round.
+The extraction audit now runs as a gate inside every guide plugin build, over the built plugin itself. Every build writes a per-guide report, `extraction-audit.json`, into the plugin folder, and the release and CI logs print it. The recorded corpus results still come from the #11 audit round, where we reproduced them. For TUG 1.28, the audit found 903 advice records, zero safety findings, and 23 of 127 candidate lines withheld. For Bethink 1.0.5, it found 2144 records, zero safety findings, and 362 of 828 lines withheld. See the [extraction audit](tug-extraction-audit.md), which includes a correction note and is kept as historical evidence. A synthetic regression test in `tests/guide.lua` or `tests/hints.lua` covers each fix that the audit drove. Those suites passed in this round.
 
 ### Acceptance-table traceability
 
@@ -97,9 +112,9 @@ Each scenario row in the acceptance table of the specification maps to offline e
 | Player activates a hint or a supporting link | `ui`: "quest, map and verified item links use existing interfaces", expansion | Offline |
 | Player dismisses a hint and later restores it | `ui`: dismissal and restore without damage to other hints | Offline (scoping per character as above) |
 | No tips match | `ui`: "valid empty results hide advice and keep settings available" | Offline |
-| Guide or provider is missing or incompatible | `runtime`: the statuses for a missing provider, a missing guide, an unadapted guide, and an incompatible provider. `ui`: "missing provider is distinct from an empty hint body". | Offline |
-| A guide update replaces its adaptation | Python: "check detects updated guide and reapplication" | Offline |
-| The real Guidelime is optionally present | Python: the adapted TOC keeps `OptionalDeps: Guidelime`, and the registration files send each registration to both addons (adapter source `tools/adapt_guide.py`). | Partial. Nobody tested real coexistence in a client. See IC-4. |
+| Guide or provider is missing or incompatible | `runtime`: the statuses for a missing provider, a missing guide with the pointer to the releases page, and an incompatible provider, plus the reconciliation warnings. `ui`: "missing provider is distinct from an empty hint body". | Offline |
+| A guide plugin is installed, chosen, or removed | `ui`: "the only installed guide is auto-selected and listed in settings", "several guides wait for an explicit choice instead of a default", "picking a row selects that guide for this character", "a removed guide falls back to the selection rule with a note". `bridge`: "the built plugin surfaces in the settings guide list". | Offline |
+| The real Guidelime is optionally present | `manifest`: Guidelime and Questie are not declared. Python builder suite: the plugin manifest declares its dependency on the core addon only, and the plugin registers only with Efficient Quests. | Partial. Nobody tested real coexistence in a client. See IC-4. |
 | Integrated tracker changes width, font, color, height, or position | `ui`: "Flare tracker geometry and backdrop", "tracker appearance and width changes are followed", font follow, "tracker scaling is reflected in the integrated width" | Offline (simulated tracker) |
 | Integrated tracker hides or collapses | `ui`: "tracker visibility, placement, resize and fallback recovery" | Offline (simulated) |
 | Space below the tracker is not enough | `ui`: "insufficient space below places the window above" | Offline (simulated). Clamping at the real edges of the screen is structural (`SetClampedToScreen`). See V-2. |
@@ -111,7 +126,7 @@ Each scenario row in the acceptance table of the specification maps to offline e
 - Two rows have offline evidence that is partly or wholly structural: "focus changes through native or Flare focus controls" and "opens details, watches, or pins". The addon never writes focus. It never reads watch state or pin state as focus. We verified this by code inspection and not by a behavioral test. No offline test can answer the open question, which is what the client and FlareUI do to the supertrack signal.
 - The row for ranking precedence had a gap: no differential test had both signals compete. The fix round above closed this gap. IC-7 still covers the map hierarchy, the distances, and the focus behavior of the client.
 - The row for a new session verifies persistence only within one session. It also verifies the declaration of the saved-variables key for each character. It does not verify a real reload, a real relogin, or a second character.
-- The row for coexistence with Guidelime verifies only the output of the adaptation. A client must verify the load order, the duplicate dispatch, and the namespace behavior with the real Guidelime.
+- The row for coexistence with Guidelime verifies only the manifest and the registration shape offline. The core declares no Guidelime dependency, and the plugin registers only with Efficient Quests. A client must still verify that the real Guidelime loads next to the plugin without a load cycle, a duplicate registration, or a namespace conflict.
 - Every row that says "Offline (simulated ...)" substitutes a fake tracker, a fake bank, or a fake map hierarchy. These rows verify the logic of the addon. They do not verify the behavior or the appearance of the real interfaces.
 - The fixtures for the combining row are synthetic. We know of no instance of the explicit-consumption format in the supported guide.
 
@@ -129,9 +144,9 @@ Before any other check, record this information:
 - The output of `/run print(GetBuildInfo())`, which gives the version, the build, the date, and the interface version: \*
 - The output of `/dump select(4, GetBuildInfo())`, which gives the interface version alone: \*. If the command fails on this client, record the interface version that the addon list shows.
 - The version of the QuestieDB addon (addon list or its TOC): \*
-- The version of the TUG guide package (its TOC): \*
+- The version of each installed guide plugin (the addon list or its TOC): \*
 - The version of FlareUI, if it is installed: \*
-- The version of Efficient Quests (its TOC, expected value 0.1.0): \*
+- The version of Efficient Quests (its TOC, expected value 0.2.0): \*
 
 Expected: you record the interface version, not only the game version that the title screen shows. The reference starting point of the specification is interface 16001. The displayed version 1.60.1 alone does not show that the API is compatible.
 
@@ -139,13 +154,12 @@ Expected: you record the interface version, not only the game version that the t
 
 Steps:
 
-1. Install Efficient Quests, QuestieDB, and the TUG guide.
-2. Adapt the guide with the local tool. See the [installation guide](installation.md).
-3. Do not install Guidelime, Questie, or FlareUI.
-4. Enable only those three addons.
-5. Log in on a character in a low-level questing zone that the adapted guide covers.
+1. Install Efficient Quests, QuestieDB, and a guide plugin from the releases page. See the [installation guide](installation.md).
+2. Do not install Guidelime, Questie, or FlareUI.
+3. Enable only those three addons.
+4. Log in on a character in a low-level questing zone that the guide covers.
 
-Expected: no Lua errors occur at login. The command `/eq status` reports `Ready.` Relevant hints appear in a compact standalone window. The guide package loads only the files that its own TOC lists.
+Expected: no Lua errors occur at login. The command `/eq status` reports `Ready.` Relevant hints appear in a compact standalone window. The guide plugin loads only the files that its own TOC lists.
 
 Result: \*
 
@@ -167,20 +181,20 @@ Result: \*
 
 Steps:
 
-1. Install and enable the real Guidelime next to the adapted guide, Efficient Quests, and QuestieDB.
+1. Install and enable the real Guidelime with one of its own guides, next to Efficient Quests, QuestieDB, and the Efficient Quests guide plugin.
 2. Reload.
 3. Open the guide list of Guidelime.
 4. Open the settings of Efficient Quests, category Guide.
 
-Expected: No Lua errors occur and no load cycle occurs. The guide appears one time in the own list of Guidelime. You can select it in Efficient Quests. Both addons receive the registration of the guide exactly one time, so no list shows a duplicate guide. The addon list shows that the dependency of the guide changed to Efficient Quests, with Guidelime as optional.
+Expected: No Lua errors occur and no load cycle occurs. The guide plugin does not appear in the list of Guidelime, because it registers only with Efficient Quests. The guide list of Efficient Quests still shows the plugin, and the hints work. The addon list shows the dependency of the guide plugin on Efficient Quests. Guidelime works with its own guide at the same time.
 
 Result: \*
 
 ### IC-5. Guide loading without Guidelime
 
-IC-2 covers this check. Record the result here if you installed Guidelime for IC-4 first. Disable Guidelime, keep the adapted guide, and reload.
+IC-2 covers this check. Record the result here if you installed Guidelime for IC-4 first. Disable Guidelime, keep the guide plugin, and reload.
 
-Expected: The guide still registers with Efficient Quests, and `/eq status` stays `Ready.`
+Expected: The guide plugin still registers with Efficient Quests, and `/eq status` stays `Ready.`
 
 Result: \*
 
@@ -299,11 +313,11 @@ Result: \*
 Steps: Make each of these broken setups one time:
 
 1. Uninstall QuestieDB.
-2. Install the guide without a run of the adaptation tool.
-3. Restore the original TOC of the guide after the adaptation. This simulates an update. Keep that guide selected.
-4. Disable the selected guide addon and reload.
+2. Remove every guide plugin.
+3. Disable the selected guide plugin and reload. The plugin stays installed but disabled.
+4. Delete the folder of the selected guide plugin and reload.
 
-Expected: The command `/eq status` reports each case in its own way: missing provider, needs adaptation, and did not register. It never presents a setup problem as "no relevant tips". The valid empty state stays separate: the body is hidden, the settings are accessible, and no status message appears. After you run `check` and `adapt` of the adaptation tool again, the status returns to `Ready.`
+Expected: The command `/eq status` reports each case in its own way: missing provider, no guide plugin registered with the pointer to the releases page, the named plugin that did not register, and the fallback selection after removal. The settings name the removed choice. The status never presents a setup problem as "no relevant tips". The valid empty state stays separate: the body is hidden, the settings are accessible, and no status message appears. After you restore the missing piece, the status returns to `Ready.`
 
 Result: \*
 
