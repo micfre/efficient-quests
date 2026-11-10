@@ -65,8 +65,11 @@ local function addUnknown(to, from)
 end
 
 local function readable(line)
-  line = line:gsub('%[CI%d+,%s*%d+%s+([^%]]+)%]', '%1')
-  line = line:gsub('%[CI%d+,%s*%d+%]', 'item')
+  line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
+  line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
+  line = line:gsub('at%s*%[TAR%d+%]', ' ')
+  line = line:gsub('%[CI%d+,%s*(%d+)%s+([^%]]+)%]', '%1 %2 ')
+  line = line:gsub('%[CI%d+,%s*(%d+)%]', '%1 item ')
   line = line:gsub('%[G%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*([^%]]+)%]', '%1')
   line = line:gsub('%[G%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*([^%]]+)%]', '%1')
   line = line:gsub('%[G[^%]]+%]', '')
@@ -84,7 +87,9 @@ local function useful(line)
       or s:find('previous step', 1, true) or s:find('previously', 1, true)
       or s:find('die and', 1, true) or s:find('rezz', 1, true)
       or s:find('each time you do', 1, true) or s:find('sell grey', 1, true)
-      or s:find('sell gray', 1, true) then return false end
+      or s:find('sell gray', 1, true) or s:find('sell it all', 1, true)
+      or s:find('this guide', 1, true) or s:find('keep an eye', 1, true)
+      or s:find('keep group', 1, true) or s:find('keep skinning', 1, true) then return false end
   -- Suppress sentences that disclose common narrative outcomes. This is a
   -- conservative screen, not proof that unrestricted guide prose is safe.
   for _, phrase in ipairs({' is murdered', ' was murdered', ' is killed',
@@ -95,8 +100,9 @@ local function useful(line)
   local plain = s:gsub('%b[]', ''):gsub('^%s+', '')
   if plain:match('^accept[%s:%.]') or plain:match('^turn%s*in[%s:%.]')
       or plain:match('^do%s*[:]') or plain:match('^run to')
-      or plain:match('^follow the') or plain:match('^learn your level') then return false end
-  return s:find('buy', 1, true) or s:find('keep', 1, true)
+      or plain:match('^follow the') or plain:match('^learn your level')
+      or plain:match('^put them') then return false end
+  return s:find('buy', 1, true) or s:find('%f[%a]keep%f[%A]')
       or s:find('save', 1, true) or s:find('sell', 1, true)
       or s:find('stock up', 1, true) or s:find('flight path', 1, true)
       or s:find('flightpath', 1, true) or s:find('flight master', 1, true)
@@ -124,11 +130,14 @@ local function usefulExcerpt(line)
   if start <= #line then pieces[#pieces + 1] = line:sub(start) end
   for index, piece in ipairs(pieces) do
     if useful(piece) then
+      local _, itemCount = piece:gsub('%[CI%d+', '')
+      if itemCount > 1 then return nil end
       local following = trim((pieces[index + 1] or ''):lower():gsub('%b[]', ''))
       -- A following condition may qualify this sentence; without understanding
       -- the relationship, withholding the advice is safer than losing it.
       if following:match('^if%s') or following:match('^unless%s')
-          or following:match('^only if%s') then return nil end
+          or following:match('^only if%s') or following:find('you need', 1, true)
+          then return nil end
       local previous = index > 1 and trim(pieces[index - 1]) or ''
       local lower = trim(previous:lower():gsub('%b[]', ''))
       if lower:match('^if%s') or lower:match('^unless%s') then

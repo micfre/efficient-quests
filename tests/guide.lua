@@ -110,3 +110,27 @@ Buy 2 Rations. Only if you have not collected them already.
 local trailing = EfficientQuests.ExtractGuide('TrailingCondition', {})
 assert(#trailing == 0 or trailing[1].text:find('Only if', 1, true), 'a trailing condition is not silently discarded')
 print('ok - trailing conditions remain visible or suppress the advice')
+EfficientQuests_RegisterGuide('Audit', [[
+[N 24-25 Duskwood]
+[G78,48.3Duskwood] Buy: [CI4371,1 Bronze Tube]
+Buy: [CI2251,6 Gooey Spider Leg]
+If you did not get one yet that is fine, we will finish parts here now. At the end of this guide you will buy one from the ah.
+Buy at the auction house now, if you did not get them yet: 1 Bronze tube. Gooey Spider Legs (you need 6 total) and 8 Murloc Fin.
+Go further into Uldaman whilst keeping left, then turn right.
+]], 'reference')
+local audit = EfficientQuests.ExtractGuide('Audit', {})
+assert(#audit == 2, 'ambiguous multi-item and route prose is withheld rather than misrepresented')
+assert(audit[1].text:find('1 Bronze Tube', 1, true), 'stated single item quantity remains in hint')
+assert(audit[2].text:find('6 Gooey Spider Leg', 1, true), 'stated multi-item quantity remains in hint')
+print('ok - reviewed TUG shopping excerpts preserve quantities and avoid route fragments')
+EfficientQuests_RegisterGuide('HordeAudit', [[
+[N 32 Gnomeregan]
+If its available on the auction house, buy: [CI2842,1 Silver Bar] [CI1206,1 Moss Agate]
+Start looking for a Shadowfang Keep group.
+I suggest to keep skinning to make some gold on the side though.
+[G1,2 The Barrens] Buy: [CI2321,4 Coarse Thread]at [TAR3485]
+]], 'reference')
+local hordeAudit = EfficientQuests.ExtractGuide('HordeAudit', {})
+assert(#hordeAudit == 1, 'unrelated training, dungeon routing and ambiguous multiple items are withheld')
+assert(hordeAudit[1].text == 'Buy: 4 Coarse Thread', 'missing target metadata must not leave dangling wording')
+print('ok - reviewed Horde examples avoid ambiguous and unrelated instructions')
