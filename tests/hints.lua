@@ -293,3 +293,37 @@ assert(tiered[1].text:find('candle', 1, true), 'a confirmed advice zone outranks
 assert(tiered[2].questID == 102 and tiered[2].uncertain,
   'marker-supported advice stays uncertain about its own location')
 print('ok - quest markers do not outrank confirmed local advice')
+
+-- Ready quests have no classifiable client POI, so turn-in proximity comes
+-- from the provider's finisher spawns bridged onto the player's own map.
+LibQuestieDB.Support = {Get=function(name)
+  if name == 'ZoneDB' then
+    return {private={areaIdToUiMapId='return {[12]=1,[13]=2}',
+      areaIdToUiMapIdOverride='return {}'}} end
+end}
+LibQuestieDB.Quest.Get = function(id, key)
+  if key == 'questLevel' then return 10 end
+  if key == 'finishedBy' then
+    if id == 104 then return {[1]={105}} end
+    if id == 105 then return {[1]={106}} end
+    return {}
+  end
+end
+LibQuestieDB.Npc.Get = function(id, key)
+  if key == 'spawns' then
+    if id == 105 then return {[12]={{41,50}}} end
+    if id == 106 then return {[13]={{40,50}}} end
+  end
+end
+C_QuestLog.IsOnQuest = function(id) return id == 104 or id == 105 end
+C_QuestLog.IsComplete = function() return true end
+C_QuestLog.GetQuestsOnMap = function() return {} end
+EfficientQuests_RegisterGuide('TurnInProximity', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI71,2 Flasks] for [QC105].
+[G40,50 Elwynn Forest] Buy [CI70,2 Vials] for [QC104].
+]], 'Author')
+local proximity = EfficientQuests.GetHints('TurnInProximity')
+assert(#proximity == 2, 'both ready-quest advice stays visible')
+assert(proximity[1].questID == 104, 'a local provider turn-in outranks a remote turn-in')
+print('ok - provider turn-in spawns give ready quests a local distance signal')
