@@ -88,3 +88,41 @@ local unresolved = EfficientQuests.GetHints('UnknownFlight')
 assert(#unresolved == 1 and unresolved[1].text:find('if you have not already learned', 1, true),
  'unreachable is not proof the flight path is known or unknown')
 print('ok - unreachable nodes do not change learned history')
+carried, bank = 2, 0
+ready, accepted = false, true
+LibQuestieDB.Item.Get = function(id,key) if id == 42 and key == 'name' then return 'Apples' end end
+assert(hint().text:find('5', 1, true), 'acquire advice states the total minimum as well as shortage')
+EfficientQuests_RegisterGuide('Quantities', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC101].
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC101].
+]], 'Author')
+local quantities = EfficientQuests.GetHints('Quantities')
+assert(#quantities == 1 and quantities[1].quantity == 5 and #quantities[1].sources == 2,
+ 'repeated same requirement uses its maximum and preserves both sources')
+print('ok - supply shortage includes minimum and duplicate minimums consolidate')
+EfficientQuests_RegisterGuide('Followup', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] After finishing [QC101], buy [CI42,5 Apples] for the next quest.
+]], 'Author')
+accepted = false
+assert(#EfficientQuests.GetHints('Followup') == 1, 'follow-up preparation survives completion of its referenced quest')
+print('ok - completed quest follow-up preparation remains')
+EfficientQuests_RegisterGuide('FlightUse', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use the flightpath at Stormwind if traveling to the city.
+]], 'Author')
+local use = EfficientQuests.GetHints('FlightUse')
+assert(#use == 1, 'learned flight paths must not suppress travel opportunities')
+assert(not use[1].text:find('if you have not already learned',1,true), 'travel advice is not an acquisition reminder')
+print('ok - known flight travel is not suppressed')
+accepted = true
+EfficientQuests_RegisterGuide('IndependentUnknown', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] for [QC101].
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] for [QC102].
+]], 'Author')
+local separate = EfficientQuests.GetHints('IndependentUnknown')
+assert(#separate == 2, 'different quests must not be combined without consumption evidence')
+assert(separate[1].quantity == 3 and separate[2].quantity == 5, 'unconfirmed requirements are not speculatively added')
+print('ok - different quest requirements are not added without evidence')
