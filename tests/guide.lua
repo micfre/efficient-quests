@@ -49,21 +49,21 @@ Repair your gear and sell grey items.
 local travel = EfficientQuests.ExtractGuide('Flight', {faction='Alliance'})
 assert(#travel == 1 and travel[1].text:find('Ironforge', 1, true), 'flight reminder retains its destination without unrelated vending')
 print('ok - travel advice retains destination')
--- Short excerpts of the supplied TUG and Bethink compatibility references.
+-- Synthetic examples exercise observed guide formats without copying guide text.
 EfficientQuests_RegisterGuide('References', [[
 [GA Alliance]
 [N 24-25 Duskwood]
-[G77.12,44.17Duskwood] Get the [P] flightpath at: [G77.12,44.17Duskwood]
-KEEP YOUR Gooey Spider Legs.Whilst grinding east for the spider and wolf quests do the next 2steps
+[G77.12,44.17Duskwood] Learn the [P] flight path at the village.
+Keep the blue tokens. Then travel east for two later route steps.
 [A Nightelf] Buy [CI1,1 Seed].
-[A Mining,IT2901<1] [OC] [G47.49,41.56 Elwynn Forest] [CI2901,1] Buy a Mining Pick from Brother Danil; keep it in your bags.
+[A Mining,IT2901<1] [OC] [G47.49,41.56 Elwynn Forest] [CI2901,1] Buy a pick from a local merchant; retain it.
 ]], 'reference')
 local reference = EfficientQuests.ExtractGuide('References', {
  faction='Alliance', race='Human', professions={mining=true}, countCarried=function(id) return 0 end
 })
-assert(#reference == 3, 'real guide snippets preserve useful advice and exclude another race')
-assert(reference[2].text == 'KEEP YOUR Gooey Spider Legs.', 'mixed route advice keeps the useful standalone sentence')
-assert(not reference[2].sourceText:find('2steps', 1, true), 'source excerpt omits unrelated route context')
+assert(#reference == 3, 'synthetic guide examples preserve useful advice and exclude another race')
+assert(reference[2].text == 'Keep the blue tokens.', 'mixed route advice keeps the useful standalone sentence')
+assert(not reference[2].sourceText:find('route steps', 1, true), 'source excerpt omits unrelated route context')
 assert(reference[3].itemID == 2901 and not reference[3].uncertain, 'known profession and possession conditions are evaluated')
 local owned = EfficientQuests.ExtractGuide('References', {
  faction='Alliance', race='Human', professions={mining=true}, countCarried=function(id) return 1 end
@@ -112,33 +112,33 @@ assert(#trailing == 0 or trailing[1].text:find('Only if', 1, true), 'a trailing 
 print('ok - trailing conditions remain visible or suppress the advice')
 EfficientQuests_RegisterGuide('Audit', [[
 [N 24-25 Duskwood]
-[G78,48.3Duskwood] Buy: [CI4371,1 Bronze Tube]
-Buy: [CI2251,6 Gooey Spider Leg]
-If you did not get one yet that is fine, we will finish parts here now. At the end of this guide you will buy one from the ah.
-Buy at the auction house now, if you did not get them yet: 1 Bronze tube. Gooey Spider Legs (you need 6 total) and 8 Murloc Fin.
-Go further into Uldaman whilst keeping left, then turn right.
+[G78,48.3Duskwood] Buy: [CI4371,1 Copper Flask]
+Buy: [CI2251,6 Yellow Seeds]
+Later in this guide, purchase the remaining supplies.
+Buy these if they are missing: 1 Copper Flask. Yellow Seeds (you need 6 total) and 8 Blue Petals.
+Follow the corridor to its next turn.
 ]], 'reference')
 local audit = EfficientQuests.ExtractGuide('Audit', {})
 assert(#audit == 3, 'reviewed shopping advice remains while route prose is withheld')
-assert(audit[1].text:find('1 Bronze Tube', 1, true), 'stated single item quantity remains in hint')
-assert(audit[2].text:find('6 Gooey Spider Leg', 1, true), 'stated multi-item quantity remains in hint')
-assert(audit[3].text:find('if you did not get them yet', 1, true) and audit[3].text:find('8 Murloc Fin', 1, true), 'conditional list is complete')
+assert(audit[1].text:find('1 Copper Flask', 1, true), 'stated single item quantity remains in hint')
+assert(audit[2].text:find('6 Yellow Seeds', 1, true), 'stated multi-item quantity remains in hint')
+assert(audit[3].text:find('if they are missing', 1, true) and audit[3].text:find('8 Blue Petals', 1, true), 'conditional list is complete')
 print('ok - reviewed TUG shopping excerpts preserve quantities and avoid route fragments')
 EfficientQuests_RegisterGuide('HordeAudit', [[
 [N 32 Gnomeregan]
-If its available on the auction house, buy: [CI2842,1 Silver Bar] [CI1206,1 Moss Agate]
-Start looking for a Shadowfang Keep group.
-I suggest to keep skinning to make some gold on the side though.
-[G1,2 The Barrens] Buy: [CI2321,4 Coarse Thread]at [TAR3485]
+If available, buy [CI2842,1 Iron Coin] and [CI1206,1 Blue Bead].
+Find a group for the dungeon.
+Keep skinning for extra money.
+[G1,2 The Barrens] Buy: [CI2321,4 Linen Thread]at [TAR3485]
 ]], 'reference')
 local hordeAudit = EfficientQuests.ExtractGuide('HordeAudit', {})
 assert(#hordeAudit == 1, 'unrelated training, dungeon routing and ambiguous multiple items are withheld')
-assert(hordeAudit[1].text == 'Buy: 4 Coarse Thread', 'missing target metadata must not leave dangling wording')
+assert(hordeAudit[1].text == 'Buy: 4 Linen Thread', 'missing target metadata must not leave dangling wording')
 print('ok - reviewed Horde examples avoid ambiguous and unrelated instructions')
 EfficientQuests_RegisterGuide('Techniques', [[
 [N Feralas]
-[G40.93,25.55 Feralas] Use Zorbin's Ultra-Shrinker on the coastal giants before killing them; collect fifteen Miniaturization Residues for [QC7003].
-Gather cactus apples while collecting tails for [QC4402], [QC97279], and [QC789].
+[G40.93,25.55 Feralas] Use the small device on the creatures before defeating them for [QC7003].
+Gather the herbs while collecting feathers for [QC4402], [QC97279], and [QC789].
 Kill ten wolves for [QC78].
 [LE SP21562 1] Use the quest codex before entering the shrine for [QC77].
 ]], 'reference')
@@ -154,25 +154,25 @@ assert(knownTechniques[3].questID == 77, 'a learning marker does not imply quest
 print('ok - quest techniques, multiple references and learning-state uncertainty')
 EfficientQuests_RegisterGuide('Training', [[
 [N Tanaris]
-[A Priest] [LE SP21562 1] Buy and use Codex: Prayer of Fortitude at the Auction House if available.
+[A Priest] [LE SP21562 1] Buy and use a training manual from a vendor.
 ]], 'reference')
 assert(#EfficientQuests.ExtractGuide('Training', {class='Priest'}) == 0, 'general class training must not become a questing tip')
 print('ok - unrelated class training is excluded')
 EfficientQuests_RegisterGuide('TUGConditions', [[
 [N Tanaris]
-[G1,2 Tanaris] Escort quest inv,if youre in a group, dont accept the follow before everyone has turned in!
-Buy your missing Stranglethorn Pages as well as Frost Oil, Gyrochronatom and Patterned Bronze Bracers. For the Items: IN THIS ORDER AS WELL, If you cant get Item 1 do not buy item 2 and 3, they rely on each other as pre quests.
+[G1,2 Tanaris] For the escort quest, wait for all group members to turn in before starting the follow-up!
+Buy one blue seed, two red seeds, and three green seeds. For the items: buy in this order; if the first item is unavailable, skip the others because they depend on each other.
 ]], 'reference')
 local tugConditions = EfficientQuests.ExtractGuide('TUGConditions', {})
 assert(#tugConditions == 2, 'quest mechanic and ordered multi-item advice survive')
 assert(tugConditions[1].kind == 'technique' and tugConditions[1].association == 'zone', 'unlinked mechanic stays an unassociated zone tip')
-assert(tugConditions[1].text:find('everyone has turned in', 1, true), 'group turn-in condition stays visible')
-assert(tugConditions[2].text:find('do not buy item 2 and 3', 1, true), 'ordering condition remains visible')
-assert(tugConditions[2].text:find('Frost Oil', 1, true) and tugConditions[2].text:find('Patterned Bronze Bracers', 1, true), 'all ordered items remain visible')
+assert(tugConditions[1].text:find('group members to turn in', 1, true), 'group turn-in condition stays visible')
+assert(tugConditions[2].text:find('skip the others', 1, true), 'ordering condition remains visible')
+assert(tugConditions[2].text:find('blue seed', 1, true) and tugConditions[2].text:find('green seeds', 1, true), 'all ordered items remain visible')
 print('ok - TUG escort mechanics and conditional buying order')
 EfficientQuests_RegisterGuide('CrossSentence', [[
 [N Un'Goro Crater]
-[G79.65,49.83 Un'Goro Crater] Use the Preserved Threshadon Meat and Pheromone Mixture at the summoning site. Defeat the summoned creature for [QC4292].
+[G79.65,49.83 Un'Goro Crater] Use the beacon to call a creature. Defeat that creature for [QC4292].
 ]], 'reference')
 local cross = EfficientQuests.ExtractGuide('CrossSentence', {})
 assert(#cross == 1 and cross[1].kind == 'technique', 'a nearby practical technique remains available')
@@ -188,37 +188,56 @@ assert(#EfficientQuests.ExtractGuide('CrossRoute', {}) == 0, 'route travel is no
 print('ok - tentative association excludes route travel')
 EfficientQuests_RegisterGuide('StoryOrdering', [[
 [N Tanaris]
-[G1,2 Tanaris] Buy Frost Oil, Gyrochronatom and Patterned Bronze Bracers. For the Items: IN THIS ORDER AS WELL, if you cant get Item 1 dont buy item 2 and 3, they rely on each other; the king is murdered.
+[G1,2 Tanaris] Buy one blue seed, two red seeds, and three green seeds. For the items: buy in this order; the king is murdered.
 ]], 'reference')
 assert(#EfficientQuests.ExtractGuide('StoryOrdering', {}) == 0, 'ordered advice must not reintroduce narrative outcomes')
 print('ok - ordered advice does not bypass narrative screening')
 EfficientQuests_RegisterGuide('EncounterMechanic', [[
 [N Hillsbrad]
-[G1,2 Hillsbrad Foothills] Once you use the provided QuestItem an Elite ghost will spawn. Its not "properly Elite" though but make sure youre full health and use big cooldowns if need be.
+[G1,2 Hillsbrad Foothills] Use the quest item to spawn an enemy. Start at full health and use your defensive skill.
 ]], 'reference')
 local encounter = EfficientQuests.ExtractGuide('EncounterMechanic', {})
 assert(#encounter == 1 and encounter[1].association == 'zone', 'TUG encounter preparation survives without invented quest association')
-assert(encounter[1].text:find('full health', 1, true) and encounter[1].text:find('Elite ghost', 1, true), 'encounter and precaution remain together')
+assert(encounter[1].text:find('full health', 1, true) and encounter[1].text:find('spawn an enemy', 1, true), 'encounter and precaution remain together')
 print('ok - practical encounter details remain available as uncertain zone advice')
 EfficientQuests_RegisterGuide('CompactItem', [[
 [N Shopping List]
-Buy [CI2592,300Wool Cloth]
+Buy [CI2592,300Blue Cloth]
 ]], 'reference')
 local compactItem = EfficientQuests.ExtractGuide('CompactItem', {})
 assert(#compactItem == 1 and compactItem[1].itemID == 2592 and compactItem[1].quantity == 300, 'TUG compact item tags retain identifier and quantity')
-assert(compactItem[1].text:find('300 Wool Cloth', 1, true), 'TUG compact item tags retain a useful item name')
+assert(compactItem[1].text:find('300 Blue Cloth', 1, true), 'TUG compact item tags retain a useful item name')
 print('ok - TUG compact item tags do not discard the name')
 EfficientQuests_RegisterGuide('TUGRoutePressure', [[
 [N Desolace]
-[G1,2 Desolace] Youll get two more chances to buy them.
-LAST CHANCE to buy your missing Stranglethorn Pages.
+[G1,2 Desolace] You will have more chances to buy supplies.
+This is the last chance to buy the missing papers.
 ]], 'reference')
 assert(#EfficientQuests.ExtractGuide('TUGRoutePressure', {}) == 0, 'route-relative shopping pressure must not become stand-alone advice')
 print('ok - TUG route-relative shopping pressure is excluded')
 EfficientQuests_RegisterGuide('TUGMismatch', [[
 [N Shopping List]
-Buy [CI2725,1 Green Hills of Stranglethorn - Page 10]
+Buy [CI2725,1 Imaginary Page Ten]
 ]], 'reference')
 local mismatch = EfficientQuests.ExtractGuide('TUGMismatch', {})
-assert(mismatch[1].itemID == 2725 and mismatch[1].itemSourceName == 'Green Hills of Stranglethorn - Page 10', 'provider can compare the source label with its identifier')
+assert(mismatch[1].itemID == 2725 and mismatch[1].itemSourceName == 'Imaginary Page Ten', 'provider can compare the source label with its identifier')
 print('ok - conflicting guide identifiers can be checked against their source labels')
+
+EfficientQuests_RegisterGuide('UnrelatedShopping', [[
+[N Greenfield]
+[G1,2 Greenfield] Buy a skinning knife from the merchant.
+[G1,2 Greenfield] Buy a new weapon for your class.
+[G1,2 Greenfield] Buy [CI42,3 Apples] for [QC101].
+]], 'synthetic')
+local relevantShopping = EfficientQuests.ExtractGuide('UnrelatedShopping', {})
+assert(#relevantShopping == 1 and relevantShopping[1].questID == 101,
+  'unrelated profession and class equipment must not crowd out quest preparation')
+print('ok - unrelated class and profession purchases are withheld')
+
+EfficientQuests_RegisterGuide('NarrativeReason', [[
+[N Greenfield]
+[G1,2 Greenfield] Buy [CI42,3 Apples] because the advisor poisoned the king.
+]], 'synthetic')
+assert(#EfficientQuests.ExtractGuide('NarrativeReason', {}) == 0,
+  'unsupported narrative explanations must not be displayed as advice or source context')
+print('ok - narrative causal explanation is withheld')

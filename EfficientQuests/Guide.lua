@@ -82,6 +82,17 @@ end
 
 local function useful(line)
   local s = line:lower()
+  -- General equipment and profession progression are not quest preparation.
+  -- An explicit quest reference can establish a narrower practical purpose.
+  if not s:find('%[qc%d+') and not s:find('%f[%a]quest%f[%A]') then
+    if s:find('skinning knife', 1, true) or s:find('mining pick', 1, true)
+        or s:find('weapon', 1, true) or s:find('training', 1, true)
+        or s:find('profession', 1, true) then return false end
+  end
+  -- Explanations introduced by causal prose can carry story outcomes; without
+  -- semantic analysis we cannot safely separate the practical advice from it.
+  if s:find('%f[%a]because%f[%A]')
+      and not s:match('because they depend on each other[%.!%s]*$') then return false end
   -- Pure guide instructions and progression are not advice. Lines containing
   -- route-relative language are omitted when their meaning cannot stand alone.
   if s:find('next step', 1, true) or s:find('next two steps', 1, true)
@@ -109,7 +120,7 @@ local function useful(line)
       or s:find('stock up', 1, true) or s:find('flight path', 1, true)
       or s:find('flightpath', 1, true) or s:find('flight master', 1, true)
       or s:find('needed for', 1, true) or s:find('quest items', 1, true)
-      or (s:find('escort quest', 1, true) and s:find('everyone has turned in', 1, true))
+      or (s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true))
       or (s:find('[qc', 1, true) and (s:find('while ', 1, true)
           or s:find('before ', 1, true) or s:find('use ', 1, true)))
 end
@@ -135,10 +146,10 @@ local function usefulExcerpt(line)
     local bare = trim(piece:gsub('%b[]', '')):lower()
     local followingPiece = pieces[index + 1] or ''
     local nextBare = trim(followingPiece:gsub('%b[]', '')):lower()
-    -- This TUG encounter warning contains the trigger and preparation in
-    -- separate sentences. Keep both, without inferring a quest identifier.
-    if bare:find('provided questitem', 1, true) and bare:find('elite ghost', 1, true)
-        and nextBare:find('full health', 1, true)
+    -- Keep a quest-item encounter and its adjacent preparation together.
+    local encounter = bare:gsub('questitem', 'quest item')
+    if encounter:find('quest item', 1, true) and encounter:find('spawn', 1, true)
+        and nextBare:find('health', 1, true)
         and useful(piece .. ' [QC1]') and useful(followingPiece .. ' [QC1]') then
       return trim(piece) .. ' ' .. trim(followingPiece)
     end
@@ -157,20 +168,20 @@ local function usefulExcerpt(line)
       local _, itemCount = piece:gsub('%[CI%d+', '')
       if itemCount > 1 then return nil end
       local following = trim((pieces[index + 1] or ''):lower():gsub('%b[]', ''))
-      -- This TUG shopping list continues after the first item. The opening
-      -- condition applies to both parts, so retain the reviewed list intact.
-      if bare:find('if you did not get them yet: 1 bronze tube', 1, true)
-          and following:match('^gooey spider legs %(you need 6 total%) and 8 murloc fin[%.!]*$') then
+      -- Preserve a conditional multi-item list when its second sentence
+      -- explicitly states a total and another quantity.
+      if bare:find('buy', 1, true) and bare:find('if ', 1, true)
+          and following:find('you need', 1, true) and following:find('total', 1, true)
+          and following:match('%d+') and useful(following .. ' buy') then
         return trim(piece) .. ' ' .. trim(pieces[index + 1])
       end
-      -- TUG's three-item purchase warning is a single requirement split over
-      -- two sentences. Keep its own wording and ordering condition together.
-      if bare:find('frost oil', 1, true) and bare:find('gyrochronatom', 1, true)
-          and bare:find('patterned bronze bracers', 1, true)
-          and following:match('^for the items') and following:find('in this order', 1, true)
-          and following:find('they rely on each other', 1, true)
-          and useful(pieces[index + 1])
-          and (following:find('dont buy', 1, true) or following:find('do not buy', 1, true)) then
+      -- Preserve an adjacent ordered-purchase condition without depending on
+      -- particular item names or the guide author's exact phrasing.
+      if bare:find('buy', 1, true) and following:match('^for the items')
+          and following:find('in this order', 1, true) and useful(pieces[index + 1])
+          and (following:find('depend', 1, true) or following:find('rely', 1, true))
+          and (following:find('skip', 1, true) or following:find('dont buy', 1, true)
+              or following:find('do not buy', 1, true)) then
         return trim(piece) .. ' ' .. trim(pieces[index + 1])
       end
       -- A following condition may qualify this sentence; without understanding
@@ -197,8 +208,8 @@ local function adviceKind(excerpt, item)
   if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
       or s:find('flight master', 1, true) then return 'flight' end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
-  if s:find('escort quest', 1, true) and s:find('everyone has turned in', 1, true) then return 'technique' end
-  if s:find('provided questitem', 1, true) and s:find('elite ghost', 1, true) then return 'technique' end
+  if s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true) then return 'technique' end
+  if s:gsub('questitem', 'quest item'):find('quest item', 1, true) and s:find('spawn', 1, true) then return 'technique' end
   if s:find('[qc', 1, true) then return 'technique' end
   return nil
 end
