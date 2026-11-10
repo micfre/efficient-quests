@@ -271,3 +271,23 @@ playerX = 0.8
 tick()
 assert(widgets.EfficientQuestsHint1.text:find('net',1,true), 'crossing distance bands refreshes visible order')
 print('ok - moving between distance bands refreshes visible hints')
+
+-- The Guide tab lists every installed guide instead of cycling through
+-- them, and the only installed guide is selected without asking.
+for _, key in ipairs({'TUG', 'Long', 'Empty', 'Moving'}) do EfficientQuests.guides[key] = nil end
+EfficientQuestsCharacter.guide = nil
+C_AddOns = {GetAddOnMetadata = function(name, field)
+  if field == 'Title' and name == 'Solo' then return 'The Solo Guide' end
+end}
+EfficientQuests_RegisterGuide('Solo', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple].', 'Solo author')
+event('QUEST_LOG_UPDATE')
+assert(EfficientQuestsCharacter.guide == 'Solo', 'the only installed guide is selected automatically')
+assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the automatic selection already supplies its advice')
+click('EfficientQuestsCategoryGuide')
+local soloRow = assert(widgets.EfficientQuestsGuideRow1, 'the guide tab lists installed guides instead of a cycle button')
+assert(soloRow.text:find('The Solo Guide', 1, true), 'a row shows the display name from the manifest')
+assert(soloRow.text:find('Solo author', 1, true), 'a row shows the guide author')
+assert(soloRow.text:find('1 chapter', 1, true), 'a row shows the chapter count')
+assert(not widgets.EfficientQuestsGuideRow2, 'one installed guide is one row')
+assert(soloRow.text:find('^✓', 1), 'the row of the active guide is marked')
+print('ok - the only installed guide is auto-selected and listed in settings')
