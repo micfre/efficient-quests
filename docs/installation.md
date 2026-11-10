@@ -56,4 +56,4 @@ If there are no relevant hints, the hint body is hidden. Settings remain availab
 
 ## Test the repository
 
-The [test guide](../tests/README.md) lists the offline commands. It also explains the extraction audit, a review aid that reads an installed guide package and reports what the addon extracts and what it withholds. The [MVP specification](specs/efficient-quests-mvp.md) lists the required checks in the game client. Record the exact Forever build and the FlareUI version when you perform those checks.
+The [test guide](../tests/README.md) lists the offline commands. It also explains the extraction audit, a review aid that reads an installed guide package and reports what the addon extracts and what it withholds. The [release validation record](validation.md) lists the required checks in the game client and records the offline coverage. Record the exact Forever build and the FlareUI version when you perform those checks.
