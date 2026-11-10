@@ -78,6 +78,74 @@ LibQuestieDB = {RequireContract=function(n) return n == 1 end,
 UnitFactionGroup=function() return 'Alliance' end
 C_Map={GetBestMapForUnit=function() return 1 end, GetMapInfo=function() return {name='Elwynn Forest'} end}
 C_QuestLog={GetNumQuestLogEntries=function() return 0, 0 end, IsOnQuest=function() return false end}
+-- The Guide tab lists every installed guide instead of cycling through
+-- them, and the only installed guide is selected without asking. This
+-- section runs first so the session starts with exactly the guides it
+-- needs; later sections add their own guides on top.
+C_AddOns = {GetAddOnMetadata = function(name, field)
+  if field == 'Title' and name == 'Solo' then return 'The Solo Guide' end
+end}
+EfficientQuests_RegisterGuide('Solo', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple].', 'Solo author')
+event('PLAYER_LOGIN')
+event('PLAYER_ENTERING_WORLD')
+assert(EfficientQuestsCharacter.guide == 'Solo', 'the only installed guide is selected automatically')
+assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the automatic selection already supplies its advice')
+SlashCmdList.EFFICIENTQUESTS('')
+click('EfficientQuestsCategoryGuide')
+local soloRow = assert(widgets.EfficientQuestsGuideRow1, 'the guide tab lists installed guides instead of a cycle button')
+assert(soloRow.text:find('The Solo Guide', 1, true), 'a row shows the display name from the manifest')
+assert(soloRow.text:find('Solo author', 1, true), 'a row shows the guide author')
+assert(soloRow.text:find('1 chapter', 1, true), 'a row shows the chapter count')
+assert(not widgets.EfficientQuestsGuideRow2, 'one installed guide is one row')
+assert(soloRow.text:find('^✓', 1), 'the row of the active guide is marked')
+print('ok - the only installed guide is auto-selected and listed in settings')
+
+-- Several installed guides never default to one silently; the player is
+-- asked to pick from the list.
+EfficientQuests_RegisterGuide('Solo', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI12,1 Bread].', 'Solo author')
+EfficientQuests_RegisterGuide('Alt', '[N Elwynn Forest]\n[G41,50 Elwynn Forest] Buy [CI13,1 Water].', 'Alt author')
+EfficientQuestsCharacter.guide = nil
+event('QUEST_LOG_UPDATE')
+assert(EfficientQuestsCharacter.guide == nil, 'several installed guides never default to one silently')
+assert(widgets.EfficientQuestsStatus:IsShown() and widgets.EfficientQuestsStatus.text:find('Choose', 1, true),
+  'the window asks the player to pick a guide')
+assert(widgets.EfficientQuestsGuideRow1.text:find('Alt', 1, true)
+  and widgets.EfficientQuestsGuideRow2.text:find('2 chapters', 1, true),
+  'every installed guide stays listed with its chapter count')
+assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1)
+  and not widgets.EfficientQuestsGuideRow2.text:find('^✓', 1),
+  'no row is marked while nothing is chosen')
+print('ok - several guides wait for an explicit choice instead of a default')
+
+-- Picking a row selects that guide for this character and shows its advice.
+click('EfficientQuestsGuideRow2')
+assert(EfficientQuestsCharacter.guide == 'Solo', 'an explicit pick is saved per character')
+assert(widgets.EfficientQuestsGuideRow2.text:find('^✓', 1), 'the chosen row is marked')
+assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1), 'the other rows are not marked')
+assert(not widgets.EfficientQuestsStatus:IsShown(), 'a complete choice clears the prompt')
+assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the hints follow the explicit choice')
+print('ok - picking a row selects that guide for this character')
+
+-- Removing the chosen guide's folder falls back to the same selection rule
+-- and leaves a status note. The registry only grows during a real session,
+-- so the missing plugin is simulated by removing the registration directly.
+EfficientQuests.guides.Solo = nil
+event('QUEST_LOG_UPDATE')
+assert(EfficientQuestsCharacter.guide == 'Alt', 'a removed guide re-runs the selection rule')
+assert(widgets.EfficientQuestsStatus:IsShown()
+  and widgets.EfficientQuestsStatus.text:find('no longer registered', 1, true),
+  'the removed choice leaves a status note')
+assert(widgets.EfficientQuestsGuideRow1.text:find('Alt', 1, true)
+  and widgets.EfficientQuestsGuideRow1.text:find('^✓', 1),
+  'the remaining guide is selected in the list')
+assert(not widgets.EfficientQuestsGuideRow2.shown, 'the removed guide no longer has a row')
+event('QUEST_LOG_UPDATE')
+assert(not widgets.EfficientQuestsStatus:IsShown()
+  and widgets.EfficientQuestsHint1.text:find('Water', 1, true),
+  'after the note the fallback guide supplies its advice')
+print('ok - a removed guide falls back to the selection rule with a note')
+click('EfficientQuestsCloseSettings')
+
 EfficientQuests_RegisterGuide('TUG', [[
 [GA Alliance]
 [N Elwynn Forest]
@@ -86,8 +154,8 @@ EfficientQuests_RegisterGuide('TUG', [[
 [G40,50 Elwynn Forest] Buy [CI13,1 Water].
 [G40,50 Elwynn Forest] Buy [CI14,1 Candle].
 ]], 'Author')
-event('PLAYER_LOGIN')
-event('PLAYER_ENTERING_WORLD')
+EfficientQuestsCharacter.guide = 'TUG'
+event('QUEST_LOG_UPDATE')
 assert(widgets.EfficientQuestsWindow:IsShown(), 'standalone hint window appears with useful advice')
 assert(widgets.EfficientQuestsHint1.text:find('Apple',1,true), 'first hint is visible')
 assert(widgets.EfficientQuestsHint3:IsShown() and not widgets.EfficientQuestsHint4, 'compact view shows at most three hints')
@@ -163,7 +231,9 @@ assert(not widgets.EfficientQuestsItem3:IsShown(), 'unverified guide item must n
 print('ok - quest, map and verified item links use existing interfaces')
 
 -- A selected guide that is no longer registered says so and points the
--- player at the settings instead of naming any external tool.
+-- player at the settings instead of naming any external tool. The registry
+-- only grows during a real session, so the missing plugin is simulated by
+-- removing the registration directly.
 EfficientQuests.guides.Links = nil
 event('QUEST_LOG_UPDATE')
 assert(widgets.EfficientQuestsStatus:IsShown(), 'a removed selected guide must show the status line')
@@ -271,67 +341,3 @@ playerX = 0.8
 tick()
 assert(widgets.EfficientQuestsHint1.text:find('net',1,true), 'crossing distance bands refreshes visible order')
 print('ok - moving between distance bands refreshes visible hints')
-
--- The Guide tab lists every installed guide instead of cycling through
--- them, and the only installed guide is selected without asking.
-for _, key in ipairs({'TUG', 'Long', 'Empty', 'Moving'}) do EfficientQuests.guides[key] = nil end
-EfficientQuestsCharacter.guide = nil
-C_AddOns = {GetAddOnMetadata = function(name, field)
-  if field == 'Title' and name == 'Solo' then return 'The Solo Guide' end
-end}
-EfficientQuests_RegisterGuide('Solo', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple].', 'Solo author')
-event('QUEST_LOG_UPDATE')
-assert(EfficientQuestsCharacter.guide == 'Solo', 'the only installed guide is selected automatically')
-assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the automatic selection already supplies its advice')
-click('EfficientQuestsCategoryGuide')
-local soloRow = assert(widgets.EfficientQuestsGuideRow1, 'the guide tab lists installed guides instead of a cycle button')
-assert(soloRow.text:find('The Solo Guide', 1, true), 'a row shows the display name from the manifest')
-assert(soloRow.text:find('Solo author', 1, true), 'a row shows the guide author')
-assert(soloRow.text:find('1 chapter', 1, true), 'a row shows the chapter count')
-assert(not widgets.EfficientQuestsGuideRow2, 'one installed guide is one row')
-assert(soloRow.text:find('^✓', 1), 'the row of the active guide is marked')
-print('ok - the only installed guide is auto-selected and listed in settings')
-
--- Several installed guides never default to one silently; the player is
--- asked to pick from the list.
-EfficientQuests_RegisterGuide('Solo', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI12,1 Bread].', 'Solo author')
-EfficientQuests_RegisterGuide('Alt', '[N Elwynn Forest]\n[G41,50 Elwynn Forest] Buy [CI13,1 Water].', 'Alt author')
-EfficientQuestsCharacter.guide = nil
-event('QUEST_LOG_UPDATE')
-assert(EfficientQuestsCharacter.guide == nil, 'several installed guides never default to one silently')
-assert(widgets.EfficientQuestsStatus:IsShown() and widgets.EfficientQuestsStatus.text:find('Choose', 1, true),
-  'the window asks the player to pick a guide')
-assert(widgets.EfficientQuestsGuideRow1.text:find('Alt', 1, true)
-  and widgets.EfficientQuestsGuideRow2.text:find('2 chapters', 1, true),
-  'every installed guide stays listed with its chapter count')
-assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1)
-  and not widgets.EfficientQuestsGuideRow2.text:find('^✓', 1),
-  'no row is marked while nothing is chosen')
-print('ok - several guides wait for an explicit choice instead of a default')
-
--- Picking a row selects that guide for this character and shows its advice.
-click('EfficientQuestsGuideRow2')
-assert(EfficientQuestsCharacter.guide == 'Solo', 'an explicit pick is saved per character')
-assert(widgets.EfficientQuestsGuideRow2.text:find('^✓', 1), 'the chosen row is marked')
-assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1), 'the other rows are not marked')
-assert(not widgets.EfficientQuestsStatus:IsShown(), 'a complete choice clears the prompt')
-assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the hints follow the explicit choice')
-print('ok - picking a row selects that guide for this character')
-
--- Removing the chosen guide's folder falls back to the same selection rule
--- and leaves a status note.
-EfficientQuests.guides.Solo = nil
-event('QUEST_LOG_UPDATE')
-assert(EfficientQuestsCharacter.guide == 'Alt', 'a removed guide re-runs the selection rule')
-assert(widgets.EfficientQuestsStatus:IsShown()
-  and widgets.EfficientQuestsStatus.text:find('no longer registered', 1, true),
-  'the removed choice leaves a status note')
-assert(widgets.EfficientQuestsGuideRow1.text:find('Alt', 1, true)
-  and widgets.EfficientQuestsGuideRow1.text:find('^✓', 1),
-  'the remaining guide is selected in the list')
-assert(not widgets.EfficientQuestsGuideRow2.shown, 'the removed guide no longer has a row')
-event('QUEST_LOG_UPDATE')
-assert(not widgets.EfficientQuestsStatus:IsShown()
-  and widgets.EfficientQuestsHint1.text:find('Water', 1, true),
-  'after the note the fallback guide supplies its advice')
-print('ok - a removed guide falls back to the selection rule with a note')
