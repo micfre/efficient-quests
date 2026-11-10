@@ -23,27 +23,27 @@ jobs:
         run: |
           python3 tools/release.py --sources tests/fixtures \
             --catalog tests/fixtures/release-catalog.json \
-            --output dist/ci-dry-run --date 2026-11-10
+            --output build/ci-dry-run --date 2026-11-10
           echo '--- release output tree ---'
-          find dist/ci-dry-run -maxdepth 2 | sort
+          find build/ci-dry-run -maxdepth 2 | sort
           echo '--- extraction audit reports, shipped and held back ---'
-          for report in dist/ci-dry-run/builds/*/extraction-audit.json; do
+          for report in build/ci-dry-run/builds/*/extraction-audit.json; do
             echo "== $report =="
             cat "$report"
           done
           echo '--- license gate assertions ---'
           core_version=$(sed -n 's/^## Version: //p' dist/EfficientQuests/EfficientQuests.toc)
           fixture_version=$(sed -n 's/^## Version: //p' tests/fixtures/Guidelime_Fixture_Two/Guidelime_Fixture_Two.toc)
-          test -f "dist/ci-dry-run/EfficientQuests-$core_version.zip" || {
+          test -f "build/ci-dry-run/EfficientQuests-$core_version.zip" || {
             echo "the core zip is missing" >&2; exit 1; }
-          test -f "dist/ci-dry-run/EfficientQuests_FixtureTwo-$fixture_version-eq1.zip" || {
+          test -f "build/ci-dry-run/EfficientQuests_FixtureTwo-$fixture_version-eq1.zip" || {
             echo "the flagged guide zip is missing" >&2; exit 1; }
-          zip_count=$(find dist/ci-dry-run -maxdepth 1 -name '*.zip' | wc -l)
+          zip_count=$(find build/ci-dry-run -maxdepth 1 -name '*.zip' | wc -l)
           [ "$zip_count" = 2 ] || {
             echo "expected exactly 2 release zips, found $zip_count" >&2; exit 1; }
-          [ -z "$(find dist/ci-dry-run -maxdepth 1 -name 'EfficientQuests_FixtureOne*.zip')" ] || {
+          [ -z "$(find build/ci-dry-run -maxdepth 1 -name 'EfficientQuests_FixtureOne*.zip')" ] || {
             echo "the unflagged guide must not be zipped" >&2; exit 1; }
-          test -f dist/ci-dry-run/builds/EfficientQuests_FixtureOne/extraction-audit.json || {
+          test -f build/ci-dry-run/builds/EfficientQuests_FixtureOne/extraction-audit.json || {
             echo "the unflagged guide should still be built for the log" >&2; exit 1; }
           echo 'License gate proved: the flagged guide ships as a zip with its'
           echo 'audit report inside; the unflagged guide builds but produces no zip.'
