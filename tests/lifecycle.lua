@@ -151,3 +151,11 @@ local similar = EfficientQuests.GetHints('SimilarFlight')
 assert(#similar == 1 and similar[1].text:find('if you have not already learned', 1, true),
  'a longer place name is not the known path with a shorter prefix')
 print('ok - partial place-name matches remain unknown')
+EfficientQuests_RegisterGuide('TimedSupplies', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] later.
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] now.
+]], 'Author')
+local timed = EfficientQuests.GetHints('TimedSupplies')
+assert(#timed == 2 and timed[1].text:find('now', 1, true), 'current opportunity remains first after inventory wording changes')
+print('ok - inventory wording preserves available-now ranking')
