@@ -2,9 +2,7 @@
 DEFAULT_CHAT_FRAME = {AddMessage=function() end}
 SlashCmdList = {}
 function CreateFrame() return {RegisterEvent=function() end, SetScript=function() end} end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-end
+dofile('tests/addon.lua')()
 local entity = {Get = function() end}
 LibQuestieDB = {RequireContract=function(n) return n == 1 end,
  Quest={Get=function(id, key) if key == 'questLevel' then return ({[101]=10, [102]=12, [103]=8})[id] end end},

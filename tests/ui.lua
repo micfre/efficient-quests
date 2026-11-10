@@ -71,9 +71,7 @@ local function click(name)
   assert(frame.shown ~= false and frame.scripts.OnClick, 'widget cannot be clicked: '..name)
   frame.scripts.OnClick(frame)
 end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-end
+dofile('tests/addon.lua')()
 local entity = {Get=function() end}
 LibQuestieDB = {RequireContract=function(n) return n == 1 end,
   Quest=entity, Npc=entity, Item=entity, Object=entity}

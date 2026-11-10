@@ -2,9 +2,7 @@
 DEFAULT_CHAT_FRAME = {AddMessage = function() end}
 SlashCmdList = {}
 function CreateFrame() return {RegisterEvent = function() end, SetScript = function() end} end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-end
+dofile('tests/addon.lua')()
 EfficientQuests_RegisterGuide('TUG', [[
 [GA Alliance]
 [N 6-9 Elwynn Forest]

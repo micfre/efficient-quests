@@ -3,9 +3,7 @@ DEFAULT_CHAT_FRAME = {AddMessage=function() end}
 SlashCmdList = {}
 local eventHandler
 function CreateFrame() return {RegisterEvent=function() end, SetScript=function(_, _, h) eventHandler=h end} end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-end
+dofile('tests/addon.lua')()
 eventHandler(nil, 'PLAYER_LOGIN')
 local carried, bank = 2, 0
 GetItemCount=function(id, includeBank) assert(id == 42); return carried + (includeBank and bank or 0) end

@@ -11,9 +11,7 @@ function CreateFrame()
 end
 
 local function loadAddon()
-  for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-    if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-  end
+  dofile('tests/addon.lua')()
   assert(handlers.OnEvent, 'addon must listen for login')
   handlers.OnEvent(nil, 'PLAYER_LOGIN')
 end
