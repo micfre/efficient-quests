@@ -34,7 +34,7 @@ assert(#hints == 3, 'known remote advice is excluded')
 assert(hints[1].questID == 101 and hints[1].relevance == 'focused quest', 'local focus ranks first')
 assert(hints[2].questID == 102 and hints[2].relevance == 'accepted quest', 'unwatched quest hidden by header ranks second')
 assert(hints[3].association == 'zone' and hints[3].relevance == 'zone tip', 'unassociated local advice is identified')
-print('ok - focus and accepted quests are ranked only after local relevance')
+print('ok - focused and accepted quests rank above zone tips by fixed precedence')
 focus = nil
 C_QuestLog.IsOnQuest = function() return false end
 EfficientQuests_RegisterGuide('Levels', [[
@@ -220,9 +220,11 @@ EfficientQuests_RegisterGuide('LocalFirst', [[
 ]], 'Author')
 focus = 101
 hints = EfficientQuests.GetHints('LocalFirst')
-assert(#hints == 2 and hints[1].text:find('candle'), 'known local advice precedes uncertain remote focus')
-assert(hints[2].uncertain, 'unknown location remains available with uncertainty')
-print('ok - known local advice precedes advice with uncertain location')
+assert(#hints == 2 and hints[1].text:find('torch'),
+  'native focus outranks locality evidence per the spec priority order')
+assert(hints[1].uncertain, 'focused advice with unresolved locality keeps its uncertainty flag')
+assert(hints[2].text:find('candle'), 'the confirmed local advice remains available')
+print('ok - native focus outranks locality tiers within the location signals')
 EfficientQuests_RegisterGuide('WestfallShopping', [[
 [N Elwynn Forest]
 [G40,50 Elwynn Forest] Buy these if they are missing: 1 Copper Flask. Yellow Seeds (you need 6 total) and 8 Blue Petals.
@@ -289,10 +291,12 @@ Use a net for [QC102].
 ]], 'Author')
 local tiered = EfficientQuests.GetHints('MarkerTier')
 assert(#tiered == 2, 'both supported hints remain visible')
-assert(tiered[1].text:find('candle', 1, true), 'a confirmed advice zone outranks local quest activity')
-assert(tiered[2].questID == 102 and tiered[2].uncertain,
-  'marker-supported advice stays uncertain about its own location')
-print('ok - quest markers do not outrank confirmed local advice')
+assert(tiered[1].questID == 102 and tiered[1].uncertain,
+  'acceptance outranks locality evidence per the spec priority order')
+assert(tiered[1].conditions and table.concat(tiered[1].conditions, ' '):find('Quest activity is local', 1, true),
+  'marker-supported advice keeps its visible support condition')
+assert(tiered[2].text:find('candle', 1, true), 'the confirmed zone tip remains available')
+print('ok - acceptance outranks locality tiers within the location signals')
 
 -- Ready quests have no classifiable client POI, so turn-in proximity comes
 -- from the provider's finisher spawns bridged onto the player's own map.

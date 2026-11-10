@@ -240,11 +240,12 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
             if not levelDistance or distance < levelDistance then levelDistance = distance end
         end
     end
-    -- Confirmed advice zones are stronger evidence than quest activity: a
-    -- local marker or turn-in never confirms where the advice itself applies.
+    -- Spec priority order: native focused quest, accepted quest, then the
+    -- location signals. Focus and acceptance are never gated by the
+    -- local-evidence tier; the tier only orders candidates that tie at a
+    -- location priority.
     local tier = localEvidence == true and 2 or (localEvidence == "quest" and 1 or 0)
-    local localFocus = focused and tier >= 1
-    advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
+    advice.relevance = focused and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if tier == 0 then advice.uncertain = true end
     local words = string.lower(originalText or advice.text or '')
@@ -263,16 +264,20 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
             if words:match(pattern) then availableNow = true; break end
         end
     end
-    advice._ranking = {localEvidence=tier, focused=localFocus,
-        accepted=accepted and tier >= 1, giverBand=giverBand, targetBand=targetBand,
+    advice._ranking = {localEvidence=tier, focused=focused,
+        accepted=accepted, giverBand=giverBand, targetBand=targetBand,
         levelDistance=levelDistance, availableNow=availableNow}
     return advice
 end
 
 local function before(a, b)
     local x, y = a._ranking, b._ranking
-    -- Confirmed local advice, then quest-activity support, then the rest.
-    if x.localEvidence ~= y.localEvidence then return x.localEvidence > y.localEvidence end
+    -- Fixed spec precedence: native focused quest, accepted quest, distance
+    -- to the relevant quest giver/start, distance to the relevant quest
+    -- target, proximity to level. The local-evidence tier never overrides
+    -- focus or acceptance; it orders candidates that are equal at a
+    -- location priority (a confirmed advice zone beats quest-activity
+    -- support beats unresolved at the same distance signal).
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
     for _, field in ipairs({"giverBand", "targetBand"}) do
@@ -281,6 +286,7 @@ local function before(a, b)
             if y[field] == nil then return true end
             return x[field] < y[field]
         end
+        if x.localEvidence ~= y.localEvidence then return x.localEvidence > y.localEvidence end
     end
     if x.levelDistance ~= y.levelDistance then
         if x.levelDistance == nil then return false end
