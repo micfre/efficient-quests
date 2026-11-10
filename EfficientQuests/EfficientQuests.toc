@@ -6,3 +6,5 @@
 ## SavedVariablesPerCharacter: EfficientQuestsCharacter
 
 Core.lua
+Provider.lua
+Context.lua

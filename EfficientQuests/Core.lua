@@ -14,9 +14,21 @@ local function status()
         return "QuestieDB is missing. Install and enable the QuestieDB addon."
     end
     if not next(guides) then
+        local addons = C_AddOns
+        if addons and addons.GetAddOnInfo and addons.GetAddOnInfo("GuideLime_TUGs_Forever") then
+            local marker = addons.GetAddOnMetadata and addons.GetAddOnMetadata("GuideLime_TUGs_Forever", "X-EfficientQuests-Adaptation")
+            if marker ~= "1" then
+                return "TUG guide needs adaptation. Run or reapply the guide adaptation tool."
+            end
+            return "TUG guide did not register. Check that it is enabled and reapply the adaptation if needed."
+        end
         return "No compatible guide is registered. Install and adapt the supported TUG guide."
     end
-    return "QuestieDB compatibility and guide processing are not yet available."
+    local _, problem = EfficientQuests.GetProvider()
+    if problem then
+        return "QuestieDB is incompatible. Update or reinstall a supported QuestieDB provider."
+    end
+    return "Guide processing is not yet available."
 end
 
 local function showStatus()
@@ -25,10 +37,15 @@ end
 
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
-events:SetScript("OnEvent", function(_, event)
+events:RegisterEvent("QUEST_TURNED_IN")
+events:SetScript("OnEvent", function(_, event, questID)
     if event == "PLAYER_LOGIN" then
         EfficientQuestsCharacter = EfficientQuestsCharacter or {}
         SLASH_EFFICIENTQUESTS1 = "/eq"
         SlashCmdList.EFFICIENTQUESTS = showStatus
+    elseif event == "QUEST_TURNED_IN" and type(questID) == "number" and questID > 0 then
+        EfficientQuestsCharacter = EfficientQuestsCharacter or {}
+        EfficientQuestsCharacter.turnedIn = EfficientQuestsCharacter.turnedIn or {}
+        EfficientQuestsCharacter.turnedIn[questID] = true
     end
 end)
