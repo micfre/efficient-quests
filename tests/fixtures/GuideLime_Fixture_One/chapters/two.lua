@@ -2,5 +2,5 @@
 -- the builder's author-less replay path.
 Guidelime.registerGuide([[
 [N Elwynn Forest]
-Buy [CI13,1 Candle].
+Buy [CI13,1 Candle]
 ]])
