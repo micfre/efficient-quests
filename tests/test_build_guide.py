@@ -246,6 +246,12 @@ class AuditGateTests(BuilderFixture):
         return json.loads((self.out / self.plugin_name / "extraction-audit.json")
                           .read_text(encoding="utf-8"))
 
+    def set_single_guide(self, body):
+        """Rewrite the fixture source with one guide chapter of the given bytes."""
+        (self.source / "chapters" / "one.lua").write_bytes(
+            b'Guidelime.registerGuide([[' + body + b']], "Fixture")\n')
+        (self.source / "chapters" / "two.lua").write_bytes(b"")
+
     def test_healthy_build_writes_extraction_audit_report(self):
         result = self.build()
         self.assertEqual(result.returncode, 0, result.stderr)
@@ -260,6 +266,14 @@ class AuditGateTests(BuilderFixture):
         self.assertEqual(audit["guides"], 3)
         self.assertGreater(audit["advice_records"], 0)
         self.assertEqual(audit["findings"], [])
+
+    def test_zero_advice_guide_fails_the_build_with_no_artifact(self):
+        self.set_single_guide(b"\n[GA Alliance]\n[N1 Empty]\n"
+                              b"Just walk north and enjoy the view.\n")
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no advice", result.stderr.lower())
+        self.assertFalse((self.out / self.plugin_name).exists())
 
 
 class CatalogTests(unittest.TestCase):
