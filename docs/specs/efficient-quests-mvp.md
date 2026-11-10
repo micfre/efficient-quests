@@ -2,7 +2,7 @@
 
 MVP means minimum viable product, the smallest version that is useful.
 
-Status: the product decisions are agreed. The boundary for addon-level tests is confirmed.
+Status: superseded. Issue [#15](https://github.com/micfre/efficient-quests/issues/15) replaces this specification. The plugin flow that issue #15 describes shipped. The two user stories about the guide adaptation tool are removed from the list below. The rest of this document stays unchanged as the record of the MVP decisions.
 
 ## Problem Statement
 
@@ -79,8 +79,6 @@ The default view shows at most three short hints. The player can expand explanat
 53. As a player with an installation problem, I want the addon to show the problem as different from an absence of relevant tips, so that I know when the setup needs attention.
 54. As a player who chooses a guide, I want one installed package to be selected at a time, so that the addon does not merge contradictory authors automatically.
 55. As a player who installs the MVP, I want QuestieDB and a supported guide to be enough, so that I do not have to run another guide engine or another quest-helper interface.
-56. As a player who updates a guide, I want the addon to detect the status of the compatibility patch, so that I know when I must apply the adaptation again.
-57. As a player who also uses Guidelime, I want the guide adaptation to preserve how Guidelime works, so that Efficient Quests can coexist with my existing setup.
 58. As a player who updates QuestieDB, I want a clear compatibility check, so that an unsupported provider version does not produce misleading advice.
 59. As a player in standalone mode, I want a compact and independent hint window, so that I can use Efficient Quests with the quest tracker that I prefer.
 60. As a FlareUI player, I want hints anchored below its quest tracker with spacing that I can configure, so that the display fits my existing layout.
