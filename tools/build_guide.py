@@ -47,7 +47,9 @@ the built plugin itself and writes a per-guide report,
 `<plugin>/extraction-audit.json`, into the plugin folder. The audit needs a
 Lua 5.1 interpreter: the builder uses `lua5.1` or `lua` from the PATH when
 present, otherwise Docker with the same image the Lua suites use. Set
-EQ_AUDIT_LUA to force a specific interpreter command. The gate fails the
+EQ_AUDIT_LUA to force a specific interpreter command, or EQ_LUA_IMAGE to
+override the Docker image. tests/bridge.sh follows the same convention.
+The gate fails the
 build (and leaves no plugin folder) when the audit extracts no advice record
 from any character context or reports a finding with any severity outside
 the advisory set (WATCH only; the screen fails closed, so a severity the
@@ -74,10 +76,21 @@ LICENSE_NAMES = {"license", "license.txt", "licence", "licence.txt", "copying", 
 
 AUDIT_TOOL = "tools/audit_extraction.lua"
 AUDIT_REPORT = "extraction-audit.json"
-AUDIT_IMAGE = "nickblah/lua:5.1"
+DEFAULT_LUA_IMAGE = "nickblah/lua:5.1"
 LUA_INTERPRETERS = ("lua5.1", "lua")
 AUDIT_TIMEOUT = 300
 REPO_ROOT = Path(__file__).resolve().parent.parent
+
+
+def lua_image():
+    """The Docker image for the Lua suites; EQ_LUA_IMAGE overrides it.
+
+    The builder and tests/bridge.sh follow one convention for running Lua:
+    EQ_AUDIT_LUA forces an interpreter command, otherwise lua5.1, then lua,
+    from the PATH, otherwise Docker with the image named by EQ_LUA_IMAGE
+    (default nickblah/lua:5.1).
+    """
+    return os.environ.get("EQ_LUA_IMAGE") or DEFAULT_LUA_IMAGE
 
 # One pass over every registration call, in file and call order. The author
 # argument is optional; text and author are captured as raw bytes so the
@@ -254,15 +267,22 @@ def audit_command(plugin):
     """Build the command line that runs the audit over a built plugin folder.
 
     A Lua 5.1 interpreter on the PATH (lua5.1, then lua; or the command in
-    EQ_AUDIT_LUA) is preferred. Without one, the audit runs under Docker with
-    the same image the Lua suites use: the worktree is mounted at /w and the
-    plugin, when it lives outside the worktree, is mounted at /eqout.
+    EQ_AUDIT_LUA) is preferred. The forced command runs from the repository
+    root with a repository-relative plugin path, so the same value works as
+    a plain interpreter or as a docker-style command. Without one, the audit
+    runs under Docker with the image named by EQ_LUA_IMAGE (default
+    nickblah/lua:5.1, the same image the Lua suites use): the worktree is
+    mounted at /w and the plugin, when it lives outside the worktree, is
+    mounted at /eqout.
     """
     plugin = plugin.resolve()
     tail = [AUDIT_TOOL, None, "--json"]
     forced = os.environ.get("EQ_AUDIT_LUA")
     if forced:
-        tail[1] = str(plugin)
+        try:
+            tail[1] = str(plugin.relative_to(REPO_ROOT))
+        except ValueError:
+            tail[1] = str(plugin)
         return shlex.split(forced) + tail, REPO_ROOT
     for interpreter in LUA_INTERPRETERS:
         if shutil.which(interpreter):
@@ -277,7 +297,7 @@ def audit_command(plugin):
             inside = "/eqout/" + plugin.name
         tail[1] = inside
         return (["docker", "run", "--rm"] + mounts
-                + ["--workdir", "/w", AUDIT_IMAGE, "lua"] + tail), REPO_ROOT
+                + ["--workdir", "/w", lua_image(), "lua"] + tail), REPO_ROOT
     raise ValueError("No Lua 5.1 interpreter or Docker found; the extraction"
                      " audit cannot run. Install lua5.1 or Docker, or set EQ_AUDIT_LUA.")
 

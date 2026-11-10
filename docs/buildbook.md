@@ -74,7 +74,7 @@ With `--date` pinned, a rebuild of the same source is byte-identical. The same i
 
 The build fails when the package TOC lists no files, lists a file outside the package, contains no registration calls, or declares no version. A failed gate leaves no plugin folder behind.
 
-The extraction audit needs Lua 5.1. The builder prefers `lua5.1`, then `lua`, both from the PATH. With neither, it runs the audit under Docker with the image `nickblah/lua:5.1`. Set the environment variable `EQ_AUDIT_LUA` to force one interpreter command.
+The extraction audit needs Lua 5.1. The builder prefers `lua5.1`, then `lua`, both from the PATH. With neither, it runs the audit under Docker with the image `nickblah/lua:5.1`. Set the environment variable `EQ_AUDIT_LUA` to force one interpreter command, or `EQ_LUA_IMAGE` to use a different Docker image. The bridge script `tests/bridge.sh` picks its Lua by the same convention.
 
 ## Gates
 

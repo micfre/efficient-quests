@@ -14,11 +14,20 @@ python3 tools/build_guide.py tests/fixtures/GuideLime_Fixture_One \
   --output dist/bridge-test --date 2026-11-10
 
 plugin=dist/bridge-test/EfficientQuests_FixtureOne
-if command -v lua5.1 >/dev/null 2>&1; then
+# One Lua-selection convention, shared with the builder
+# (tools/build_guide.py): EQ_AUDIT_LUA forces an interpreter command;
+# otherwise lua5.1, then lua, from the PATH; otherwise Docker with the
+# image named by EQ_LUA_IMAGE (default nickblah/lua:5.1).
+if [ -n "$EQ_AUDIT_LUA" ]; then
+  # The variable may hold a command with arguments, so it stays unquoted.
+  exec $EQ_AUDIT_LUA tests/bridge.lua "$plugin"
+elif command -v lua5.1 >/dev/null 2>&1; then
   exec lua5.1 tests/bridge.lua "$plugin"
+elif command -v lua >/dev/null 2>&1; then
+  exec lua tests/bridge.lua "$plugin"
 elif command -v docker >/dev/null 2>&1; then
-  exec docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua tests/bridge.lua "$plugin"
+  exec docker run --rm -v "$PWD:/w" -w /w "${EQ_LUA_IMAGE:-nickblah/lua:5.1}" lua tests/bridge.lua "$plugin"
 else
-  echo "tests/bridge.sh: no lua5.1 interpreter and no docker found" >&2
+  echo "tests/bridge.sh: no Lua 5.1 interpreter (lua5.1, lua, or EQ_AUDIT_LUA) and no docker found" >&2
   exit 1
 fi
