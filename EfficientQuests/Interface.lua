@@ -8,6 +8,8 @@ local L = {
   display='Display', dismissed='Dismissed', standalone='Standalone',
   integrated='FlareUI', spacing='Tracker spacing', width='Window width',
   noGuide='Install a guide plugin.',
+  choose='Choose one of the installed guides in Settings.',
+  pick='Several guides are installed. Choose one below.',
   missing='Install and enable QuestieDB.',
   incompatible='Update or reinstall a compatible QuestieDB.',
   unavailable='This guide is no longer registered. Choose another in Settings.',
@@ -190,7 +192,10 @@ local function refreshSettings()
   showOrHide(widthLabel, display); showOrHide(widthLess, display); showOrHide(widthMore, display)
   showOrHide(spacingLabel, display); showOrHide(spacingLess, display); showOrHide(spacingMore, display)
   showOrHide(restore, dismissed)
-  settingsNote:SetText(guide and 'Select one installed guide.' or
+  local guideNote = 'Select one installed guide.'
+  if #list == 0 then guideNote = L.noGuide
+  elseif not chosen then guideNote = L.pick end
+  settingsNote:SetText(guide and guideNote or
     (display and 'Choose the window mode, width and tracker spacing.' or
     (#dismissedEntries > 0 and 'Restore individual hints, or restore them all.' or L.none)))
   for index = 1, math.max(#guideRows, guide and #list or 0) do
@@ -395,7 +400,8 @@ function EQ.RefreshInterface()
   elseif problem == 'missing' then statusText = L.missing
   elseif problem == 'incompatible' then statusText = L.incompatible
   elseif problem == 'guide' then
-    statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide
+    if not guide and next(EQ.guides) then statusText = L.choose
+    else statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide end
   end
   status:SetWidth(math.max(1, width - 16))
   status:SetText(statusText or '')
