@@ -25,11 +25,14 @@ loadAddon()
 assert(status():find('QuestieDB', 1, true), 'missing provider should produce actionable status')
 print('ok - missing provider status without optional addons')
 LibQuestieDB = {}
-assert(status():find('guide', 1, true), 'missing guide should be distinguished from a missing provider')
-print('ok - missing guide status')
-EfficientQuests_RegisterGuide('TUG', '[NExample advice]', 'TUG')
-assert(not status():find('No compatible guide', 1, true), 'adapted guide should be recognized')
-print('ok - adapted guide registers independently')
+local message = status()
+assert(message:find('guide', 1, true), 'missing guide should be distinguished from a missing provider')
+assert(message:find('github.com/micfre/efficient-quests/releases', 1, true),
+  'missing guide status should point at the releases page')
+print('ok - missing guide status points at the releases page')
+EfficientQuests_RegisterGuide('Example', '[NExample advice]', 'reference')
+assert(not status():find('releases', 1, true), 'a registered guide removes the releases pointer')
+print('ok - registered guide recognized without a releases pointer')
 assert(not status():find('No relevant tips', 1, true), 'unverified dependencies must not be presented as a valid empty state')
 print('ok - unverified dependencies do not look like an empty result')
 assert(status():find('incompatible', 1, true), 'provider without a supported contract should be reported as incompatible')
@@ -74,12 +77,23 @@ C_QuestLog.IsOnQuest = nil
 context = EfficientQuests.GetContext()
 assert(context.isAccepted(103) == nil, 'incomplete log must not imply unaccepted')
 print('ok - hidden quests can be checked without treating unknown as false')
-EfficientQuests.guides.TUG = nil
-C_AddOns = { GetAddOnInfo = function(name) if name == 'GuideLime_TUGs_Forever' then return {name = name} end end,
- GetAddOnMetadata = function() return nil end }
-assert(status():find('reapply', 1, true) and status():find('TUG', 1, true),
-  'installed guide missing adaptation should give an actionable setup status')
-print('ok - unadapted guide status')
+-- With no guide registered, the setup status names a declared guide
+-- plugin that failed to register instead of the generic pointer.
+EfficientQuests.guides.Example = nil
+C_AddOns = {
+  GetNumAddOns = function() return 1 end,
+  GetAddOnInfo = function() return 'EfficientQuests_Declared' end,
+  GetAddOnMetadata = function(name, field)
+    if field == 'X-EfficientQuests-Guide' then return '1' end
+  end,
+}
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+local statusMessage = status()
+assert(statusMessage:find('EfficientQuests_Declared', 1, true) and statusMessage:find('did not register', 1, true),
+  'a declared guide that did not register should be named in the setup status')
+assert(not statusMessage:find('releases', 1, true),
+  'the generic releases pointer must not hide the specific broken plugin')
+print('ok - unregistered declared guide is named in status')
 handlers.OnEvent(nil, 'QUEST_TURNED_IN', 105)
 context = EfficientQuests.GetContext()
 assert(context.completedQuestIDs[105], 'observed turn-in should be remembered')
@@ -129,6 +143,11 @@ assert(silentWarning and silentWarning:find('did not register', 1, true),
 assert(rogueWarning and rogueWarning:find('without declaring', 1, true),
   'a guide that registers without declaring the marker must warn distinctly')
 print('ok - registered guide without the marker warns at login')
+local setup = status()
+assert(setup:find('EfficientQuests_Rogue', 1, true) and setup:find('without declaring', 1, true),
+  'reconciliation mismatches should reach the setup status')
+assert(not setup:find('Ready', 1, true), 'a setup with mismatch warnings must not report ready')
+print('ok - mismatch warnings surface in the setup status')
 
 clearGuides()
 EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired again]', 'Paired Author')
@@ -139,6 +158,8 @@ handlers.OnEvent(nil, 'PLAYER_LOGIN')
 assert(#EfficientQuests.GetGuideWarnings() == 0,
   'a matching declared and registered set must produce no warnings')
 print('ok - matching declared and registered set stays silent')
+assert(status():find('Ready', 1, true), 'a reconciled setup must still report ready')
+print('ok - reconciled setup reports ready')
 
 clearGuides()
 EfficientQuests_RegisterGuide('EfficientQuests_Opaque', '[N Opaque]', 'Opaque Author')

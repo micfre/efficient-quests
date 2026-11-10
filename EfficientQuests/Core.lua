@@ -81,19 +81,17 @@ local function status()
         return "QuestieDB is missing. Install and enable the QuestieDB addon."
     end
     if not next(guides) then
-        local addons = C_AddOns
-        if addons and addons.GetAddOnInfo and addons.GetAddOnInfo("GuideLime_TUGs_Forever") then
-            local marker = addons.GetAddOnMetadata and addons.GetAddOnMetadata("GuideLime_TUGs_Forever", "X-EfficientQuests-Adaptation")
-            if marker ~= "1" then
-                return "TUG guide needs adaptation. Run or reapply the guide adaptation tool."
-            end
-            return "TUG guide did not register. Check that it is enabled and reapply the adaptation if needed."
-        end
-        return "No compatible guide is registered. Install and adapt the supported TUG guide."
+        local warnings = EfficientQuests.GetGuideWarnings()
+        if #warnings > 0 then return table.concat(warnings, " ") end
+        return "No guide plugin is registered. Install one from github.com/micfre/efficient-quests/releases."
     end
     local _, problem = EfficientQuests.GetProvider()
     if problem then
         return "QuestieDB is incompatible. Update or reinstall a supported QuestieDB provider."
+    end
+    local warnings = EfficientQuests.GetGuideWarnings()
+    if #warnings > 0 then
+        return table.concat(warnings, " ")
     end
     return "Ready."
 end

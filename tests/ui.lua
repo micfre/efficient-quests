@@ -162,6 +162,17 @@ click('EfficientQuestsHint3')
 assert(not widgets.EfficientQuestsItem3:IsShown(), 'unverified guide item must not produce an item link')
 print('ok - quest, map and verified item links use existing interfaces')
 
+-- A selected guide that is no longer registered says so and points the
+-- player at the settings instead of naming any external tool.
+EfficientQuests.guides.Links = nil
+event('QUEST_LOG_UPDATE')
+assert(widgets.EfficientQuestsStatus:IsShown(), 'a removed selected guide must show the status line')
+assert(widgets.EfficientQuestsStatus.text:find('no longer registered', 1, true),
+  'the removed-guide status must say the guide is gone')
+assert(widgets.EfficientQuestsStatus.text:find('Settings', 1, true),
+  'the removed-guide status must point at where another guide can be chosen')
+print('ok - removed selected guide names the problem')
+
 EfficientQuests_RegisterGuide('Long', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple] ' .. string.rep('for later use ', 90), 'Author')
 EfficientQuestsCharacter.guide = 'Long'
 event('QUEST_LOG_UPDATE')
