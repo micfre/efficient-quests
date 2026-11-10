@@ -172,7 +172,11 @@ end
 -- instead of cycling through them.
 local function makeGuideRow(index)
   local row = {}
-  row.button = button(settings, 'EfficientQuestsGuideRow'..index, '', 360, 25, nil)
+  row.button = button(settings, 'EfficientQuestsGuideRow'..index, '', 360, 25, function()
+    if row.key then
+      savedCharacterData().guide = row.key; page = 0; EQ.RefreshInterface()
+    end
+  end)
   guideRows[index] = row
   return row
 end
