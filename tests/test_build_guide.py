@@ -275,6 +275,17 @@ class AuditGateTests(BuilderFixture):
         self.assertIn("no advice", result.stderr.lower())
         self.assertFalse((self.out / self.plugin_name).exists())
 
+    def test_safety_screen_trip_fails_the_build_with_no_artifact(self):
+        # The conditional-prefix path of the extraction can carry a screened
+        # phrase into the visible text; the ROUTE finding must stop the build.
+        self.set_single_guide(b"\n[GA Alliance]\n[N1 Route]\n"
+                              b"If you are done with this guide, buy 5 apples. "
+                              b"Also save 10 silks.\n")
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ROUTE", result.stderr)
+        self.assertFalse((self.out / self.plugin_name).exists())
+
 
 class CatalogTests(unittest.TestCase):
     """The shipped catalog must stay valid and list the ticket's two guides."""
