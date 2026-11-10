@@ -249,9 +249,10 @@ EfficientQuests_RegisterGuide('QuestTagLists', [[
 [G1,2 Greenfield] Collect eight reagents for [QC105] before leaving the grove.
 [G1,2 Greenfield] Buy [CI42,5 Apples] for [QC101].
 [G1,2 Greenfield] Collect a token and a badge for [QC106] and [QC107] before leaving the hall.
+[G1,2 Greenfield] Buy a lantern for the mine shaft.
 ]], 'synthetic')
 local lists = EfficientQuests.ExtractGuide('QuestTagLists', {})
-assert(#lists == 5, 'quest-tag lists with practical verbs remain available')
+assert(#lists == 6, 'quest-tag lists with practical verbs remain available')
 assert(not lists[1].text:find('for ,', 1, true) and not lists[1].text:find('for  ', 1, true),
   'a quest-tag list must not leave dangling punctuation')
 assert(lists[1].text:find('for these quests', 1, true), 'multiple quest tags resolve to a plural reference')
@@ -264,4 +265,25 @@ assert(lists[4].text == 'Buy 5 Apples for this quest.',
   'a trailing single quest tag keeps its established wording')
 assert(lists[5].text:find('for these quests before leaving', 1, true),
   'two tags joined by and resolve to a plural reference')
+assert(lists[6].text == 'Buy a lantern for the mine shaft.',
+  'an ordinary use of for is preserved verbatim')
 print('ok - quest-tag lists render as standalone references')
+
+EfficientQuests_RegisterGuide('PrefixTags', [[
+[N Greenfield]
+[A Mage] [G30.09,71.52 Greenfield] [CI2901,1] Buy a pick from the merchant; keep it in your bags.
+[A Mage] [G25.81,75.55 Greenfield] [V] Buy a usable early wand at the auction house.
+[A Mage] [G43.85,43.89 Greenfield] [CI4470,1] Buy one Simple Wood from the merchant for your first campfire kit.
+[G70.95,72.51 Greenfield] Buy a pick from the merchant.
+]], 'synthetic')
+local prefixed = EfficientQuests.ExtractGuide('PrefixTags', {class='Mage'})
+assert(#prefixed == 4, 'advice with prefixed position tags remains available')
+assert(prefixed[1].text == 'Buy a pick from the merchant; keep it in your bags.',
+  'a coordinate tag after condition tags is a position marker, not prose')
+assert(prefixed[1].itemID == 2901 and prefixed[1].quantity == 1,
+  'dropping the marker rendering keeps the item identity')
+assert(prefixed[2].text == 'Buy a usable early wand at the auction house.',
+  'a zone name from a position marker must not start the visible text')
+assert(prefixed[3].text == 'Buy one Simple Wood from the merchant for your first campfire kit.',
+  'a nameless item tag before the prose must not render as a bare count')
+print('ok - position-marker tags do not leak into visible advice')

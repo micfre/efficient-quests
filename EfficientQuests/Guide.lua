@@ -68,17 +68,14 @@ end
 -- [QC2] and [QC3]"). Replacing that whole run with a standalone reference
 -- keeps the shortened text readable instead of leaving dangling punctuation.
 local function resolveQuestLists(line)
-  local out, position = {}, 1
+  local out, position, scan = {}, 1, 1
   while true do
-    local start, finish = line:find('%f[%a]for%f[%A]', position)
+    local start, finish = line:find('%f[%a]for%f[%A]', scan)
     if not start then break end
-    out[#out + 1] = line:sub(position, start - 1)
-    local tagStart = finish + 1 + #(line:match('^%s*', finish + 1) or '')
-    if not tagStart then
-      out[#out + 1] = line:sub(start, finish)
-      position = finish + 1
-    else
-      local count, cursor = 0, tagStart
+    local whitespace = line:match('^%s*', finish + 1) or ''
+    local tagStart = finish + 1 + #whitespace
+    local count, cursor = 0, tagStart
+    if line:match('^%[QC%d+', tagStart) then
       while true do
         local tag = line:match('^%[QC%d+[^%]]*%]', cursor)
         if not tag then break end
@@ -86,11 +83,16 @@ local function resolveQuestLists(line)
         cursor = cursor + #tag
         local separator = line:match('^[%s,]*and[%s,]*', cursor)
           or line:match('^[%s,]*', cursor) or ''
-        if not line:match('^%[QC', cursor + #separator) then break end
+        if not line:match('^%[QC%d+', cursor + #separator) then break end
         cursor = cursor + #separator
       end
+    end
+    if count > 0 then
+      out[#out + 1] = line:sub(position, start - 1)
       out[#out + 1] = count == 1 and 'for this quest' or 'for these quests'
-      position = cursor
+      position, scan = cursor, cursor
+    else
+      scan = finish + 1
     end
   end
   out[#out + 1] = line:sub(position)
@@ -99,6 +101,20 @@ end
 
 local function readable(line)
   line = resolveQuestLists(line)
+  -- A run of tags before any prose marks the step's position and conditions;
+  -- it is not prose. Drop coordinate zones and bare item counts there so
+  -- they cannot leak into the start of the visible text.
+  local prefix, position = '', 1
+  while true do
+    local whitespace, tag = line:sub(position):match('^(%s*)(%[[^%]]+%])')
+    if not tag then break end
+    prefix = prefix .. whitespace
+    local zone = tag:match('^%[G%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*[^%]]*%]$')
+    local nameless = tag:match('^%[CI%d+,%s*%d+%]$')
+    if not zone and not nameless then prefix = prefix .. tag end
+    position = position + #whitespace + #tag
+  end
+  line = prefix .. line:sub(position)
   line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
   line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
   line = line:gsub('at%s*%[TAR%d+%]', ' ')
