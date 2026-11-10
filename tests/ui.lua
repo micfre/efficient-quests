@@ -308,3 +308,12 @@ assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1)
   and not widgets.EfficientQuestsGuideRow2.text:find('^✓', 1),
   'no row is marked while nothing is chosen')
 print('ok - several guides wait for an explicit choice instead of a default')
+
+-- Picking a row selects that guide for this character and shows its advice.
+click('EfficientQuestsGuideRow2')
+assert(EfficientQuestsCharacter.guide == 'Solo', 'an explicit pick is saved per character')
+assert(widgets.EfficientQuestsGuideRow2.text:find('^✓', 1), 'the chosen row is marked')
+assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1), 'the other rows are not marked')
+assert(not widgets.EfficientQuestsStatus:IsShown(), 'a complete choice clears the prompt')
+assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the hints follow the explicit choice')
+print('ok - picking a row selects that guide for this character')
