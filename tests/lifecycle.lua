@@ -69,6 +69,17 @@ assert(not flight(), 'positively observed named flight path suppresses its remin
 eventHandler(nil, 'TAXIMAP_CLOSED')
 assert(not flight(), 'observed path is retained after the taxi map closes')
 print('ok - positive flight discovery persists and unknown history stays conditional')
+EfficientQuests_RegisterGuide('NamedFlights', [[
+[N Elwynn Forest]
+[G55.5,47.8 Elwynn Forest] [P Stormwind] Take the flight point on arrival.
+[G40,50 Elwynn Forest] [P Goldshire] Collect the gryphon point before the patrol quests.
+]], 'Author')
+local named = EfficientQuests.GetHints('NamedFlights')
+assert(#named == 1 and named[1].text:find('Goldshire', 1, true),
+  'an observed named flight point is suppressed while an unknown one remains')
+assert(named[1].text:find('if you have not already learned', 1, true),
+  'named flight point advice stays conditional while its history is unknown')
+print('ok - named flight points follow the same learned/unknown wording')
 EfficientQuests_RegisterGuide('Technique', [[
 [N Elwynn Forest]
 [G40,50 Elwynn Forest] Use a torch before killing enemies for [QC101].

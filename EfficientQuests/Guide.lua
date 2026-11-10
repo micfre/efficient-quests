@@ -64,7 +64,58 @@ local function addUnknown(to, from)
   for _, item in ipairs(from) do to[#to + 1] = item end
 end
 
+-- A preposition such as "for" can introduce a run of quest tags ("for [QC1],
+-- [QC2] and [QC3]"). Replacing that whole run with a standalone reference
+-- keeps the shortened text readable instead of leaving dangling punctuation.
+local function resolveQuestLists(line)
+  local out, position, scan = {}, 1, 1
+  while true do
+    local start, finish = line:find('%f[%a]for%f[%A]', scan)
+    if not start then break end
+    local whitespace = line:match('^%s*', finish + 1) or ''
+    local tagStart = finish + 1 + #whitespace
+    local count, cursor = 0, tagStart
+    if line:match('^%[QC%d+', tagStart) then
+      while true do
+        local tag = line:match('^%[QC%d+[^%]]*%]', cursor)
+        if not tag then break end
+        count = count + 1
+        cursor = cursor + #tag
+        local separator = line:match('^[%s,]*and[%s,]*', cursor)
+          or line:match('^[%s,]*', cursor) or ''
+        if not line:match('^%[QC%d+', cursor + #separator) then break end
+        cursor = cursor + #separator
+      end
+    end
+    if count > 0 then
+      out[#out + 1] = line:sub(position, start - 1)
+      out[#out + 1] = count == 1 and 'for this quest' or 'for these quests'
+      position, scan = cursor, cursor
+    else
+      scan = finish + 1
+    end
+  end
+  out[#out + 1] = line:sub(position)
+  return table.concat(out)
+end
+
 local function readable(line)
+  line = resolveQuestLists(line)
+  -- A run of tags before any prose marks the step's position and conditions;
+  -- it is not prose. Drop coordinate zones and bare item counts there so
+  -- they cannot leak into the start of the visible text.
+  local prefix, position = '', 1
+  while true do
+    local whitespace, tag = line:sub(position):match('^(%s*)(%[[^%]]+%])')
+    if not tag then break end
+    prefix = prefix .. whitespace
+    local zone = tag:match('^%[G%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*[^%]]*%]$')
+    local nameless = tag:match('^%[CI%d+,%s*%d+%]$')
+    local flightPoint = tag:match('^%[P%s+')
+    if not zone and not nameless and not flightPoint then prefix = prefix .. tag end
+    position = position + #whitespace + #tag
+  end
+  line = prefix .. line:sub(position)
   line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
   line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
   line = line:gsub('at%s*%[TAR%d+%]', ' ')
@@ -122,14 +173,20 @@ local function useful(line)
       or plain:match('^do%s*[:]') or plain:match('^run to')
       or plain:match('^follow the') or plain:match('^learn your level')
       or plain:match('^put them') then return false end
-  return s:find('buy', 1, true) or s:find('%f[%a]keep%f[%A]')
-      or s:find('save', 1, true) or s:find('sell', 1, true)
-      or s:find('stock up', 1, true) or s:find('flight path', 1, true)
-      or s:find('flightpath', 1, true) or s:find('flight master', 1, true)
-      or s:find('needed for', 1, true) or s:find('quest items', 1, true)
-      or (s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true))
-      or (s:find('[qc', 1, true) and (s:find('while ', 1, true)
-          or s:find('before ', 1, true) or s:find('use ', 1, true)))
+  -- Practical wording is prose, not tag metadata, and a retention "keep"
+  -- takes an object: a bare "keep" before punctuation is a fortress name.
+  local words = s:gsub('%b[]', '')
+  return words:find('buy', 1, true) or words:find('%f[%a]keep[!%s]')
+      or words:find('save', 1, true) or words:find('sell', 1, true)
+      or words:find('stock up', 1, true) or words:find('flight path', 1, true)
+      or words:find('flightpath', 1, true) or words:find('flight master', 1, true)
+      or words:find('flight point', 1, true) or words:find('gryphon point', 1, true)
+      or words:find('wind rider point', 1, true)
+      or words:find('needed for', 1, true) or words:find('quest items', 1, true)
+      or (words:find('escort quest', 1, true) and words:find('group', 1, true)
+          and words:find('turn', 1, true))
+      or (s:find('[qc', 1, true) and (words:find('while ', 1, true)
+          or words:find('before ', 1, true) or words:find('use ', 1, true)))
 end
 
 -- Some quest directives have a self-contained practical note in parentheses.
@@ -146,10 +203,30 @@ local function cameraLootNote(line)
   if normalized == 'you can loot it from outside using camera angle' then return trim(note) end
 end
 
+-- A bare objective directive can still carry the guide's knowledge of what
+-- its quests require. Keep that requirement without adopting the directive.
+local function directiveRequirement(line)
+  local bare = trim((line:gsub('%[[^%]]+%]', '')):gsub('%s+', ' '))
+  if bare:lower() ~= 'do:' and bare:lower() ~= 'do' then return nil end
+  local _, itemCount = line:gsub('%[CI%d+', '')
+  if itemCount ~= 1 then return nil end
+  local id, quantity, name = line:match('%[CI(%d+)%s*,%s*(%d+)%s+([^%]]+)%]')
+  if not name then return nil end
+  local quests, seen = {}, {}
+  for questID in line:gmatch('%[QC(%d+)') do
+    local numeric = tonumber(questID)
+    if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
+  end
+  if #quests == 0 then return nil end
+  return {itemID=tonumber(id), quantity=tonumber(quantity), name=trim(name), quests=quests}
+end
+
 -- A line can mix a route instruction with a separate practical sentence.
 -- Split only at sentence punctuation, never at decimal points or tags.
 local function usefulExcerpt(line)
   if cameraLootNote(line) then return trim(line) end
+  local requirement = directiveRequirement(line)
+  if requirement then return trim(line), nil, requirement end
   local pieces, start, insideTag = {}, 1, false
   for i = 1, #line do
     local char = line:sub(i, i)
@@ -228,7 +305,8 @@ end
 local function adviceKind(excerpt, item)
   local s = excerpt:lower()
   if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
-      or s:find('flight master', 1, true) then return 'flight' end
+      or s:find('flight master', 1, true) or s:find('flight point', 1, true)
+      or s:find('gryphon point', 1, true) or s:find('wind rider point', 1, true) then return 'flight' end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
   if s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true) then return 'technique' end
   if s:gsub('questitem', 'quest item'):find('quest item', 1, true) and s:find('spawn', 1, true) then return 'technique' end
@@ -294,8 +372,8 @@ function EQ.ExtractGuide(packageName, context)
             location = {x=tonumber(x), y=tonumber(y), zone=trim(zone),
               conditions=lineUnknown}
           end
-          local excerpt, inferred
-          if lineAllowed then excerpt, inferred = usefulExcerpt(line) end
+          local excerpt, inferred, requirement
+          if lineAllowed then excerpt, inferred, requirement = usefulExcerpt(line) end
           local learning = excerpt and learningStates(line, context) or {}
           -- General class/profession progression is outside the quest-focused
           -- view. Keep explicitly quest-related learning advice available.
@@ -303,6 +381,11 @@ function EQ.ExtractGuide(packageName, context)
               and not excerpt:lower():find('quest', 1, true) then excerpt = nil end
           if excerpt then
             local text = cameraLootNote(excerpt) or readable(excerpt)
+            if requirement then
+              text = requirement.quantity .. ' ' .. requirement.name
+                .. ' needed for '
+                .. (#requirement.quests == 1 and 'this quest' or 'these quests') .. '.'
+            end
             if text ~= '' then
               local item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
               local itemTag = excerpt:match('%[CI([^%]]+)%]')
@@ -315,9 +398,6 @@ function EQ.ExtractGuide(packageName, context)
                 if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
               end
               local quest = #quests == 1 and quests[1] or nil
-              if quest and excerpt:match('for%s*%[QC%d+[^%]]*%]%s*[%.!]?%s*$') then
-                text = text:gsub('for%s*([%.!]?)%s*$', 'for this quest%1')
-              end
               local unknown = {}
               addUnknown(unknown, chapterUnknown)
               addUnknown(unknown, lineUnknown)
@@ -326,7 +406,18 @@ function EQ.ExtractGuide(packageName, context)
                 if state.known == nil then unknown[#unknown + 1] = 'learning state unknown' end
               end
               if #quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
+              if requirement then unknown[#unknown + 1] = 'requirement from an objective directive' end
               if inferred then unknown[#unknown + 1] = 'quest reference inferred from following sentence' end
+              local kind = requirement and 'supply'
+                or (inferred and 'technique' or adviceKind(excerpt, item))
+              -- A named flight point tag on the line identifies the travel
+              -- opportunity; keep the name with advice whose prose omits it.
+              if kind == 'flight' then
+                local point = line:match('%[P%s+([^%]]*%S)%]')
+                if point and not text:lower():find(point:lower(), 1, true) then
+                  text = point .. ': ' .. text
+                end
+              end
               local loc
               if location then loc = {x=location.x, y=location.y, zone=location.zone,
                 coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not x} end
@@ -338,7 +429,7 @@ function EQ.ExtractGuide(packageName, context)
                 association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
                 itemID=tonumber(item), quantity=tonumber(quantity),
                 itemSourceName=itemName,
-                kind=inferred and 'technique' or adviceKind(excerpt, item),
+                kind=kind,
                 learningState=learning,
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,

@@ -143,11 +143,13 @@ local function knownFlight(advice, context)
     if not paths or not context.zoneID then return false end
     local text, matches = string.lower(advice.text), 0
     -- A location mentioned elsewhere in the instruction is not the path's
-    -- identity. Only compare a name immediately after its destination phrase.
+    -- identity. Only compare a name immediately after its destination phrase,
+    -- or a flight point named by a leading guide tag.
     local destination = text:match('flight%s*path%s+at%s*:%s*(.+)')
         or text:match('flight%s*path%s+at%s+(.+)')
         or text:match('flight%s*path%s+in%s*:%s*(.+)')
         or text:match('flight%s*path%s+in%s+(.+)')
+        or text:match('^%s*([^:]+):%s')
     if not destination then
         -- Without a named destination in the sentence, the guide's own
         -- location tag can identify the path: an exact, unique observed
@@ -231,12 +233,19 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
         local text = string.lower(advice.text)
         -- Only a leading acquisition directive is evidence that the guide
         -- asks the player to learn a path. "Use ... to get to ..." is travel.
-        local acquisition = text:match("^%s*get%f[%A]") or text:match("^%s*learn%f[%A]")
-            or text:match("^%s*grab%f[%A]") or text:match("^%s*pick%s+up%f[%A]")
-            or text:match("^%s*acquire%f[%A]")
-        if acquisition then
+        -- A named flight point can prefix the same directive with its name.
+        local function acquisition(t)
+            return t:match("^%s*get%f[%A]") or t:match("^%s*learn%f[%A]")
+                or t:match("^%s*grab%f[%A]") or t:match("^%s*pick%s+up%f[%A]")
+                or t:match("^%s*acquire%f[%A]") or t:match("^%s*take%s")
+                or t:match("^%s*collect%s")
+        end
+        local body = text:match("^%s*[^:]+:%s*(.+)$")
+        if acquisition(text) or (body and acquisition(body)) then
             if knownFlight(advice, context) then return false end
-            advice.text = advice.text .. " (if you have not already learned it)"
+            if not text:find("already", 1, true) then
+                advice.text = advice.text .. " (if you have not already learned it)"
+            end
         end
     end
     return true

@@ -241,3 +241,109 @@ EfficientQuests_RegisterGuide('NarrativeReason', [[
 assert(#EfficientQuests.ExtractGuide('NarrativeReason', {}) == 0,
   'unsupported narrative explanations must not be displayed as advice or source context')
 print('ok - narrative causal explanation is withheld')
+
+EfficientQuests_RegisterGuide('QuestTagLists', [[
+[N Greenfield]
+[G1,2 Greenfield] Buy [CI42,3 Apples] for [QC101], [QC102], and [QC103].
+[G1,2 Greenfield] Defeat the bandit leader for [QC104], then return to the camp before dark.
+[G1,2 Greenfield] Collect eight reagents for [QC105] before leaving the grove.
+[G1,2 Greenfield] Buy [CI42,5 Apples] for [QC101].
+[G1,2 Greenfield] Collect a token and a badge for [QC106] and [QC107] before leaving the hall.
+[G1,2 Greenfield] Buy a lantern for the mine shaft.
+]], 'synthetic')
+local lists = EfficientQuests.ExtractGuide('QuestTagLists', {})
+assert(#lists == 6, 'quest-tag lists with practical verbs remain available')
+assert(not lists[1].text:find('for ,', 1, true) and not lists[1].text:find('for  ', 1, true),
+  'a quest-tag list must not leave dangling punctuation')
+assert(lists[1].text:find('for these quests', 1, true), 'multiple quest tags resolve to a plural reference')
+assert(#lists[1].questIDs == 3 and lists[1].association == 'quests', 'tag list quests are all retained')
+assert(lists[2].text:find('for this quest, then return', 1, true),
+  'a single tag followed by more prose keeps its punctuation')
+assert(lists[3].text:find('for this quest before leaving', 1, true),
+  'a single tag followed by a condition keeps its meaning')
+assert(lists[4].text == 'Buy 5 Apples for this quest.',
+  'a trailing single quest tag keeps its established wording')
+assert(lists[5].text:find('for these quests before leaving', 1, true),
+  'two tags joined by and resolve to a plural reference')
+assert(lists[6].text == 'Buy a lantern for the mine shaft.',
+  'an ordinary use of for is preserved verbatim')
+print('ok - quest-tag lists render as standalone references')
+
+EfficientQuests_RegisterGuide('PrefixTags', [[
+[N Greenfield]
+[A Mage] [G30.09,71.52 Greenfield] [CI2901,1] Buy a pick from the merchant; keep it in your bags.
+[A Mage] [G25.81,75.55 Greenfield] [V] Buy a usable early wand at the auction house.
+[A Mage] [G43.85,43.89 Greenfield] [CI4470,1] Buy one Simple Wood from the merchant for your first campfire kit.
+[G70.95,72.51 Greenfield] Buy a pick from the merchant.
+]], 'synthetic')
+local prefixed = EfficientQuests.ExtractGuide('PrefixTags', {class='Mage'})
+assert(#prefixed == 4, 'advice with prefixed position tags remains available')
+assert(prefixed[1].text == 'Buy a pick from the merchant; keep it in your bags.',
+  'a coordinate tag after condition tags is a position marker, not prose')
+assert(prefixed[1].itemID == 2901 and prefixed[1].quantity == 1,
+  'dropping the marker rendering keeps the item identity')
+assert(prefixed[2].text == 'Buy a usable early wand at the auction house.',
+  'a zone name from a position marker must not start the visible text')
+assert(prefixed[3].text == 'Buy one Simple Wood from the merchant for your first campfire kit.',
+  'a nameless item tag before the prose must not render as a bare count')
+print('ok - position-marker tags do not leak into visible advice')
+
+EfficientQuests_RegisterGuide('FlightPoints', [[
+[N Greenfield]
+[A Druid,Night Elf] [G58.38,94.01 Greenfield] [P Rut'theran Village] Take the regular gryphon point before boarding the boat.
+[A Druid,Night Elf] [G36.33,45.09 Greenfield] [P Auberdine] Take the gryphon point on arrival.
+[G70.95,72.51 Greenfield] [P Stormwind] Collect the gryphon point if you don't already have it.
+[G51.50,30.34 Greenfield] [P The Crossroads] Take the wind rider point on arrival.
+[G55.50,47.74 Greenfield] Learn the flight path at the mountain outpost.
+]], 'synthetic')
+local points = EfficientQuests.ExtractGuide('FlightPoints', {class='Druid', race='Night Elf'})
+assert(#points == 5, 'gryphon and wind rider advice is available alongside flight paths')
+for _, point in ipairs(points) do
+  assert(point.kind == 'flight', 'gryphon and wind rider points are travel opportunities')
+end
+assert(points[1].text:find("Rut'theran Village", 1, true),
+  'a named flight point tag keeps its name in the visible text')
+assert(points[2].text:find('Auberdine', 1, true) and points[2].text:find('gryphon point', 1, true),
+  'the flight point name and action stay together')
+assert(points[3].text:find('if you don', 1, true),
+  "the guide's own conditional wording is preserved")
+assert(points[4].text:find('The Crossroads', 1, true) and points[4].text:find('wind rider', 1, true),
+  'horde flight points use their own wording')
+assert(not points[5].text:find('%['), 'existing flight path advice is unchanged')
+print('ok - gryphon and wind rider points become named travel advice')
+
+EfficientQuests_RegisterGuide('DirectiveItems', [[
+[N Greenfield]
+Do: [QC201-][QC202-][QC203][CI501,7 Spider Silk]
+[O]Do: [QC204][CI501,7 Spider Silk]
+Do: [QC205][CI501,7 Spider Silk][CI502,4 Turtle Meat]
+Do: [QC206]
+Now get [CI501,7 Spider Silk].
+]], 'synthetic')
+local directives = EfficientQuests.ExtractGuide('DirectiveItems', {})
+assert(#directives == 2, 'only item-bearing objective directives carry extractable knowledge')
+assert(directives[1].kind == 'supply' and directives[1].itemID == 501 and directives[1].quantity == 7,
+  'the directive item and quantity become a supply requirement')
+assert(directives[1].text == '7 Spider Silk needed for these quests.',
+  'the requirement is stated without adopting the route directive')
+assert(#directives[1].questIDs == 3 and directives[1].association == 'quests'
+  and directives[1].uncertain, 'directive requirements stay quest-linked and uncertain')
+assert(directives[2].text == '7 Spider Silk needed for this quest.',
+  'a single directive quest reference uses the established singular wording')
+print('ok - item-bearing objective directives preserve their requirement')
+
+EfficientQuests_RegisterGuide('FlightPointWording', [[
+[N Greenfield]
+[G65.5,24.3 Greenfield] [P Northgate Keep] Ride south into the valley, then follow the road east to Northgate Keep. Collect its flight point before entering the keep.
+[G1,2 Greenfield] Repair your gear at the smith.
+]], 'synthetic')
+local flightWording = EfficientQuests.ExtractGuide('FlightPointWording', {})
+assert(#flightWording == 1, 'flight point wording is recognized as travel advice')
+assert(flightWording[1].kind == 'flight', 'collecting a flight point is a travel opportunity')
+assert(flightWording[1].text:find('Collect its flight point', 1, true),
+  'the flight point sentence is the advice, not the riding directions')
+assert(not flightWording[1].text:find('Ride south', 1, true),
+  'a fortress name must not mistake route riding for retention advice')
+assert(flightWording[1].text:find('Northgate Keep', 1, true),
+  'the named flight point stays visible with its advice')
+print('ok - flight point wording and fortress names are distinguished')
