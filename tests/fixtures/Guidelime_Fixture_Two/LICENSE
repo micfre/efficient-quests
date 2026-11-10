@@ -1,0 +1,6 @@
+Synthetic fixture license for tests and the release dry-run.
+
+This file is not third-party text. It exists so that the licensed-fixture
+guide package carries a license file in its root, the way the real GPLv3
+guide package does, and so the release dry-run can show the license being
+bundled into the shipped zip.
