@@ -1,5 +1,5 @@
--- Global hook used by locally adapted guide packages. Keep this independent of
--- Guidelime so either addon can be present without replacing its namespace.
+-- Global hook called by guide plugins. The first argument is the plugin's
+-- addon name and the registry key; each further call appends one chapter.
 local guides = {}
 EfficientQuests = { guides = guides }
 local function registerGuide(packageName, ...)
@@ -8,6 +8,30 @@ local function registerGuide(packageName, ...)
     table.insert(guides[packageName], {...})
 end
 _G.EfficientQuests_RegisterGuide = registerGuide
+
+local function guideTitle(key)
+    local addons = _G.C_AddOns
+    if addons and type(addons.GetAddOnMetadata) == "function" then
+        local title = addons.GetAddOnMetadata(key, "Title")
+        if type(title) == "string" and title ~= "" then return title end
+    end
+    return key
+end
+
+local function guideList()
+    local list = {}
+    for key, chapters in pairs(guides) do
+        table.insert(list, {
+            key = key,
+            name = guideTitle(key),
+            author = chapters[1] and chapters[1][2] or nil,
+            chapters = #chapters,
+        })
+    end
+    table.sort(list, function(a, b) return a.key < b.key end)
+    return list
+end
+EfficientQuests.GetGuideList = guideList
 
 local function status()
     if not _G.LibQuestieDB then
