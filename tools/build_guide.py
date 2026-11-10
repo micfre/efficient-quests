@@ -40,12 +40,22 @@ without .txt, matched case-insensitively) is copied into the plugin unchanged.
 
 The build fails when the TOC lists no files, lists a file outside the package,
 contains no registration calls, or declares no version.
+
+Every build then runs the extraction audit (tools/audit_extraction.lua) over
+the built plugin itself and writes a per-guide report,
+`<plugin>/extraction-audit.json`, into the plugin folder. The audit needs a
+Lua 5.1 interpreter: the builder uses `lua5.1` or `lua` from the PATH when
+present, otherwise Docker with the same image the Lua suites use. Set
+EQ_AUDIT_LUA to force a specific interpreter command.
 """
 import argparse
 import hashlib
 import json
+import os
 import re
+import shlex
 import shutil
+import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
@@ -55,6 +65,13 @@ WRAPPER = "Guides.lua"
 DEFAULT_CATALOG = Path(__file__).resolve().parent / "catalog.json"
 DEFAULT_OUTPUT = "dist"
 LICENSE_NAMES = {"license", "license.txt", "licence", "licence.txt", "copying", "copying.txt"}
+
+AUDIT_TOOL = "tools/audit_extraction.lua"
+AUDIT_REPORT = "extraction-audit.json"
+AUDIT_IMAGE = "nickblah/lua:5.1"
+LUA_INTERPRETERS = ("lua5.1", "lua")
+AUDIT_TIMEOUT = 300
+REPO_ROOT = Path(__file__).resolve().parent.parent
 
 # One pass over every registration call, in file and call order. The author
 # argument is optional; text and author are captured as raw bytes so the
@@ -227,6 +244,90 @@ def compose_wrapper(plugin, calls):
     return b"".join(parts)
 
 
+def audit_command(plugin):
+    """Build the command line that runs the audit over a built plugin folder.
+
+    A Lua 5.1 interpreter on the PATH (lua5.1, then lua; or the command in
+    EQ_AUDIT_LUA) is preferred. Without one, the audit runs under Docker with
+    the same image the Lua suites use: the worktree is mounted at /w and the
+    plugin, when it lives outside the worktree, is mounted at /eqout.
+    """
+    plugin = plugin.resolve()
+    tail = [AUDIT_TOOL, None, "--json"]
+    forced = os.environ.get("EQ_AUDIT_LUA")
+    if forced:
+        tail[1] = str(plugin)
+        return shlex.split(forced) + tail, REPO_ROOT
+    for interpreter in LUA_INTERPRETERS:
+        if shutil.which(interpreter):
+            tail[1] = str(plugin)
+            return [interpreter] + tail, REPO_ROOT
+    if shutil.which("docker"):
+        mounts = ["--volume", str(REPO_ROOT) + ":/w"]
+        try:
+            inside = str(plugin.relative_to(REPO_ROOT))
+        except ValueError:
+            mounts += ["--volume", str(plugin.parent) + ":/eqout"]
+            inside = "/eqout/" + plugin.name
+        tail[1] = inside
+        return (["docker", "run", "--rm"] + mounts
+                + ["--workdir", "/w", AUDIT_IMAGE, "lua"] + tail), REPO_ROOT
+    raise ValueError("No Lua 5.1 interpreter or Docker found; the extraction"
+                     " audit cannot run. Install lua5.1 or Docker, or set EQ_AUDIT_LUA.")
+
+
+def run_audit(plugin):
+    """Run the extraction audit over the built plugin and return its result."""
+    command, cwd = audit_command(plugin)
+    try:
+        completed = subprocess.run(command, cwd=cwd, text=True, capture_output=True,
+                                   timeout=AUDIT_TIMEOUT)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise ValueError("The extraction audit could not run (" + " ".join(command[:3])
+                         + "): " + str(exc))
+    if completed.returncode != 0:
+        raise ValueError("The extraction audit exited with status "
+                         + str(completed.returncode) + ": " + _detail(completed))
+    try:
+        document = json.loads(completed.stdout)
+    except ValueError as exc:
+        raise ValueError("The extraction audit produced no readable report: "
+                         + _detail(completed))
+    packages = document.get("packages", [])
+    if len(packages) != 1 or packages[0].get("error"):
+        raise ValueError("The extraction audit did not audit the built plugin: "
+                         + _detail(completed))
+    return packages[0]
+
+
+def _detail(completed, limit=400):
+    note = (completed.stderr or "").strip() or (completed.stdout or "").strip()
+    return " ".join(note.split())[:limit]
+
+
+def compose_report(plugin, package_name, fields, plugin_version, date, audit):
+    """The per-guide extraction audit report shipped inside the plugin."""
+    return {
+        "plugin": plugin,
+        "source_package": package_name,
+        "source_version": fields["version"],
+        "plugin_version": plugin_version,
+        "build_date": date,
+        "audit": {
+            "guides": audit["guides"],
+            "lines": audit["lines"],
+            "candidate_lines": audit["candidate_lines"],
+            "withheld_lines": audit["withheld_lines"],
+            "advice_records": audit["advice_records"],
+            "records_by_kind": audit["records_by_kind"],
+            "associations": audit["associations"],
+            "per_context": audit["per_context"],
+            "findings": audit["findings"],
+            "findings_by_severity": audit["findings_by_severity"],
+        },
+    }
+
+
 def build(source, entry, output, date):
     toc_name, raw, fields, files = parse_toc(source)
     if not fields.get("version"):
@@ -247,8 +348,19 @@ def build(source, entry, output, date):
     license_source = find_license(source)
     if license_source:
         shutil.copyfile(license_source, target / license_source.name)
+    try:
+        audit = run_audit(target)
+    except ValueError:
+        shutil.rmtree(target, ignore_errors=True)
+        raise
+    (target / AUDIT_REPORT).write_text(
+        json.dumps(compose_report(plugin, source.name, fields, plugin_version, date, audit),
+                   indent=2, sort_keys=True) + "\n", encoding="utf-8")
     print("Built " + plugin + " " + plugin_version + " (" + str(len(calls))
           + " guides) in " + str(target))
+    print("Extraction audit: " + str(audit["guides"]) + " guides, "
+          + str(audit["advice_records"]) + " advice records, "
+          + str(len(audit["findings"])) + " findings.")
     if license_source:
         print("Bundled license file " + license_source.name + ".")
     if not entry["distribute"]:

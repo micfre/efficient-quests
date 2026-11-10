@@ -71,7 +71,8 @@ class BuildOutputTests(BuilderFixture):
         plugin = self.out / self.plugin_name
         self.assertTrue(plugin.is_dir(), str(list(self.out.iterdir())))
         self.assertEqual({p.name for p in plugin.iterdir()},
-                         {self.plugin_name + ".toc", "Guides.lua"})
+                         {self.plugin_name + ".toc", "Guides.lua",
+                          "extraction-audit.json"})
 
     def test_manifest_fields(self):
         self.assertEqual(self.build().returncode, 0)
@@ -236,6 +237,29 @@ class GuardTests(BuilderFixture):
         result = self.build()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("toc", result.stderr.lower())
+
+
+class AuditGateTests(BuilderFixture):
+    """The extraction gate: every build audits the built plugin itself."""
+
+    def report(self):
+        return json.loads((self.out / self.plugin_name / "extraction-audit.json")
+                          .read_text(encoding="utf-8"))
+
+    def test_healthy_build_writes_extraction_audit_report(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = self.report()
+        self.assertEqual(report["plugin"], self.plugin_name)
+        self.assertEqual(report["source_package"], self.source_name)
+        self.assertEqual(report["plugin_version"], "1.28-eq1")
+        self.assertEqual(report["build_date"], BUILD_DATE)
+        audit = report["audit"]
+        # The audit read the built wrapper: all three replayed calls,
+        # including the author-less one, registered as guides.
+        self.assertEqual(audit["guides"], 3)
+        self.assertGreater(audit["advice_records"], 0)
+        self.assertEqual(audit["findings"], [])
 
 
 class CatalogTests(unittest.TestCase):
