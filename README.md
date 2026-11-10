@@ -8,7 +8,7 @@ The addon has offline tests. Nobody verified its behavior or appearance in the F
 
 ## Documents
 
-- [Installation guide](docs/installation.md): how to install the addon and adapt a local guide.
+- [Installation guide](docs/installation.md): how to install the addon and build a guide plugin.
 - [MVP specification](docs/specs/efficient-quests-mvp.md): the intended behavior of the first version. MVP means minimum viable product, the smallest version that is useful.
 - [Release validation record](docs/validation.md): what the offline tests cover, and the in-client and visual checks that remain.
 - [Local relevance notes](docs/local-relevance-evidence.md): how the addon ties advice to the location of the player.

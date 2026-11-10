@@ -8,35 +8,32 @@ An addon is a folder that adds features to the game interface. The `AddOns` fold
 
 You need these items:
 
-- The Efficient Quests repository. It contains the addon and the adaptation tool.
+- The Efficient Quests repository. It contains the addon and the guide plugin builder.
 - The Forever version of [QuestieDB](https://www.curseforge.com/wow/addons/questiedb/files/all).
-- The Forever version of [the TUG guide](https://www.curseforge.com/wow/addons/guidelime_tugs/files/all). Its folder is named `GuideLime_TUGs_Forever`.
-- Python 3.9 or later, on the computer that holds the guide folder.
+- A source guide package that the catalog lists. The catalog is the file `tools/catalog.json`. The first packages are [the TUG guide](https://www.curseforge.com/wow/addons/guidelime_tugs/files/all) and the Bethink guide. Their folders are named `GuideLime_TUGs_Forever` and `Guidelime_Bethink`.
+- Python 3.9 or later, on the computer that holds the source guide package.
 
-The adaptation tool changes the loading files of the installed guide. It does not download the guide. It does not change the prose of the guide. Questie, Guidelime, and FlareUI are optional.
+The builder reads a source guide package and writes a guide plugin folder. A guide plugin is a separate addon that holds the guide text. The builder does not download the guide. It does not change the source package. It copies the guide text without changes. You do not install Guidelime for this addon.
 
-## Install and adapt
+## Install and build
 
 1. Close the game.
 2. Copy the `EfficientQuests` folder from the repository into the `Interface/AddOns` folder of Forever.
 3. Install QuestieDB for Forever in the same `AddOns` folder.
-4. Install the TUG Forever guide in the same `AddOns` folder.
-5. Make sure that `EfficientQuests/EfficientQuests.toc` and `GuideLime_TUGs_Forever/GuideLime_TUGs_Forever.toc` are directly inside their addon folders.
-6. Make a backup of the installed `GuideLime_TUGs_Forever` folder.
-7. Open a terminal in the root folder of the Efficient Quests repository.
-8. Replace the example path with the full path to the installed guide folder, then run these commands:
+4. Open a terminal in the root folder of the Efficient Quests repository.
+5. Replace the example path with the full path to the source guide folder, then run this command:
 
    ```sh
-   python3 tools/adapt_guide.py adapt "/path/to/Interface/AddOns/GuideLime_TUGs_Forever"
-   python3 tools/adapt_guide.py check "/path/to/Interface/AddOns/GuideLime_TUGs_Forever"
+   python3 tools/build_guide.py "/path/to/GuideLime_TUGs_Forever"
    ```
 
-9. Start the game. In the addon list, enable Efficient Quests, QuestieDB, and the TUG guide.
-10. Enter the game and type `/eq status` in chat. The command shows the setup status.
+6. The command writes the plugin folder into the `dist` folder of the repository. For the TUG guide, the plugin folder is named `EfficientQuests_TUGsForever`. Copy that plugin folder into the same `AddOns` folder.
+7. Start the game. In the addon list, enable Efficient Quests, QuestieDB, and the guide plugin.
+8. Enter the game and type `/eq status` in chat. The command shows the setup status.
 
-On Windows, use your Python 3 command in place of `python3` if necessary. If the path contains spaces, keep the quotes. When the local adaptation matches the recorded files, the second command reports `Guide adaptation is current.` That result does not show that the client is compatible.
+On Windows, use your Python 3 command in place of `python3` if necessary. If the path contains spaces, keep the quotes. The plugin folder depends on Efficient Quests. The plugin registers the guide text with Efficient Quests only.
 
-The tool adds registration files and changes the loading metadata of the guide. The adapted guide depends on Efficient Quests. If Guidelime is enabled, the adapted guide also registers with Guidelime. The [adaptation guide](guide-adaptation.md) describes the update checks and the limits.
+The TUG guide has no distribution permission. Build it for your own computer only. Do not share or publish its plugin folder. The Bethink guide is GPLv3. The builder copies its license file into the plugin folder.
 
 ## Choose the display
 
@@ -48,9 +45,9 @@ The default view shows up to three hints. To see the source of a hint and more d
 
 ## Update or troubleshoot
 
-After a guide update, close the game and run the `check` command from the install steps. If the command reports a missing or changed adaptation, run `adapt` and then run `check` again. A guide update can replace the local adaptation. The tool checks the recorded files. It does not check the gameplay claims of the guide.
+After a guide update, run the build command again with the new source package. Then copy the new plugin folder into `AddOns` and replace the old plugin folder. The builder never changes the source package.
 
-If `/eq status` reports a missing provider, make sure that the Forever QuestieDB addon is installed and enabled. If it reports an incompatible provider, update or reinstall QuestieDB. If it reports that the guide is missing or did not register, make sure that the TUG guide is installed and enabled. If needed, run the adaptation commands again.
+If `/eq status` reports a missing provider, make sure that the Forever QuestieDB addon is installed and enabled. If it reports an incompatible provider, update or reinstall QuestieDB. If it reports that the guide is missing or did not register, make sure that the guide plugin is installed and enabled. If needed, build the plugin again.
 
 If no hint is relevant, the addon hides the hint body. The settings remain available through `/eq`. This is not a setup error.
 
