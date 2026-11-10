@@ -29,7 +29,8 @@ and author are copied byte-for-byte; the builder never interprets guide markup.
 Manifest fields: `Dependencies: EfficientQuests` (load-order critical),
 `X-EfficientQuests-Guide: 1` (the core reads it at login),
 `X-EfficientQuests-API: 1` (reserved API marker; emitted, never read),
-`Title:` (display name; underscores become spaces), `Version:` (source version
+`Title:` (the source package's own title verbatim; when the source declares
+none, the plugin name with underscores as spaces), `Version:` (source version
 plus the catalog build suffix), and provenance: source name, source version,
 source checksum, and build date. The source checksum is the sha256 over each
 TOC-listed file's name, digest, and the TOC itself, in TOC order. Rebuilds are
@@ -221,7 +222,7 @@ def compose_toc(package_name, plugin, fields, plugin_version, checksum, date):
             lines.append("## " + name + ": " + value)
 
     field("Interface", fields.get("interface"))
-    lines.append("## Title: " + plugin.replace("_", " "))
+    lines.append("## Title: " + (fields.get("title") or plugin.replace("_", " ")))
     field("Notes", fields.get("notes"))
     field("Author", fields.get("author"))
     lines.append("## Version: " + plugin_version)

@@ -94,8 +94,8 @@ print('ok - the built plugin reconciles at login and reports ready')
 local list = EfficientQuests.GetGuideList()
 assert(#list == 1, 'exactly the built plugin must be listed, got ' .. #list)
 assert(list[1].key == plugin, 'the list key must be the plugin addon name')
-assert(list[1].name == 'EfficientQuests FixtureOne',
-  'the display name must come from the manifest title the builder emitted')
+assert(list[1].name == 'Fixture Guide',
+  'the display name must be the source title the builder copied verbatim')
 assert(list[1].author == 'Fixture Author', 'the first chapter author must surface')
 assert(list[1].chapters == 2, 'both chapters must be counted, got ' .. list[1].chapters)
 print('ok - the built plugin surfaces in the settings guide list')

@@ -62,7 +62,7 @@ The builder writes `dist/<plugin>/` with these files:
 
 The generated manifest declares `Dependencies: EfficientQuests`. This is load-order critical. The registration hook of the core addon must exist before `Guides.lua` runs. The manifest also declares:
 
-- `Title`, the display name. Underscores become spaces.
+- `Title`, the display name. The builder copies the `Title` field of the source package verbatim. When the source declares no title, the plugin name is used and its underscores become spaces.
 - `Version`, the source package version plus the `build_suffix` of the catalog entry.
 - `X-EfficientQuests-Guide: 1`, the marker the core reads at login.
 - `X-EfficientQuests-API: 1`, a reserved marker for a future contract change. The addon emits it and never reads it.
