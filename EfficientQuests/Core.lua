@@ -89,6 +89,10 @@ local function status()
     if problem then
         return "QuestieDB is incompatible. Update or reinstall a supported QuestieDB provider."
     end
+    local warnings = EfficientQuests.GetGuideWarnings()
+    if #warnings > 0 then
+        return table.concat(warnings, " ")
+    end
     return "Ready."
 end
 EfficientQuests.GetSetupStatus = status
