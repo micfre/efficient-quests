@@ -85,6 +85,13 @@ local function useful(line)
       or s:find('die and', 1, true) or s:find('rezz', 1, true)
       or s:find('each time you do', 1, true) or s:find('sell grey', 1, true)
       or s:find('sell gray', 1, true) then return false end
+  -- Suppress sentences that disclose common narrative outcomes. This is a
+  -- conservative screen, not proof that unrestricted guide prose is safe.
+  for _, phrase in ipairs({' is murdered', ' was murdered', ' is killed',
+      ' was killed', ' is secretly ', ' turns out ', ' is revealed',
+      ' betrays ', ' betrayed ', ' dies', ' death of ', ' true identity'}) do
+    if s:find(phrase, 1, true) then return false end
+  end
   local plain = s:gsub('%b[]', ''):gsub('^%s+', '')
   if plain:match('^accept[%s:%.]') or plain:match('^turn%s*in[%s:%.]')
       or plain:match('^do%s*[:]') or plain:match('^run to')
@@ -106,16 +113,42 @@ local function usefulExcerpt(line)
     local char = line:sub(i, i)
     if char == '[' then insideTag = true elseif char == ']' then insideTag = false end
     local after = line:sub(i + 1, i + 1)
-    if not insideTag and (char == '.' or char == '!' or char == '?')
+    local prefix = line:sub(start, i):lower():gsub('%b[]', '')
+    local emphasis = char == '!' and prefix:match('^%s*keep!+$')
+    if not insideTag and not emphasis and (char == '.' or char == '!' or char == '?')
         and (not after:match('%d') or not line:sub(i - 1, i - 1):match('%d')) then
       pieces[#pieces + 1] = line:sub(start, i)
       start = i + 1
     end
   end
   if start <= #line then pieces[#pieces + 1] = line:sub(start) end
-  for _, piece in ipairs(pieces) do
-    if useful(piece) then return trim(piece) end
+  for index, piece in ipairs(pieces) do
+    if useful(piece) then
+      local following = trim((pieces[index + 1] or ''):lower():gsub('%b[]', ''))
+      -- A following condition may qualify this sentence; without understanding
+      -- the relationship, withholding the advice is safer than losing it.
+      if following:match('^if%s') or following:match('^unless%s')
+          or following:match('^only if%s') then return nil end
+      local previous = index > 1 and trim(pieces[index - 1]) or ''
+      local lower = trim(previous:lower():gsub('%b[]', ''))
+      if lower:match('^if%s') or lower:match('^unless%s') then
+        if lower:find('next step', 1, true) or lower:find('previous step', 1, true)
+            or lower:find('is secretly', 1, true) or lower:find('is murdered', 1, true)
+            or lower:find(' dies', 1, true) then return nil end
+        return previous .. ' ' .. trim(piece)
+      end
+      return trim(piece)
+    end
   end
+end
+
+local function adviceKind(excerpt, item)
+  local s = excerpt:lower()
+  if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
+      or s:find('flight master', 1, true) then return 'flight' end
+  if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
+  if s:find('[qc', 1, true) then return 'technique' end
+  return nil
 end
 
 function EQ.ExtractGuide(packageName, context)
@@ -162,6 +195,7 @@ function EQ.ExtractGuide(packageName, context)
                 sourceText=excerpt, text=text, questID=tonumber(quest),
                 association=quest and 'quest' or 'zone',
                 itemID=tonumber(item), quantity=tonumber(quantity),
+                kind=adviceKind(excerpt, item),
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,
               }

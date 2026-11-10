@@ -86,3 +86,27 @@ Buy [CI200,1 Bread].
 local localAdvice = EfficientQuests.ExtractGuide('RestrictedLocation', {class='Mage'})
 assert(#localAdvice == 1 and localAdvice[1].location == nil, 'an inapplicable step cannot supply inherited coordinates')
 print('ok - restricted steps do not supply locations')
+EfficientQuests_RegisterGuide('Meaning', [[
+[N Example]
+[G5,6 Thousand Needles] KEEP!!!!! 10 Turtle Meat for a future quest.
+If the vendor has stock. Buy a Bronzetube.
+Keep 5 Apples; the king is murdered by the advisor.
+Buy 3 Bread. The princess is secretly the villain.
+]], 'reference')
+local meaning = EfficientQuests.ExtractGuide('Meaning', {})
+assert(#meaning == 3, 'spoiler-bearing sentences should be excluded from advice and excerpts')
+assert(meaning[1].text:find('10 Turtle Meat', 1, true), 'emphasis must not remove required quantity')
+assert(meaning[2].text:find('If the vendor has stock', 1, true), 'separate condition is preserved with the advice')
+assert(not meaning[3].sourceText:find('princess', 1, true), 'source excerpt omits narrative outcome')
+print('ok - quantities, separate conditions and spoiler-bearing excerpts')
+assert(travel[1].kind == 'flight', 'flight reminders are identified as travel opportunities')
+assert(reference[3].kind == 'supply', 'an identified item provides a supply candidate')
+assert(meaning[1].kind == 'supply', 'a stated minimum is preserved as a supply candidate')
+print('ok - conservative advice classifications')
+EfficientQuests_RegisterGuide('TrailingCondition', [[
+[N Example]
+Buy 2 Rations. Only if you have not collected them already.
+]], 'reference')
+local trailing = EfficientQuests.ExtractGuide('TrailingCondition', {})
+assert(#trailing == 0 or trailing[1].text:find('Only if', 1, true), 'a trailing condition is not silently discarded')
+print('ok - trailing conditions remain visible or suppress the advice')
