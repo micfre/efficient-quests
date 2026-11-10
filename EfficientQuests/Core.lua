@@ -1,5 +1,5 @@
--- Global hook used by locally adapted guide packages. Keep this independent of
--- Guidelime so either addon can be present without replacing its namespace.
+-- Global hook used by locally adapted guide packages. Keep it on its own
+-- global name so packages register guides without claiming another namespace.
 local guides = {}
 EfficientQuests = { guides = guides }
 local function registerGuide(packageName, ...)
