@@ -1,33 +1,16 @@
-# Addon behavioral tests
+# Offline tests
 
-Run from the repository root with Lua 5.1 installed:
+Run these commands from the repository root. You need Lua 5.1 and Python 3.9 or later.
 
 ```sh
 lua5.1 tests/runtime.lua
-```
-
-The test loads the same files as the addon TOC and supplies minimal game APIs.
-Extend this boundary with simulated client, provider and tracker inputs and
-assert player-visible hints and interactions. These offline tests do not prove
-compatibility with a particular Forever build or UI scale.
-
-Guide registration and extraction scenarios run at the same addon boundary:
-
-```sh
 lua5.1 tests/guide.lua
-```
-
-`lua5.1 tests/guide.lua` exercises extraction from registered guide chapters.
-`lua5.1 tests/hints.lua` exercises the composed guide, provider, client-context,
-and relevance path, including focus, acceptance, remote advice and uncertainty.
-`lua5.1 tests/lifecycle.lua` exercises supply, quest and flight observations
-through registered guide advice and simulated client and provider data.
-
-The standalone presentation scenarios load the addon with simulated game
-widgets and external APIs:
-
-```sh
+lua5.1 tests/hints.lua
+lua5.1 tests/lifecycle.lua
 lua5.1 tests/ui.lua
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-These tests do not replace visual review in the Forever client.
+The Lua tests load the addon files and simulate the game, QuestieDB, and FlareUI. They cover guide advice, player context, ranking, item and flight observations, and interface actions. The Python tests exercise the local guide adaptation tool.
+
+These tests run without the game. They do not establish compatibility with a Forever build or visual fidelity at a particular interface scale. The [MVP specification](../docs/specs/efficient-quests-mvp.md) lists the separate in-client checks.
