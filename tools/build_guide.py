@@ -54,8 +54,7 @@ CORE = "EfficientQuests"
 WRAPPER = "Guides.lua"
 DEFAULT_CATALOG = Path(__file__).resolve().parent / "catalog.json"
 DEFAULT_OUTPUT = "dist"
-LICENSE_FILES = ("license.txt", "licence.txt", "copying.txt",
-                 "license", "licence", "copying")
+LICENSE_NAMES = {"license", "license.txt", "licence", "licence.txt", "copying", "copying.txt"}
 
 # One pass over every registration call, in file and call order. The author
 # argument is optional; text and author are captured as raw bytes so the
@@ -161,10 +160,10 @@ def source_checksum(toc_name, toc_raw, files):
 
 
 def find_license(package):
-    for name in LICENSE_FILES:
-        candidate = package / name
-        if candidate.is_file():
-            return candidate
+    """Find a license file in the package root, case-insensitively."""
+    for entry in sorted(p for p in package.iterdir() if p.is_file()):
+        if entry.name.lower() in LICENSE_NAMES:
+            return entry
     return None
 
 

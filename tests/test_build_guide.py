@@ -1,5 +1,7 @@
 """Exercise the guide plugin builder as a release builder (seam 1: subprocess)."""
 import json
+import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -70,6 +72,102 @@ class BuildOutputTests(BuilderFixture):
         self.assertTrue(plugin.is_dir(), str(list(self.out.iterdir())))
         self.assertEqual({p.name for p in plugin.iterdir()},
                          {self.plugin_name + ".toc", "Guides.lua"})
+
+    def test_manifest_fields(self):
+        self.assertEqual(self.build().returncode, 0)
+        toc = (self.out / self.plugin_name / (self.plugin_name + ".toc")).read_text()
+        expected = {
+            "Interface": "16001",
+            "Title": "EfficientQuests FixtureOne",
+            "Notes": "Fixture notes",
+            "Author": "Fixture Author",
+            "Version": "1.28-eq1",
+            "Dependencies": "EfficientQuests",
+            "X-EfficientQuests-Guide": "1",
+            "X-EfficientQuests-API": "1",
+            "X-EfficientQuests-Source-Name": "GuideLime_Fixture_One",
+            "X-EfficientQuests-Source-Version": "1.28",
+            "X-EfficientQuests-Build-Date": BUILD_DATE,
+        }
+        for field, value in expected.items():
+            self.assertIn("## " + field + ": " + value, toc, field)
+        self.assertIsNotNone(
+            re.search(r"^## X-EfficientQuests-Source-Checksum: [0-9a-f]{64}$", toc, re.M),
+            "source checksum field must be a sha256 hex digest")
+        file_lines = [l.strip() for l in toc.splitlines()
+                      if l.strip() and not l.strip().startswith("#")]
+        self.assertEqual(file_lines, ["Guides.lua"])
+        self.assertNotIn("OptionalDeps", toc)
+        self.assertNotIn("Guidelime,", toc)
+
+    def test_wrapper_replays_calls_verbatim(self):
+        self.assertEqual(self.build().returncode, 0)
+        wrapper = (self.out / self.plugin_name / "Guides.lua").read_bytes()
+        self.assertEqual(wrapper.count(b"EfficientQuests_RegisterGuide("), 3)
+        # Text and author are byte-for-byte: CRLF bodies stay CRLF, and the
+        # author-less call is replayed without an author argument.
+        self.assertIn(b'EfficientQuests_RegisterGuide("EfficientQuests_FixtureOne", '
+                      b'[[\r\n[GA Alliance]\r\n[N1 Something]\r\nKeep 5 apples.\r\n]], '
+                      b'"Fixture")', wrapper)
+        self.assertIn(b'EfficientQuests_RegisterGuide("EfficientQuests_FixtureOne", '
+                      b'[[Pick 2 flowers]], "Fixture")', wrapper)
+        self.assertIn(b'EfficientQuests_RegisterGuide("EfficientQuests_FixtureOne", '
+                      b'[[No author here]])', wrapper)
+        self.assertNotIn(b"Do not load me", wrapper)
+        self.assertNotIn(b"Guidelime.registerGuide", wrapper)
+
+    def test_source_package_is_never_modified(self):
+        before = {p: p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.assertEqual(self.build().returncode, 0)
+        after = {p: p.read_bytes() for p in self.source.rglob("*") if p.is_file()}
+        self.assertEqual(before, after)
+
+    def test_rebuild_is_byte_identical(self):
+        self.assertEqual(self.build().returncode, 0)
+        first = {p.relative_to(self.out): p.read_bytes() for p in self.out.rglob("*") if p.is_file()}
+        shutil.rmtree(self.out)
+        self.assertEqual(self.build().returncode, 0)
+        second = {p.relative_to(self.out): p.read_bytes() for p in self.out.rglob("*") if p.is_file()}
+        self.assertEqual(first, second)
+
+
+class LicensedFixture(unittest.TestCase):
+    """A synthetic package styled after Bethink (lowercase prefix, LF, GPLv3 LICENSE)."""
+
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.root = Path(self.tmp.name)
+        self.source = self.root / "Guidelime_Licensed"
+        self.source.mkdir()
+        (self.source / "Guidelime_Licensed.toc").write_bytes(
+            b"## Title: Licensed Guide\n## Interface: 16001\n## Version: 2.0\n"
+            b"## X-License: GPLv3\n\nguide.lua\n")
+        (self.source / "guide.lua").write_bytes(
+            b'Guidelime.registerGuide([[Buy 1 sword]], "Someone")\n')
+        self.license_bytes = b"GNU GENERAL PUBLIC LICENSE\nVersion 3, 29 June 2007\n"
+        (self.source / "LICENSE").write_bytes(self.license_bytes)
+        self.catalog = self.root / "catalog.json"
+        self.catalog.write_text(json.dumps({"version": 1, "guides": [
+            {"source_package": "Guidelime_Licensed", "plugin": "EfficientQuests_Licensed",
+             "license": "GPLv3", "distribute": True, "build_suffix": "-eq3"}]},
+            indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.out = self.root / "out"
+
+    def build(self):
+        return subprocess.run(
+            [sys.executable, str(TOOL), str(self.source), "--catalog", str(self.catalog),
+             "--output", str(self.out), "--date", BUILD_DATE],
+            text=True, capture_output=True)
+
+    def test_license_is_copied_and_version_carries_suffix(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        plugin = self.out / "EfficientQuests_Licensed"
+        self.assertEqual((plugin / "LICENSE").read_bytes(), self.license_bytes)
+        toc = (plugin / "EfficientQuests_Licensed.toc").read_text()
+        self.assertIn("## Version: 2.0-eq3", toc)
+        self.assertNotIn("X-License", toc)
 
 
 if __name__ == "__main__":
