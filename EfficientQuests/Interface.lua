@@ -24,7 +24,9 @@ local expanded, currentCategory = {}, 'guide'
 local dismissedRows, dismissedEntries = {}, {}
 local itemTooltipOwner
 
-local function character()
+-- The character's saved variables: dismissals and display preferences
+-- scoped to this character by the TOC's SavedVariablesPerCharacter key.
+local function savedCharacterData()
   EfficientQuestsCharacter = EfficientQuestsCharacter or {}
   local data = EfficientQuestsCharacter
   data.dismissed = data.dismissed or {}
@@ -43,7 +45,7 @@ local function sortedGuides()
 end
 
 local function selectedGuide()
-  local data = character()
+  local data = savedCharacterData()
   if data.guide then return data.guide end
   local names = sortedGuides()
   if #names > 0 then data.guide = names[1] end
@@ -121,7 +123,7 @@ local function makeRow(index)
   row.dismiss = button(body, 'EfficientQuestsDismiss'..index, L.dismiss, 66, 22, function()
     local hint = shownHints[index]
     if not hint then return end
-    character().dismissed[hint.id] = true
+    savedCharacterData().dismissed[hint.id] = true
     EQ.RefreshInterface()
   end)
   row.quest = button(body, 'EfficientQuestsQuest'..index, L.quest, 52, 20, function()
@@ -150,7 +152,7 @@ local function makeDismissedRow(index)
   row.label:SetWidth(290)
   row.restore = button(settings, 'EfficientQuestsRestoreHint'..index, L.restoreHint, 66, 22, function()
     if row.hintID then
-      character().dismissed[row.hintID] = nil
+      savedCharacterData().dismissed[row.hintID] = nil
       EQ.RefreshInterface()
     end
   end)
@@ -160,7 +162,7 @@ end
 
 local function refreshSettings()
   if not settings then return end
-  local data = character()
+  local data = savedCharacterData()
   guideButton:SetText(L.guide .. ': ' .. (selectedGuide() or 'None'))
   modeButton:SetText(L.display .. ': ' .. (data.display.mode == 'flare' and L.integrated or L.standalone))
   widthLabel:SetText(L.width .. ': ' .. data.display.width)
@@ -340,7 +342,7 @@ end
 function EQ.RefreshInterface()
   if not frame then return end
   closeItemTooltip()
-  local data = character()
+  local data = savedCharacterData()
   local tracker = trackerFor(data.display)
   local width = effectiveWidth(tracker, data.display.width)
   frame:SetWidth(width)
@@ -437,7 +439,7 @@ end
 local function build()
   if frame then return end
   frame = CreateFrame('Frame', 'EfficientQuestsWindow', UIParent, 'BackdropTemplate')
-  local position = character().display.position
+  local position = savedCharacterData().display.position
   if position and position.point and position.relativePoint and type(position.x) == 'number' and type(position.y) == 'number' then
     frame:SetPoint(position.point, UIParent, position.relativePoint, position.x, position.y)
   else
@@ -447,16 +449,16 @@ local function build()
   frame:RegisterForDrag('LeftButton'); frame:SetClampedToScreen(true)
   local dragging = false
   frame:SetScript('OnDragStart', function(self)
-    if not trackerFor(character().display) then dragging = true; self:StartMoving() end
+    if not trackerFor(savedCharacterData().display) then dragging = true; self:StartMoving() end
   end)
   frame:SetScript('OnHide', function() closeItemTooltip() end)
   frame:SetScript('OnDragStop', function(self)
     if not dragging then return end
     dragging = false
     self:StopMovingOrSizing()
-    if trackerFor(character().display) then return end
+    if trackerFor(savedCharacterData().display) then return end
     local point, _, relativePoint, x, y = self:GetPoint()
-    character().display.position = {point=point, relativePoint=relativePoint, x=x, y=y}
+    savedCharacterData().display.position = {point=point, relativePoint=relativePoint, x=x, y=y}
   end)
   background = frame:CreateTexture(nil, 'BACKGROUND')
   background:SetAllPoints(frame); background:SetColorTexture(0.06, 0.06, 0.08, 0.88)
@@ -467,7 +469,7 @@ local function build()
     local guide = selectedGuide()
     local hints = EQ.GetHints(guide) or {}
     local count = 0
-    for _, hint in ipairs(hints) do if hint.id and not character().dismissed[hint.id] then count = count + 1 end end
+    for _, hint in ipairs(hints) do if hint.id and not savedCharacterData().dismissed[hint.id] then count = count + 1 end end
     page = (page + 1) % math.max(1, math.ceil(count / 3))
     EQ.RefreshInterface()
   end)
@@ -498,32 +500,32 @@ local function build()
   category(L.dismissed, -108, 'dismissed', 'EfficientQuestsCategoryDismissed')
   guideButton = button(settings, 'EfficientQuestsGuide', '', 300, 25, function()
     local names = sortedGuides(); if #names == 0 then return end
-    local data = character(); local current = selectedGuide(); local nextIndex = 1
+    local data = savedCharacterData(); local current = selectedGuide(); local nextIndex = 1
     for i, name in ipairs(names) do if name == current then nextIndex = i % #names + 1; break end end
     data.guide = names[nextIndex]; page = 0; EQ.RefreshInterface()
   end)
   guideButton:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -82)
   modeButton = button(settings, 'EfficientQuestsMode', '', 170, 25, function()
-    local display = character().display
+    local display = savedCharacterData().display
     display.mode = display.mode == 'flare' and 'standalone' or 'flare'; EQ.RefreshInterface()
   end)
   modeButton:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -115)
   widthLabel = text(settings, nil); widthLabel:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -152)
   widthLess = button(settings, 'EfficientQuestsWidthLess', '−', 26, 22, function()
-    local d=character().display; d.width=math.max(240, d.width-20); EQ.RefreshInterface()
+    local d=savedCharacterData().display; d.width=math.max(240, d.width-20); EQ.RefreshInterface()
   end); widthLess:SetPoint('TOPLEFT', settings, 'TOPLEFT', 320, -148)
   widthMore = button(settings, 'EfficientQuestsWidthMore', '+', 26, 22, function()
-    local d=character().display; d.width=math.min(600, d.width+20); EQ.RefreshInterface()
+    local d=savedCharacterData().display; d.width=math.min(600, d.width+20); EQ.RefreshInterface()
   end); widthMore:SetPoint('LEFT', widthLess, 'RIGHT', 4, 0)
   spacingLabel = text(settings, nil); spacingLabel:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -185)
   spacingLess = button(settings, 'EfficientQuestsSpacingLess', '−', 26, 22, function()
-    local d=character().display; d.spacing=math.max(0, d.spacing-2); EQ.RefreshInterface()
+    local d=savedCharacterData().display; d.spacing=math.max(0, d.spacing-2); EQ.RefreshInterface()
   end); spacingLess:SetPoint('TOPLEFT', settings, 'TOPLEFT', 320, -181)
   spacingMore = button(settings, 'EfficientQuestsSpacingMore', '+', 26, 22, function()
-    local d=character().display; d.spacing=math.min(100, d.spacing+2); EQ.RefreshInterface()
+    local d=savedCharacterData().display; d.spacing=math.min(100, d.spacing+2); EQ.RefreshInterface()
   end); spacingMore:SetPoint('LEFT', spacingLess, 'RIGHT', 4, 0)
   restore = button(settings, 'EfficientQuestsRestore', L.restore, 200, 25, function()
-    character().dismissed = {}; EQ.RefreshInterface(); settingsNote:SetText(L.restored)
+    savedCharacterData().dismissed = {}; EQ.RefreshInterface(); settingsNote:SetText(L.restored)
   end); restore:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -225)
   settings:Hide()
 end
@@ -570,7 +572,7 @@ events:SetScript('OnUpdate', function(_, elapsed)
   sinceUpdate = sinceUpdate + elapsed
   if sinceUpdate < 0.5 then return end
   sinceUpdate = 0
-  local signature = trackerSignature(character().display)
+  local signature = trackerSignature(savedCharacterData().display)
   local moved = playerMoved()
   if signature ~= lastTrackerSignature or moved then
     lastTrackerSignature = signature

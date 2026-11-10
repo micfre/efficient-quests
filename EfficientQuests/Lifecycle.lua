@@ -13,6 +13,18 @@ local function qualify(advice, message)
     table.insert(advice.conditions, message)
 end
 
+-- Wording that refers to handing a quest in, shared by the lifecycle
+-- screens that must agree on it; "after" belongs because the reviewed
+-- guides use it for post-turn-in sequencing.
+local handInWords = {"after", "turn in", "turn-in", "hand in"}
+
+local function mentionsAny(text, words)
+    for _, phrase in ipairs(words) do
+        if text:find(phrase, 1, true) then return true end
+    end
+    return false
+end
+
 local function supplyKey(questID, itemID) return questID .. "\31" .. itemID end
 
 local function isConsumedFor(itemID, questID)
@@ -237,10 +249,8 @@ end
 
 local function obsoleteOnTurnIn(advice, questID)
     local source = string.lower(advice.sourceText or advice.text or "")
-    if source:find("after", 1, true) or source:find("next quest", 1, true)
-        or source:find("follow-up", 1, true) or source:find("follow up", 1, true)
-        or source:find("turn in", 1, true) or source:find("turn-in", 1, true)
-        or source:find("hand in", 1, true) then return false end
+    if mentionsAny(source, handInWords)
+        or mentionsAny(source, {"next quest", "follow-up", "follow up"}) then return false end
     if advice.kind == "technique" then return true end
     if advice.kind == "supply" then
         return source:find("for%s*%[qc%s*" .. questID .. "[%],]") ~= nil
@@ -280,8 +290,7 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
     if advice.kind == "technique" and advice.questID
         and context.questPhase(advice.questID) == "ready" then
         local text = string.lower(advice.text)
-        if not text:find("turn in", 1, true) and not text:find("turn-in", 1, true)
-            and not text:find("hand in", 1, true) and not text:find("after", 1, true)
+        if not mentionsAny(text, handInWords)
             and not text:find("completion", 1, true) then return false end
     end
     if advice.kind == "supply" then supplies(advice, context, provider) end
