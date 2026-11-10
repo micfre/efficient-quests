@@ -1,8 +1,8 @@
 -- Drive the addon UI with simulated game widgets and real guide/context/provider inputs.
-local frames, widgets = {}, {}
+local frames, widgets, chatMessages = {}, {}, {}
 UIParent = {}
 SlashCmdList = {}
-DEFAULT_CHAT_FRAME = {AddMessage=function() end}
+DEFAULT_CHAT_FRAME = {AddMessage = function(_, message) chatMessages[#chatMessages + 1] = message end}
 local Widget = {}
 function Widget:RegisterEvent(event) self.events[event] = true end
 function Widget:SetScript(name, handler) self.scripts[name] = handler end
@@ -242,6 +242,26 @@ assert(widgets.EfficientQuestsStatus.text:find('no longer registered', 1, true),
 assert(widgets.EfficientQuestsStatus.text:find('Settings', 1, true),
   'the removed-guide status must point at where another guide can be chosen')
 print('ok - removed selected guide names the problem')
+
+-- A missing provider outranks the stale-guide note: with both problems at
+-- once, the window status and /eq status must name the same problem.
+EfficientQuestsCharacter.guide = 'Links'
+local provider = LibQuestieDB
+LibQuestieDB = nil
+event('QUEST_LOG_UPDATE')
+assert(widgets.EfficientQuestsStatus.text:find('QuestieDB', 1, true),
+  'a missing provider outranks the stale-guide note in the window status')
+assert(not widgets.EfficientQuestsStatus.text:find('no longer registered', 1, true),
+  'the stale-guide note must not hide the provider problem')
+chatMessages = {}
+SlashCmdList.EFFICIENTQUESTS('status')
+local commandStatus = table.concat(chatMessages, ' ')
+assert(commandStatus:find('QuestieDB', 1, true), '/eq status names the provider problem')
+assert(not commandStatus:find('no longer registered', 1, true),
+  'the window and /eq status must name the same problem')
+LibQuestieDB = provider
+event('QUEST_LOG_UPDATE')
+print('ok - the provider problem outranks the stale-guide note everywhere')
 
 EfficientQuests_RegisterGuide('Long', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple] ' .. string.rep('for later use ', 90), 'Author')
 EfficientQuestsCharacter.guide = 'Long'
