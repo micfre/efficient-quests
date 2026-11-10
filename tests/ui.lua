@@ -47,6 +47,7 @@ function Widget:CreateTexture() return setmetatable({scripts={},events={},shown=
 for _, name in ipairs({'SetAllPoints','SetColorTexture','SetJustifyH','SetJustifyV','SetWordWrap','SetMovable','EnableMouse','RegisterForDrag','StartMoving','StopMovingOrSizing','SetClampedToScreen','SetFrameStrata','SetBackdrop','SetBackdropColor','SetNormalFontObject','SetHighlightFontObject','SetScale'}) do Widget[name] = function() end end
 function Widget:SetTextColor(...) self.color = {...} end
 function Widget:SetPoint(...) self.point = {...} end
+function Widget:GetPoint() return unpack(self.point or {}) end
 function Widget:ClearAllPoints() self.point = nil end
 function Widget:SetSize(w,h) self.width, self.height = w,h end
 function Widget:SetWidth(w) self.width = w end
@@ -191,6 +192,12 @@ local window = widgets.EfficientQuestsWindow
 assert(window.width == 250 and window.point[2] == tracker and window.point[3] == 'BOTTOMLEFT', 'integrated window attaches below tracker at its width')
 assert(window.backdrop and window.backdrop.bgFile == 'tracker-background', 'integrated window follows tracker backdrop')
 assert(widgets.EfficientQuestsStatus:GetFont() == 'flare-font', 'integrated text matches tracker font')
+EfficientQuestsCharacter.display.position = {point='CENTER',relativePoint='CENTER',x=12,y=34}
+window.scripts.OnDragStart(window)
+window.scripts.OnDragStop(window)
+local remembered = EfficientQuestsCharacter.display.position
+assert(remembered.point == 'CENTER' and remembered.relativePoint == 'CENTER' and remembered.x == 12 and remembered.y == 34,
+  'drag attempts while integrated must not overwrite standalone position')
 print('ok - Flare tracker geometry and backdrop')
 local function tick()
   for _, value in ipairs(frames) do if value.scripts.OnUpdate then value.scripts.OnUpdate(value, 1) end end
@@ -210,6 +217,10 @@ assert(widgets.EfficientQuestsStatus:GetFont() == 'changed-font', 'font changes 
 FlareUI_ObjectiveTracker = nil; tick()
 assert(window:IsShown() and window.width == EfficientQuestsCharacter.display.width and EfficientQuestsCharacter.display.mode == 'flare', 'unavailable tracker falls back without changing preference')
 assert(widgets.EfficientQuestsStatus:GetFont() == 'default-font', 'fallback restores standalone text styling')
+window:SetPoint('CENTER', UIParent, 'CENTER', 31, 44)
+window.scripts.OnDragStart(window); window.scripts.OnDragStop(window)
+assert(EfficientQuestsCharacter.display.position.x == 31 and EfficientQuestsCharacter.display.position.y == 44,
+  'standalone fallback dragging still updates the saved position')
 FlareUI_ObjectiveTracker = tracker; tick()
 assert(window.point[2] == tracker and window.width == 310, 'integration resumes when tracker returns')
 print('ok - tracker visibility, placement, resize and fallback recovery')
