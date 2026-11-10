@@ -145,6 +145,25 @@ local function prepare(advice, context, provider, localEvidence, distances)
             if bands.giver and (not giverBand or bands.giver < giverBand) then giverBand = bands.giver end
             if bands.target and (not targetBand or bands.target < targetBand) then targetBand = bands.target end
         end
+        -- The native next waypoint follows the quest's current phase. Only
+        -- use it for a known ready quest, in the same client map frame.
+        local quest = context.quests[id]
+        local phase = quest and quest.phase
+        if not phase and context.isAccepted(id) and C_QuestLog and C_QuestLog.IsComplete then
+            if C_QuestLog.IsComplete(id) then phase = 'ready' end
+        end
+        if phase == 'ready' and context.zoneID and context.position and C_QuestLog
+            and C_QuestLog.GetNextWaypoint and C_Map and C_Map.GetMapWorldSize then
+            local map, x, y = C_QuestLog.GetNextWaypoint(id)
+            local width, height = C_Map.GetMapWorldSize(context.zoneID)
+            if map == context.zoneID and type(x) == 'number' and x >= 0 and x <= 1
+                and type(y) == 'number' and y >= 0 and y <= 1
+                and type(width) == 'number' and width > 0 and type(height) == 'number' and height > 0 then
+                local dx, dy = (x - context.position.x) * width, (y - context.position.y) * height
+                local band = math.floor(math.sqrt(dx * dx + dy * dy) / 250)
+                if not targetBand or band < targetBand then targetBand = band end
+            end
+        end
         local level = questLevel(provider, id, context)
         if level and context.level then
             local distance = math.abs(level - context.level)
@@ -156,12 +175,19 @@ local function prepare(advice, context, provider, localEvidence, distances)
     advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if localEvidence == nil then advice.uncertain = true end
-    advice._ranking = {focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance}
+    local words = string.lower(advice.text or '')
+    -- Only a direct unqualified purchase instruction establishes timing.
+    -- Other prose remains unknown; do not infer timing from acceptance alone.
+    local availableNow = localEvidence == true and not advice.uncertain
+        and words:match('^buy [^,;]+ now[%.!]*$') ~= nil
+        and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true)
+    advice._ranking = {localEvidence=localEvidence == true, focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance, availableNow=availableNow}
     return advice
 end
 
 local function before(a, b)
     local x, y = a._ranking, b._ranking
+    if x.localEvidence ~= y.localEvidence then return x.localEvidence end
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
     for _, field in ipairs({"giverBand", "targetBand"}) do
@@ -176,6 +202,7 @@ local function before(a, b)
         if y.levelDistance == nil then return true end
         return x.levelDistance < y.levelDistance
     end
+    if x.availableNow ~= y.availableNow then return x.availableNow end
     if a.sourceOrder ~= b.sourceOrder then return a.sourceOrder < b.sourceOrder end
     return a.id < b.id
 end
