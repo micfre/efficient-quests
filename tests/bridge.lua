@@ -4,7 +4,7 @@
 -- load it: the plugin's own manifest drives which files run, in order. Every
 -- assertion goes through the addon's public globals; no internal function is
 -- inspected. Run from the repository root:
---   lua5.1 tests/bridge.lua dist/bridge-test/EfficientQuests_FixtureOne
+--   lua5.1 tests/bridge.lua tests/bridge-test/EfficientQuests_FixtureOne
 
 local pluginDir = arg and arg[1] or ''
 pluginDir = pluginDir:gsub('/$', '')

@@ -32,7 +32,7 @@ jobs:
             cat "$report"
           done
           echo '--- license gate assertions ---'
-          core_version=$(sed -n 's/^## Version: //p' EfficientQuests/EfficientQuests.toc)
+          core_version=$(sed -n 's/^## Version: //p' dist/EfficientQuests/EfficientQuests.toc)
           fixture_version=$(sed -n 's/^## Version: //p' tests/fixtures/Guidelime_Fixture_Two/Guidelime_Fixture_Two.toc)
           test -f "dist/ci-dry-run/EfficientQuests-$core_version.zip" || {
             echo "the core zip is missing" >&2; exit 1; }

@@ -11,9 +11,9 @@ cd "$(dirname "$0")/.."
 
 python3 tools/build_guide.py tests/fixtures/GuideLime_Fixture_One \
   --catalog tests/fixtures/bridge-catalog.json \
-  --output dist/bridge-test --date 2026-11-10
+  --output tests/bridge-test --date 2026-11-10
 
-plugin=dist/bridge-test/EfficientQuests_FixtureOne
+plugin=tests/bridge-test/EfficientQuests_FixtureOne
 # One Lua-selection convention, shared with the builder
 # (tools/build_guide.py): EQ_AUDIT_LUA forces an interpreter command;
 # otherwise lua5.1, then lua, from the PATH; otherwise Docker with the

@@ -12,9 +12,11 @@
 
 # Generated artifacts. The addon source itself is tracked under
 # dist/EfficientQuests, so ignore only the other content of dist/.
+# The bridge suite builds its fixture plugin into tests/bridge-test.
 /dist/*
 !/dist/EfficientQuests/
 /build/
+/tests/bridge-test/
 *.zip
 
 # Editor and operating-system files
