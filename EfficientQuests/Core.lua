@@ -33,6 +33,41 @@ local function guideList()
 end
 EfficientQuests.GetGuideList = guideList
 
+-- Guide plugins declare this manifest field so the core can find them at
+-- login. The reserved X-EfficientQuests-API marker is emitted by the builder
+-- for a future contract change and is never read at runtime.
+local GUIDE_MARKER = "X-EfficientQuests-Guide"
+
+local function addonList()
+    local addons = _G.C_AddOns
+    if not addons
+        or type(addons.GetNumAddOns) ~= "function"
+        or type(addons.GetAddOnInfo) ~= "function"
+        or type(addons.GetAddOnMetadata) ~= "function" then
+        return nil
+    end
+    return addons
+end
+
+local loginWarnings = {}
+
+local function reconcileGuides()
+    local warnings = {}
+    local addons = addonList()
+    if not addons then return warnings end
+    for index = 1, addons.GetNumAddOns() do
+        local name = addons.GetAddOnInfo(index)
+        if type(name) == "string"
+            and addons.GetAddOnMetadata(name, GUIDE_MARKER)
+            and not guides[name] then
+            table.insert(warnings, name .. " did not register. Check that the guide plugin is enabled.")
+        end
+    end
+    table.sort(warnings)
+    return warnings
+end
+EfficientQuests.GetGuideWarnings = function() return loginWarnings end
+
 local function status()
     if not _G.LibQuestieDB then
         return "QuestieDB is missing. Install and enable the QuestieDB addon."
@@ -81,6 +116,7 @@ events:SetScript("OnEvent", function(_, event, questID)
         EfficientQuestsCharacter = EfficientQuestsCharacter or {}
         SLASH_EFFICIENTQUESTS1 = "/eq"
         SlashCmdList.EFFICIENTQUESTS = showStatus
+        loginWarnings = reconcileGuides()
     elseif event == "QUEST_ACCEPTED" and type(questID) == "number" then
         if EfficientQuests.ForgetConsumption then EfficientQuests.ForgetConsumption(questID) end
     elseif event == "QUEST_LOG_UPDATE" or event == "QUEST_WATCH_UPDATE" then

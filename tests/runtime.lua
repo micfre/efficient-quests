@@ -91,3 +91,26 @@ context = EfficientQuests.GetContext()
 assert(context.professions.mining == true and context.professions.alchemy == nil,
   'known professions should be available while absent skills remain unknown')
 print('ok - profession observations preserve unknowns')
+
+-- At login the core reconciles addons that declare the guide marker against
+-- the guides that actually registered and exposes each mismatch as a warning.
+local function clearGuides()
+  for key in pairs(EfficientQuests.guides) do EfficientQuests.guides[key] = nil end
+end
+clearGuides()
+C_AddOns = {
+  GetNumAddOns = function() return 3 end,
+  GetAddOnInfo = function(index)
+    return ({ 'EfficientQuests_Paired', 'EfficientQuests_Silent', 'Unrelated_Tool' })[index]
+  end,
+  GetAddOnMetadata = function(name, field)
+    if field == 'X-EfficientQuests-Guide' and name ~= 'Unrelated_Tool' then return '1' end
+  end,
+}
+EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired]', 'Paired Author')
+handlers.OnEvent(nil, 'PLAYER_LOGIN')
+local warnings = EfficientQuests.GetGuideWarnings()
+assert(#warnings == 1, 'a fully matching set apart from one missing guide must warn once')
+assert(warnings[1]:find('EfficientQuests_Silent', 1, true) and warnings[1]:find('did not register', 1, true),
+  'a declared guide that did not register should produce its own warning line')
+print('ok - declared guide that never registers warns at login')
