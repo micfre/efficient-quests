@@ -45,7 +45,11 @@ local function supplies(advice, context, provider)
     else
         text = text .. " You carry " .. carried .. "; if applicable, acquire at least " .. shortage .. " more."
     end
-    if shortage == 0 and prefix then text = text .. " Do not sell or discard them." end
+    if shortage == 0 and prefix then
+        text = text .. " Do not sell or discard them."
+    elseif shortage > 0 and prefix then
+        text = text .. " If applicable, keep at least " .. needed .. " in total."
+    end
     advice.text = text
 end
 
@@ -86,13 +90,27 @@ local function knownFlight(advice, context)
     return matches == 1
 end
 
+local function obsoleteOnTurnIn(advice, questID)
+    local source = string.lower(advice.sourceText or advice.text or "")
+    if source:find("after", 1, true) or source:find("next quest", 1, true)
+        or source:find("follow-up", 1, true) or source:find("follow up", 1, true)
+        or source:find("turn in", 1, true) or source:find("turn-in", 1, true)
+        or source:find("hand in", 1, true) then return false end
+    if advice.kind == "technique" then return true end
+    if advice.kind == "supply" then
+        return source:find("for%s*%[qc%s*" .. questID .. "[%],]") ~= nil
+    end
+    return false
+end
+
 function EfficientQuests.ApplyLifecycle(advice, context, provider)
     local ids = advice.eligibleQuestIDs or advice.questIDs or {}
     if #ids > 0 then
         local remaining = {}
         for _, id in ipairs(ids) do
             -- A repeatable or reaccepted quest takes precedence over history.
-            if not (context.completedQuestIDs[id] and context.isAccepted(id) == false) then
+            if not (context.completedQuestIDs[id] and context.isAccepted(id) == false
+                and obsoleteOnTurnIn(advice, id)) then
                 remaining[#remaining + 1] = id
             end
         end
@@ -109,8 +127,14 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
     end
     if advice.kind == "supply" then supplies(advice, context, provider) end
     if advice.kind == "flight" then
-        if knownFlight(advice, context) then return false end
-        advice.text = advice.text .. " (if you have not already learned it)"
+        local text = string.lower(advice.text)
+        local acquisition = text:find("%f[%a]get%f[%A]") or text:find("%f[%a]learn%f[%A]")
+            or text:find("%f[%a]grab%f[%A]") or text:find("pick up", 1, true)
+            or text:find("%f[%a]acquire%f[%A]")
+        if acquisition then
+            if knownFlight(advice, context) then return false end
+            advice.text = advice.text .. " (if you have not already learned it)"
+        end
     end
     return true
 end

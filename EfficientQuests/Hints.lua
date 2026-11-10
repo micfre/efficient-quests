@@ -180,13 +180,21 @@ local function before(a, b)
     return a.id < b.id
 end
 
-local function duplicateKey(advice)
+local function duplicateKey(advice, originalText)
     local ids = {}
     for _, id in ipairs(advice.questIDs or {}) do ids[#ids + 1] = tostring(id) end
     table.sort(ids)
-    return table.concat({string.lower(advice.text), table.concat(ids, ","),
+    local text = string.lower(advice.text)
+    local quantity = tostring(advice.quantity or "")
+    -- Repeated, verified purchases with otherwise identical wording describe
+    -- one stated minimum. Do not combine different quests or conditions.
+    if advice.kind == "supply" and advice.verifiedItemID and originalText then
+        local normalized, count = string.lower(originalText):gsub("^buy:?%s+%d+%s+", "buy <minimum> ", 1)
+        if count == 1 then text, quantity = normalized, "minimum" end
+    end
+    return table.concat({text, table.concat(ids, ","),
         table.concat(advice.conditions or {}, "|"), advice.location and advice.location.zone or "",
-        tostring(advice.itemID or ""), tostring(advice.quantity or ""),
+        tostring(advice.itemID or ""), quantity,
         tostring(advice.location and advice.location.x or ""),
         tostring(advice.location and advice.location.y or ""),
         advice.location and advice.location.coordinateSystem or ""}, "\31")
@@ -204,9 +212,10 @@ function EfficientQuests.GetHints(packageName)
     local output, seen = {}, {}
     for _, advice in ipairs(candidates) do
         local locality = localStatus(advice, context)
+        local originalText = advice.text
         if locality ~= false and eligibleQuests(advice, context, provider)
             and EfficientQuests.ApplyLifecycle(advice, context, provider) then
-            local key = duplicateKey(advice)
+            local key = duplicateKey(advice, originalText)
             local source = {id=advice.id, chapter=advice.chapter, sourceText=advice.sourceText,
                 sourceAuthor=advice.sourceAuthor, location=advice.location}
             if not seen[key] then
@@ -214,7 +223,12 @@ function EfficientQuests.GetHints(packageName)
                 seen[key] = advice
                 output[#output + 1] = prepare(advice, context, provider, locality, distances)
             else
-                table.insert(seen[key].sources, source)
+                local prior = seen[key]
+                table.insert(prior.sources, source)
+                if advice.verifiedItemID and prior.verifiedItemID and type(advice.quantity) == "number"
+                    and type(prior.quantity) == "number" and advice.quantity > prior.quantity then
+                    prior.quantity, prior.text = advice.quantity, advice.text
+                end
             end
         end
     end
