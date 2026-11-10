@@ -6,7 +6,7 @@ DEFAULT_CHAT_FRAME = {AddMessage=function() end}
 local Widget = {}
 function Widget:RegisterEvent(event) self.events[event] = true end
 function Widget:SetScript(name, handler) self.scripts[name] = handler end
-function Widget:SetText(text) self.text = text end
+function Widget:SetText(text) self.text = text; if self.fontString then self.fontString.text = text end end
 function Widget:GetText() return self.text end
 function Widget:IsVisible() return self.shown ~= false end
 function Widget:GetObjectType() return self.kind end
@@ -14,7 +14,7 @@ function Widget:GetFont() return unpack(self.font or {'default-font', 12, ''}) e
 function Widget:SetFont(face, size, flags) self.font = {face, size, flags} end
 function Widget:GetTextColor() return unpack(self.color or {1,1,1,1}) end
 function Widget:GetFontString()
-  if not self.fontString then self.fontString = self:CreateFontString() end
+  if not self.fontString then self.fontString = self:CreateFontString(); self.fontString.text = self.text end
   return self.fontString
 end
 function Widget:GetWidth() return self.width end
@@ -31,6 +31,7 @@ function Widget:Show() self.shown = true end
 function Widget:Hide() self.shown = false end
 function Widget:IsShown() return self.shown end
 function Widget:GetStringHeight() return math.ceil(#(self.text or '') / 25) * 14 end
+function Widget:GetFontString() return self end
 function Widget:SetScrollChild(child) self.child = child end
 function Widget:EnableMouseWheel() end
 function Widget:SetVerticalScroll(value) self.scroll = value end
@@ -53,6 +54,7 @@ function Widget:SetHeight(h) self.height = h end
 function Widget:SetBackdrop(value) self.backdrop = value end
 function Widget:SetBackdropBorderColor(...) self.border = {...} end
 UIParent = setmetatable({width=1000,height=800,shown=true,children={}}, {__index=Widget})
+
 function CreateFrame(kind, name, parent)
   local frame = setmetatable({kind=kind,parent=parent,scripts={},events={},shown=true}, {__index=Widget})
   frames[#frames+1] = frame
@@ -112,7 +114,11 @@ print('ok - missing provider is distinct from an empty hint body')
 local openedQuest, openedMap, openedItem
 QuestMapFrame_OpenToQuestDetails=function(id) openedQuest=id end
 WorldMapFrame={SetMapID=function(_,id) openedMap=id end, Show=function() end}
-GameTooltip={SetOwner=function() end, SetHyperlink=function(_,item) openedItem=item end, Show=function() end}
+local tooltipOwner, tooltipVisible
+GameTooltip={SetOwner=function(_,owner) tooltipOwner=owner end,
+ IsOwned=function(_,owner) return tooltipOwner == owner end,
+ SetHyperlink=function(_,item) openedItem=item end, Show=function() tooltipVisible=true end,
+ Hide=function() tooltipVisible=false end}
 LibQuestieDB = {RequireContract=function(n) return n == 1 end,
   Quest=entity, Npc=entity, Object=entity,
   Item={Get=function(id, field) if id == 11 and field == 'name' then return 'Apple' end end}}
@@ -131,6 +137,16 @@ assert(openedQuest == 77 and openedMap == 1, 'quest and location controls open e
 click('EfficientQuestsHint2')
 click('EfficientQuestsItem2')
 assert(openedItem == 'item:11', 'provider-verified item opens an existing tooltip')
+assert(tooltipVisible and widgets.EfficientQuestsItem2.scripts.OnLeave, 'item tooltip has leave handling')
+widgets.EfficientQuestsItem2.scripts.OnLeave(widgets.EfficientQuestsItem2)
+assert(not tooltipVisible, 'item tooltip hides when the pointer leaves')
+click('EfficientQuestsItem2')
+GameTooltip:SetOwner({})
+widgets.EfficientQuestsItem2.scripts.OnLeave(widgets.EfficientQuestsItem2)
+assert(tooltipVisible, 'leaving must not hide a tooltip now owned by another widget')
+click('EfficientQuestsItem2')
+click('EfficientQuestsHint2')
+assert(not tooltipVisible, 'item tooltip hides when its details close')
 click('EfficientQuestsHint3')
 assert(not widgets.EfficientQuestsItem3:IsShown(), 'unverified guide item must not produce an item link')
 print('ok - quest, map and verified item links use existing interfaces')
@@ -138,6 +154,7 @@ print('ok - quest, map and verified item links use existing interfaces')
 EfficientQuests_RegisterGuide('Long', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple] ' .. string.rep('for later use ', 90), 'Author')
 EfficientQuestsCharacter.guide = 'Long'
 event('QUEST_LOG_UPDATE')
+assert(widgets.EfficientQuestsHint1.height > 36, 'long advice grows rather than clipping in its button')
 click('EfficientQuestsHint1')
 local scroll = assert(widgets.EfficientQuestsScroll, 'long explanations need a deliberate scroll control')
 assert(scroll.scripts.OnMouseWheel, 'long explanations support mouse-wheel navigation')

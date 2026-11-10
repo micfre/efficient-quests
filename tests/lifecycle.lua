@@ -53,6 +53,7 @@ print('ok - turn-in is distinct from ready and abandonment')
 LibQuestieDB.Item.Get = function() return 'Different Item' end
 local uncertain = hint()
 assert(uncertain and not uncertain.verifiedItemID and uncertain.uncertain, 'mismatched source item ID must remain unverified')
+assert(uncertain.text:find('for this quest', 1, true) and not uncertain.text:find('for .', 1, true), 'unverified item advice keeps a readable quest association')
 assert(not uncertain.text:lower():find('acquire 3',1,true), 'mismatched item should not receive an invented inventory calculation')
 print('ok - mismatched guide item identities stay conditional')
 EfficientQuests_RegisterGuide('Flights', [[
