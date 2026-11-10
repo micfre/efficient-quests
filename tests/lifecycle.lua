@@ -108,6 +108,25 @@ local unresolved = EfficientQuests.GetHints('UnknownFlight')
 assert(#unresolved == 1 and unresolved[1].text:find('if you have not already learned', 1, true),
  'unreachable is not proof the flight path is known or unknown')
 print('ok - unreachable nodes do not change learned history')
+-- A state the client itself documents as unlearned is explicit negative
+-- evidence: the reminder states the fact instead of hedging, and later
+-- positive evidence upgrades the observation.
+Enum = {FlightPathState={Current=0, Reachable=1, Unreachable=2, Undiscovered=3}}
+EfficientQuests_RegisterGuide('UnlearnedFlight', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Get the flightpath at Westfall.
+]], 'Author')
+C_TaxiMap.GetAllTaxiNodes = function() return {{nodeID=21, name='Westfall', state=3}} end
+eventHandler(nil, 'TAXIMAP_OPENED')
+local unlearned = EfficientQuests.GetHints('UnlearnedFlight')
+assert(#unlearned == 1, 'an unlearned path keeps its acquisition reminder')
+assert(not unlearned[1].text:find('if you have not already learned', 1, true),
+ 'explicit unlearned evidence does not hedge with conditional wording')
+C_TaxiMap.GetAllTaxiNodes = function() return {{nodeID=21, name='Westfall', state=1}} end
+eventHandler(nil, 'TAXIMAP_OPENED')
+assert(#EfficientQuests.GetHints('UnlearnedFlight') == 0,
+ 'learning the path upgrades the observation and suppresses the reminder')
+print('ok - explicit unlearned evidence is assertive and upgrades on learning')
 carried, bank = 2, 0
 ready, accepted = false, true
 LibQuestieDB.Item.Get = function(id,key) if id == 42 and key == 'name' then return 'Apples' end end
