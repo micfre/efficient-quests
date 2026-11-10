@@ -317,3 +317,21 @@ assert(not widgets.EfficientQuestsGuideRow1.text:find('^✓', 1), 'the other row
 assert(not widgets.EfficientQuestsStatus:IsShown(), 'a complete choice clears the prompt')
 assert(widgets.EfficientQuestsHint1.text:find('Apple', 1, true), 'the hints follow the explicit choice')
 print('ok - picking a row selects that guide for this character')
+
+-- Removing the chosen guide's folder falls back to the same selection rule
+-- and leaves a status note.
+EfficientQuests.guides.Solo = nil
+event('QUEST_LOG_UPDATE')
+assert(EfficientQuestsCharacter.guide == 'Alt', 'a removed guide re-runs the selection rule')
+assert(widgets.EfficientQuestsStatus:IsShown()
+  and widgets.EfficientQuestsStatus.text:find('no longer registered', 1, true),
+  'the removed choice leaves a status note')
+assert(widgets.EfficientQuestsGuideRow1.text:find('Alt', 1, true)
+  and widgets.EfficientQuestsGuideRow1.text:find('^✓', 1),
+  'the remaining guide is selected in the list')
+assert(not widgets.EfficientQuestsGuideRow2.shown, 'the removed guide no longer has a row')
+event('QUEST_LOG_UPDATE')
+assert(not widgets.EfficientQuestsStatus:IsShown()
+  and widgets.EfficientQuestsHint1.text:find('Water', 1, true),
+  'after the note the fallback guide supplies its advice')
+print('ok - a removed guide falls back to the selection rule with a note')
