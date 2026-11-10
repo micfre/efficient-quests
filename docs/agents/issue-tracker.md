@@ -1,30 +1,35 @@
 # Issue tracker: GitHub
 
-Issues and specs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and specifications for this repository are GitHub issues. Use the `gh` command for all operations. The repository is `micfre/efficient-quests`. If `gh` needs the repository name, read it from `git remote -v`.
 
-## Conventions
+## Commands
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --json number,title,body,labels,comments`.
-- **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Make an issue a sub-issue of a parent**: `gh issue create --parent <parent> ...`, or `gh issue edit <parent> --add-sub-issue <child>` afterwards (`gh` 2.94+). Older `gh`: `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>` (database id, as in **Blocking** below). Without sub-issues, put `Part of #<parent>` at the top of the child body.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`
-- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- **Close**: `gh issue close <number> --comment "..."`
+- Create an issue: `gh issue create --title "..." --body "..."`. For a body of more than one line, use a heredoc.
+- Read an issue: `gh issue view <number> --json number,title,body,labels,comments`.
+- List issues: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'`. Add `--label` and `--state` filters as needed.
+- Comment on an issue: `gh issue comment <number> --body "..."`.
+- Add or remove a label: `gh issue edit <number> --add-label "..."` or `gh issue edit <number> --remove-label "..."`.
+- Close an issue: `gh issue close <number> --comment "..."`.
 
-The repository is `micfre/efficient-quests`. Infer it from `git remote -v` when using `gh`.
+## Sub-issues
+
+A sub-issue is an issue that belongs to a parent issue. To make an issue a sub-issue, use one of these methods:
+
+- With `gh` 2.94 or later, run `gh issue create --parent <parent> ...`. To change an existing issue, run `gh issue edit <parent> --add-sub-issue <child>`.
+- With an older `gh`, run `gh api --method POST repos/<owner>/<repo>/issues/<parent>/sub_issues -F sub_issue_id=<child-db-id>`. The value `<child-db-id>` is the database ID of the child. The section on blocking below shows how to find a database ID.
+- If sub-issues are not available, write `Part of #<parent>` at the top of the child body.
 
 ## Pull requests as a triage surface
 
-**PRs as a request surface: no.** _(Set to `yes` if this repo treats external PRs as feature requests; `/triage` reads this flag.)_
+PRs as a request surface: no.
 
-When set to `yes`, PRs run through the same labels and states as issues, using the `gh pr` equivalents:
+Change this value to `yes` if the repository treats external pull requests as feature requests. The `/triage` command reads this value. If the value is `yes`, pull requests use the same labels and states as issues. Use these `gh pr` commands:
 
-- **Read a PR**: `gh pr view <number> --comments` and `gh pr diff <number>` for the diff.
-- **List external PRs for triage**: `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open' --jq '.[] | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not) | {number, title, author: .user.login, author_association, labels: [.labels[].name]}'`.
-- **Comment / label / close**: `gh pr comment`, `gh pr edit --add-label`/`--remove-label`, `gh pr close`.
+- Read a pull request: `gh pr view <number> --comments`. To read the diff, run `gh pr diff <number>`.
+- List external pull requests for triage: `gh api --paginate 'repos/{owner}/{repo}/pulls?state=open' --jq '.[] | select(.author_association | IN("OWNER","MEMBER","COLLABORATOR") | not) | {number, title, author: .user.login, author_association, labels: [.labels[].name]}'`.
+- Comment, label, or close: `gh pr comment`, `gh pr edit --add-label`, `gh pr edit --remove-label`, and `gh pr close`.
 
-GitHub shares one number space across issues and PRs, so a bare `#42` may be either: resolve with `gh pr view 42` and fall back to `gh issue view 42`.
+GitHub uses one number space for issues and pull requests. A number such as `#42` can be either one. To find out which, run `gh pr view 42`. If that fails, run `gh issue view 42`.
 
 ## When a skill says "publish to the issue tracker"
 
@@ -32,15 +37,15 @@ Create a GitHub issue.
 
 ## When a skill says "fetch the relevant ticket"
 
-Read it as in **Read an issue** above.
+Read the issue with the command in the Commands section.
 
 ## Wayfinding operations
 
-Used by `/wayfinder`. The **map** is a single issue with **child** issues as tickets.
+The `/wayfinder` command uses these operations. A map is one issue. Its child issues are the tickets.
 
-- **Map**: a single issue labelled `wayfinder:map`, holding the Notes / Decisions-so-far / Fog body. `gh issue create --label wayfinder:map`.
-- **Child ticket**: an issue linked to the map as a GitHub sub-issue (see **Make an issue a sub-issue of a parent**). Where sub-issues aren't enabled, add the child to a task list in the map body and put `Part of #<map>` at the top of the child body. Labels: `wayfinder:<type>` (`research`/`prototype`/`grilling`/`task`). Once claimed, the ticket is assigned to the driving dev.
-- **Blocking**: GitHub's **native issue dependencies**, the canonical, UI-visible representation. Add an edge with `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`, where `<blocker-db-id>` is the blocker's numeric **database id** (`gh api repos/<owner>/<repo>/issues/<n> --jq .id`, _not_ the `#number` or `node_id`). GitHub reports `issue_dependencies_summary.blocked_by` (open blockers only, the live gate). Where dependencies aren't available, fall back to a `Blocked by: #<n>, #<n>` line at the top of the child body. A ticket is unblocked when every blocker is closed.
-- **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
-- **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
-- **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+- Map: One issue with the label `wayfinder:map`. Its body has the sections Notes, Decisions-so-far, and Fog. Create it with `gh issue create --label wayfinder:map`.
+- Child ticket: An issue that is a sub-issue of the map. See the Sub-issues section. If sub-issues are not enabled, add the child to a task list in the map body. Also write `Part of #<map>` at the top of the child body. Give the child the label `wayfinder:<type>`, where the type is `research`, `prototype`, `grilling`, or `task`. When a developer claims a ticket, assign the ticket to that developer.
+- Blocking: Use the native issue dependencies of GitHub. They are the standard way to record blocking, and the GitHub interface shows them. To add a dependency, run `gh api --method POST repos/<owner>/<repo>/issues/<child>/dependencies/blocked_by -F issue_id=<blocker-db-id>`. The value `<blocker-db-id>` is the numeric database ID of the blocker. It is not the `#number` and it is not the `node_id`. To get it, run `gh api repos/<owner>/<repo>/issues/<n> --jq .id`. GitHub reports `issue_dependencies_summary.blocked_by`. This value counts open blockers only, so it shows whether a ticket is blocked now. If dependencies are not available, write `Blocked by: #<n>, #<n>` at the top of the child body. A ticket is unblocked when every blocker is closed.
+- Frontier query: The frontier is the set of tickets that are ready to start. To find it, list the open children of the map with `gh issue list --state open`. Limit the list to the sub-issues or the task list of the map. Remove each ticket that has an open blocker or an assignee. A ticket has an open blocker if `issue_dependencies_summary.blocked_by` is above 0, or if an open issue is in its `Blocked by` line. Of the tickets that remain, take the first one in map order.
+- Claim: Run `gh issue edit <n> --add-assignee @me`. This is the first write of the session.
+- Resolve: Run `gh issue comment <n> --body "<answer>"`. Then run `gh issue close <n>`. Then add a context pointer (a gist and a link) to the Decisions-so-far section of the map.

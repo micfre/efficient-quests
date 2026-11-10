@@ -1,18 +1,19 @@
 # Adapt the TUG Forever guide
 
-The adaptation tool changes a local copy of TUG's Forever guide. It changes the guide's loading metadata and adds registration files. It does not change the guide's prose or tags. The guide loads only the files listed in its addon manifest, which is the `.toc` file.
+The adaptation tool changes a local copy of the Forever guide from TUG. It changes the loading metadata of the guide and adds registration files. It does not change the prose or the tags of the guide. The guide loads only the files that its addon manifest lists. The addon manifest is the `.toc` file.
 
-Install Efficient Quests and the TUG Forever guide first. The [installation guide](installation.md) lists the steps and requirements. Close the game before you run the tool.
+Before you start, install Efficient Quests and the TUG Forever guide. The [installation guide](installation.md) lists the steps and the requirements. Close the game before you run the tool.
 
-From the repository root, replace the example path with the installed guide folder and run:
+1. Open a terminal in the root folder of the repository.
+2. Replace the example path with the path to the installed guide folder, then run these commands:
 
-```sh
-python3 tools/adapt_guide.py adapt "/path/to/Interface/AddOns/GuideLime_TUGs_Forever"
-python3 tools/adapt_guide.py check "/path/to/Interface/AddOns/GuideLime_TUGs_Forever"
-```
+   ```sh
+   python3 tools/adapt_guide.py adapt "/path/to/Interface/AddOns/GuideLime_TUGs_Forever"
+   python3 tools/adapt_guide.py check "/path/to/Interface/AddOns/GuideLime_TUGs_Forever"
+   ```
 
-The tool requires Python 3.9 or later. It supports the package folder named `GuideLime_TUGs_Forever`. It does not download the guide. Run `adapt` again if `check` reports a missing or changed adaptation. You can run `adapt` more than once.
+The tool needs Python 3.9 or later. It supports only the package folder named `GuideLime_TUGs_Forever`. It does not download the guide. You can run `adapt` more than one time. If `check` reports a missing or changed adaptation, run `adapt` again.
 
-After you update the guide, run `check` again. It compares the loading files and listed guide files with the recorded checksums. A checksum is a value used to detect file changes. If a file differs, run `adapt` and then `check` again.
+After you update the guide, run `check` again. The command compares the loading files and the listed guide files with the recorded checksums. A checksum is a value that shows whether a file changed. If a file is different, run `adapt` and then run `check` again.
 
-The adapted guide requires Efficient Quests. Guidelime remains optional. If Guidelime is enabled, the adapter also passes the guide registration to it. Actual loading and coexistence in the Forever client have not been verified by the offline tests.
+The adapted guide requires Efficient Quests. Guidelime is still optional. If Guidelime is enabled, the adapter also passes the guide registration to Guidelime. The offline tests did not verify loading or coexistence in the Forever client.

@@ -2,8 +2,16 @@
 
 Efficient Quests is an experimental addon for World of Warcraft: Forever. An addon adds features to the game interface.
 
-It shows practical quest and travel tips without choosing your next quest. The first version targets Forever 1.60.1 and TUG's Forever guide. It needs the separately installed QuestieDB addon. Guidelime, Questie, and FlareUI are optional.
+The addon shows practical quest and travel tips. It does not choose your next quest. The first version targets Forever 1.60.1 and the Forever guide from TUG. It needs the QuestieDB addon, which you install separately. Guidelime, Questie, and FlareUI are optional.
 
-The addon has offline tests, but its behavior and appearance have not been verified in the Forever client. It is not yet a validated release.
+The addon has offline tests. Nobody verified its behavior or appearance in the Forever client. It is not a validated release.
 
-See the [installation guide](docs/installation.md) to install the addon and adapt a local guide. The [MVP specification](docs/specs/efficient-quests-mvp.md) describes the intended behavior. The [release validation record](docs/validation.md) reports what the offline tests cover and lists the in-client and visual checks that remain. Two evidence notes record how the addon reasons and what remains unverified: the [local relevance notes](docs/local-relevance-evidence.md) cover how advice is tied to the player's location, and the [consumption notes](docs/consumption-evidence.md) cover supply requirements and flight-path observations. The [TUG extraction audit](docs/tug-extraction-audit.md) records the offline review of the supported guide. The [contribution guide](CONTRIBUTING.md) explains how to run the tests.
+## Documents
+
+- [Installation guide](docs/installation.md): how to install the addon and adapt a local guide.
+- [MVP specification](docs/specs/efficient-quests-mvp.md): the intended behavior of the first version. MVP means minimum viable product, the smallest version that is useful.
+- [Release validation record](docs/validation.md): what the offline tests cover, and the in-client and visual checks that remain.
+- [Local relevance notes](docs/local-relevance-evidence.md): how the addon ties advice to the location of the player.
+- [Consumption notes](docs/consumption-evidence.md): supply requirements and flight-path observations.
+- [TUG extraction audit](docs/tug-extraction-audit.md): the offline review of the supported guide.
+- [Contribution guide](CONTRIBUTING.md): how to run the tests.

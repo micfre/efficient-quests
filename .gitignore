@@ -3,6 +3,7 @@
 
 # Local tooling and credentials
 /.agents/
+/.claude/skills
 /.codex/
 /.aws/
 .env
