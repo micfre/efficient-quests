@@ -172,8 +172,9 @@ local function turnInBand(provider, context, questID, uiMapByAreaId, width, heig
     return best
 end
 
--- Client map POIs already carry their UI-map frame. QuestieDB AreaIDs do not,
--- so do not compare provider spawn coordinates to the player position here.
+-- Distances to the quest's current-phase location: client map POIs for
+-- unaccepted starts and active objectives, provider finisher spawns for
+-- quests ready to hand in. Bands are 250-yard steps on the player's map.
 local function mapBands(context, provider, questIDs)
     local result = {}
     if not context.zoneID or not context.position or not C_Map or not C_Map.GetMapWorldSize then return result end
