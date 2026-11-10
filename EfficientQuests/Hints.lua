@@ -45,7 +45,11 @@ local function localStatus(advice, context)
         if zoneType and current and current.mapType == zoneType and match.mapType == zoneType then return false end
         return nil
     end
-    if advice.chapter and string.find(string.lower(advice.chapter), string.lower(zoneName), 1, true) then
+    -- An exact chapter-title match confirms locality. A title that merely
+    -- contains the zone name ("6-9 Elwynn Forest") is an inference about
+    -- the chapter's setting, not a confirmed source fact, so it stays
+    -- unresolved and uncertain.
+    if advice.chapter and string.lower(advice.chapter) == string.lower(zoneName) then
         return true
     end
     return nil

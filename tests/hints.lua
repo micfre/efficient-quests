@@ -501,3 +501,24 @@ assert(tierOrder[2].text:find('net', 1, true) and tierOrder[2].uncertain,
 assert(tierOrder[3].text:find('rope', 1, true) and tierOrder[3].uncertain,
   'unresolved locality orders last among equal distance signals')
 print('ok - locality tiers order equal distance signals')
+
+-- A chapter title that merely contains the zone name is an inference about
+-- the chapter's setting, not a confirmed source fact; only an exact match
+-- confirms. Unlocated advice without quest-activity support stays withheld.
+C_QuestLog.GetQuestsOnMap = function() return {} end
+EfficientQuests_RegisterGuide('ChapterEvidence', [[
+[N 6-9 Elwynn Forest]
+Use a torch for [QC533].
+[G40,50 Elwynn Forest] Use a net for [QC533].
+]], 'Author')
+local chapterEvidence = EfficientQuests.GetHints('ChapterEvidence')
+assert(#chapterEvidence == 1 and chapterEvidence[1].text:find('net', 1, true),
+  'a chapter title containing the zone name does not confirm locality')
+EfficientQuests_RegisterGuide('ChapterExact', [[
+[N Elwynn Forest]
+Use a torch for [QC533].
+]], 'Author')
+local chapterExact = EfficientQuests.GetHints('ChapterExact')
+assert(#chapterExact == 1 and chapterExact[1].text:find('torch', 1, true),
+  'an exact chapter-title zone match remains confirmed')
+print('ok - chapter titles confirm locality only on exact zone-name equality')
