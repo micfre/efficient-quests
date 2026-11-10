@@ -155,7 +155,7 @@ function EQ.ExtractGuide(packageName, context)
               if not x and location then addUnknown(unknown, location.conditions) end
               local loc
               if location then loc = {x=location.x, y=location.y, zone=location.zone,
-                inherited=not x} end
+                coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not x} end
               result[#result + 1] = {
                 id=packageName .. ':' .. chapterIndex .. ':' .. lineIndex,
                 package=packageName, sourceAuthor=author, chapter=title,
