@@ -160,6 +160,39 @@ local function adviceKind(excerpt, item)
   return nil
 end
 
+-- LE/SK tags describe the guide step's learning target, not quest completion.
+-- Keep the observed state separate so a later lifecycle decision can use it.
+local function learningStates(line, context)
+  local states = {}
+  for tag, body in line:gmatch('%[(LE)%s+([^%]]+)%]') do
+    local spell, rank, suffix = body:match('^SP(%d+)%s+(%d+)(%-?)$')
+    if spell then
+      local state = {kind='spell', id=tonumber(spell), rank=tonumber(rank), suffix=suffix}
+      if type(context.isSpellKnown) == 'function' then
+        local ok, value = pcall(context.isSpellKnown, state.id)
+        if ok and type(value) == 'boolean' then state.known = value end
+      end
+      states[#states + 1] = state
+    else
+      local name, target, ending = body:match('^(.-)%s+(%d+)(%-?)$')
+      states[#states + 1] = {kind='skill-cap', name=name or body,
+        rank=tonumber(target), suffix=ending}
+    end
+  end
+  for body in line:gmatch('%[SK%s+([^%]]+)%]') do
+    local name, target, ending = body:match('^(.-)%s+(%d+)(%-?)$')
+    local state = {kind='skill', name=name or body, rank=tonumber(target), suffix=ending}
+    local skillRank = name and context.skillRanks and context.skillRanks[name:lower()]
+    if type(skillRank) == 'number' and state.rank then
+      state.known = skillRank >= state.rank
+    elseif name and state.rank == 1 and context.professions and context.professions[name:lower()] then
+      state.known = true
+    end
+    states[#states + 1] = state
+  end
+  return states
+end
+
 function EQ.ExtractGuide(packageName, context)
   context = context or {}
   local result = {}
@@ -186,25 +219,40 @@ function EQ.ExtractGuide(packageName, context)
               conditions=lineUnknown}
           end
           local excerpt = lineAllowed and usefulExcerpt(line)
+          local learning = excerpt and learningStates(line, context) or {}
+          -- General class/profession progression is outside the quest-focused
+          -- view. Keep explicitly quest-related learning advice available.
+          if excerpt and #learning > 0 and not excerpt:find('%[QC%d+')
+              and not excerpt:lower():find('quest', 1, true) then excerpt = nil end
           if excerpt then
             local text = readable(excerpt)
             if text ~= '' then
               local item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
-              local quest = excerpt:match('%[QC(%d+)')
+              local quests, seen = {}, {}
+              for id in excerpt:gmatch('%[QC(%d+)') do
+                local numeric = tonumber(id)
+                if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
+              end
+              local quest = #quests == 1 and quests[1] or nil
               local unknown = {}
               addUnknown(unknown, chapterUnknown)
               addUnknown(unknown, lineUnknown)
               if not x and location then addUnknown(unknown, location.conditions) end
+              for _, state in ipairs(learning) do
+                if state.known == nil then unknown[#unknown + 1] = 'learning state unknown' end
+              end
+              if #quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
               local loc
               if location then loc = {x=location.x, y=location.y, zone=location.zone,
                 coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not x} end
               result[#result + 1] = {
                 id=packageName .. ':' .. chapterIndex .. ':' .. lineIndex,
                 package=packageName, sourceAuthor=author, chapter=title,
-                sourceText=excerpt, text=text, questID=tonumber(quest),
-                association=quest and 'quest' or 'zone',
+                sourceText=excerpt, text=text, questID=quest, questIDs=quests,
+                association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
                 itemID=tonumber(item), quantity=tonumber(quantity),
                 kind=adviceKind(excerpt, item),
+                learningState=learning,
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,
               }

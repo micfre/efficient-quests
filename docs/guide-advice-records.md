@@ -1,0 +1,13 @@
+# Guide advice records
+
+`EfficientQuests.ExtractGuide(packageName, context)` interprets the registered chapters of one package and returns candidate advice in source order. It is an input to relevance, lifecycle, and presentation processing; a candidate is not a verified gameplay fact or automatically a visible hint.
+
+Each record contains a stable source `id`, `package`, `sourceAuthor`, `chapter`, selected `sourceText`, shortened `text`, `sourceOrder`, and optional `kind` (`supply`, `flight`, or `technique`). An item `itemID` and `quantity` are supplied only when present in an item tag; an item tag does not establish a retention requirement or independent consumption.
+
+`association` is `zone`, `quest`, or `quests`. A single explicit quest reference has `questID` and a one-element `questIDs` list. Multiple quest references have `questIDs` and no `questID`; `uncertain` remains true because the prose does not prove which part applies to each quest. No quest reference produces an empty list and does not invent an association.
+
+`location`, when present, has `x`, `y`, `zone`, `coordinateSystem = "guide-percent"`, `zoneSource = "guide-name"`, and an `inherited` flag. Its named zone and 0–100 coordinates must not be compared directly to a numeric client map ID or 0–1 position without a reliable mapping. `conditions` lists unsupported or unobserved restrictions and `uncertain` identifies candidates needing qualification.
+
+`learningState` contains any guide learning markers as `{kind, id or name, rank, suffix, known}`. `known` is present only when supported by a positive or negative observation. Such a marker describes the guide step's learning target; it does not prove that a linked quest is complete. The context can provide `isSpellKnown(id)` and `skillRanks` for observations. Unavailable observations remain unknown.
+
+Extraction deliberately withholds some ambiguous prose. Its narrative screening is heuristic and does not prove that arbitrary source material is spoiler-free. Expand coverage using reviewed examples and tests, and retain uncertainty when an association, condition, or location cannot be resolved.

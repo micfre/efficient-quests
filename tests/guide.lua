@@ -134,3 +134,26 @@ local hordeAudit = EfficientQuests.ExtractGuide('HordeAudit', {})
 assert(#hordeAudit == 1, 'unrelated training, dungeon routing and ambiguous multiple items are withheld')
 assert(hordeAudit[1].text == 'Buy: 4 Coarse Thread', 'missing target metadata must not leave dangling wording')
 print('ok - reviewed Horde examples avoid ambiguous and unrelated instructions')
+EfficientQuests_RegisterGuide('Techniques', [[
+[N Feralas]
+[G40.93,25.55 Feralas] Use Zorbin's Ultra-Shrinker on the coastal giants before killing them; collect fifteen Miniaturization Residues for [QC7003].
+Gather cactus apples while collecting tails for [QC4402], [QC97279], and [QC789].
+Kill ten wolves for [QC78].
+[LE SP21562 1] Use the quest codex before entering the shrine for [QC77].
+]], 'reference')
+local techniques = EfficientQuests.ExtractGuide('Techniques', {})
+assert(#techniques == 3, 'practical quest techniques are retained and bare objectives excluded')
+assert(techniques[1].questID == 7003 and techniques[1].kind == 'technique', 'specific technique retains its explicit quest association')
+assert(techniques[2].questID == nil and techniques[2].association == 'quests' and #techniques[2].questIDs == 3, 'multiple quest references must not collapse to one')
+assert(techniques[2].uncertain, 'shared prose must not imply the exact association for each quest is known')
+assert(techniques[3].learningState[1].id == 21562 and techniques[3].learningState[1].known == nil and techniques[3].uncertain, 'unknown learning state is preserved')
+local knownTechniques = EfficientQuests.ExtractGuide('Techniques', {isSpellKnown=function(id) return id == 21562 end})
+assert(knownTechniques[3].learningState[1].known == true, 'positive learning observation is preserved')
+assert(knownTechniques[3].questID == 77, 'a learning marker does not imply quest completion')
+print('ok - quest techniques, multiple references and learning-state uncertainty')
+EfficientQuests_RegisterGuide('Training', [[
+[N Tanaris]
+[A Priest] [LE SP21562 1] Buy and use Codex: Prayer of Fortitude at the Auction House if available.
+]], 'reference')
+assert(#EfficientQuests.ExtractGuide('Training', {class='Priest'}) == 0, 'general class training must not become a questing tip')
+print('ok - unrelated class training is excluded')
