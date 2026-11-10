@@ -13,13 +13,25 @@ local function qualify(advice, message)
     table.insert(advice.conditions, message)
 end
 
+local function supplyKey(questID, itemID) return questID .. "\31" .. itemID end
+
+local function isConsumedFor(itemID, questID)
+    local saved = EfficientQuestsCharacter
+    if type(saved) ~= "table" or type(saved.consumedFor) ~= "table" then return false end
+    if type(itemID) ~= "number" or type(questID) ~= "number" then return false end
+    return saved.consumedFor[supplyKey(questID, itemID)] == true
+end
+
 local function supplies(advice, context, provider)
-    local name = verifiedItem(advice, provider)
-    if not name then
-        if advice.itemID then qualify(advice, "Guide item identity is not confirmed.") end
-        return
+    if not advice.verifiedItemID then return end
+    -- Remember verified quest-linked supplies so later quest-log observations
+    -- can attribute this item's use to that quest.
+    if advice.questID and context.isAccepted(advice.questID) == true
+        and type(EfficientQuestsCharacter) == "table" then
+        local saved = EfficientQuestsCharacter
+        saved.trackedSupplies = saved.trackedSupplies or {}
+        saved.trackedSupplies[supplyKey(advice.questID, advice.verifiedItemID)] = true
     end
-    advice.verifiedItemID = advice.itemID
     local needed = advice.quantity
     if type(needed) ~= "number" or needed <= 0 or needed ~= math.floor(needed) then return end
     local carried = context.countCarried(advice.itemID)
@@ -51,6 +63,59 @@ local function supplies(advice, context, provider)
         text = text .. " If applicable, keep at least " .. needed .. " in total."
     end
     advice.text = text
+end
+
+-- An intended consumption is recorded only from coincident observations: the
+-- quest's item objective progressed while the carried count fell. A sale
+-- without progress, progress without a fall, or a log disappearance alone is
+-- never attributed to the quest.
+function EfficientQuests.ObserveConsumption()
+    local saved = EfficientQuestsCharacter
+    if type(saved) ~= "table" or type(saved.trackedSupplies) ~= "table" then return end
+    local context = EfficientQuests.GetContext()
+    for key in pairs(saved.trackedSupplies) do
+        local questID, itemID = key:match("^(%d+)\31(%d+)$")
+        questID, itemID = tonumber(questID), tonumber(itemID)
+        local quest = questID and context.quests[questID]
+        local objectives = quest and quest.objectives
+        if itemID and type(objectives) == "table" then
+            local itemProgress = 0
+            for _, objective in ipairs(objectives) do
+                if type(objective) == "table" and type(objective.numFulfilled) == "number"
+                    and (objective.type == "item" or objective.objectiveType == "item") then
+                    itemProgress = itemProgress + objective.numFulfilled
+                end
+            end
+            local carried = context.countCarried and context.countCarried(itemID)
+            local last = type(saved.lastSeen) == "table" and saved.lastSeen[key] or nil
+            if type(last) == "table" and type(last.itemProgress) == "number"
+                and type(last.carried) == "number" and type(carried) == "number"
+                and itemProgress > last.itemProgress and carried < last.carried then
+                saved.consumedFor = saved.consumedFor or {}
+                saved.consumedFor[key] = true
+            end
+            if type(carried) == "number" then
+                saved.lastSeen = saved.lastSeen or {}
+                saved.lastSeen[key] = {itemProgress = itemProgress, carried = carried}
+            end
+        end
+    end
+end
+
+-- Accepting a quest starts a fresh run of it; earlier consumption
+-- observations no longer describe its current requirement.
+function EfficientQuests.ForgetConsumption(questID)
+    local saved = EfficientQuestsCharacter
+    if type(saved) ~= "table" or type(questID) ~= "number" then return end
+    local prefix = questID .. "\31"
+    for _, field in ipairs({"consumedFor", "lastSeen", "trackedSupplies"}) do
+        local records = type(saved[field]) == "table" and saved[field] or nil
+        if records then
+            for key in pairs(records) do
+                if string.sub(key, 1, #prefix) == prefix then records[key] = nil end
+            end
+        end
+    end
 end
 
 -- Persist only explicit positive observations, scoped to the current character.
@@ -85,7 +150,21 @@ local function knownFlight(advice, context)
         or text:match('flight%s*path%s+in%s*:%s*(.+)')
         or text:match('flight%s*path%s+in%s+(.+)')
         or text:match('^%s*([^:]+):%s')
-    if not destination then return false end
+    if not destination then
+        -- Without a named destination in the sentence, the guide's own
+        -- location tag can identify the path: an exact, unique observed
+        -- node name on the current map.
+        local zone = advice.location and advice.location.zone
+        if type(zone) ~= "string" or zone == "" then return false end
+        local zoneMatches = 0
+        for _, node in pairs(paths) do
+            if node.mapID == context.zoneID and type(node.name) == "string"
+                and string.lower(node.name) == string.lower(zone) then
+                zoneMatches = zoneMatches + 1
+            end
+        end
+        return zoneMatches == 1
+    end
     for _, node in pairs(paths) do
         if node.mapID == context.zoneID and type(node.name) == "string" then
             local name = string.lower(node.name)
@@ -114,19 +193,33 @@ local function obsoleteOnTurnIn(advice, questID)
 end
 
 function EfficientQuests.ApplyLifecycle(advice, context, provider)
+    if advice.kind == "supply" and not advice.verifiedItemID then
+        if verifiedItem(advice, provider) then
+            advice.verifiedItemID = advice.itemID
+        elseif advice.itemID then
+            qualify(advice, "Guide item identity is not confirmed.")
+        end
+    end
     local ids = advice.eligibleQuestIDs or advice.questIDs or {}
     if #ids > 0 then
-        local remaining = {}
+        local remaining, usedAsIntended = {}, false
         for _, id in ipairs(ids) do
+            local consumed = advice.kind == "supply" and advice.verifiedItemID ~= nil
+                and isConsumedFor(advice.verifiedItemID, id)
+            if consumed then usedAsIntended = true end
             -- A repeatable or reaccepted quest takes precedence over history.
-            if not (context.completedQuestIDs[id] and context.isAccepted(id) == false
+            if not consumed and not (context.completedQuestIDs[id] and context.isAccepted(id) == false
                 and obsoleteOnTurnIn(advice, id)) then
                 remaining[#remaining + 1] = id
             end
         end
         if #remaining == 0 then return false end
         advice.eligibleQuestIDs = remaining
-        if #remaining < #ids then qualify(advice, "Some associated quests are complete.") end
+        if usedAsIntended then
+            qualify(advice, "Some stated supplies were already used as intended.")
+        elseif #remaining < #ids then
+            qualify(advice, "Some associated quests are complete.")
+        end
     end
     if advice.kind == "technique" and advice.questID
         and context.questPhase(advice.questID) == "ready" then
