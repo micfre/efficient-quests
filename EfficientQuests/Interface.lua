@@ -3,7 +3,8 @@ local EQ = EfficientQuests
 local L = {
   title='Efficient Quests', settings='Settings', more='More', first='First',
   quest='Quest', item='Item', map='Map',
-  dismiss='Dismiss', restore='Restore dismissed hints', guide='Guide',
+  dismiss='Dismiss', restore='Restore all dismissed hints', restoreHint='Restore',
+  guide='Guide',
   display='Display', dismissed='Dismissed', standalone='Standalone',
   integrated='FlareUI', spacing='Tracker spacing', width='Window width',
   noGuide='Install and adapt a supported guide.',
@@ -20,6 +21,7 @@ local scrollRange = 0
 local widthLess, widthMore, spacingLess, spacingMore, restore
 local rows, shownHints, page = {}, {}, 0
 local expanded, currentCategory = {}, 'guide'
+local dismissedRows, dismissedEntries = {}, {}
 local itemTooltipOwner
 
 local function character()
@@ -140,6 +142,22 @@ local function showOrHide(widget, visible)
   if visible then widget:Show() else widget:Hide() end
 end
 
+-- One restore control per dismissed hint, so recovering one hint never
+-- wipes the character's other dismissals.
+local function makeDismissedRow(index)
+  local row = {}
+  row.label = text(settings, 'EfficientQuestsDismissedLabel'..index)
+  row.label:SetWidth(290)
+  row.restore = button(settings, 'EfficientQuestsRestoreHint'..index, L.restoreHint, 66, 22, function()
+    if row.hintID then
+      character().dismissed[row.hintID] = nil
+      EQ.RefreshInterface()
+    end
+  end)
+  dismissedRows[index] = row
+  return row
+end
+
 local function refreshSettings()
   if not settings then return end
   local data = character()
@@ -157,7 +175,22 @@ local function refreshSettings()
   showOrHide(restore, dismissed)
   settingsNote:SetText(guide and 'Select one installed guide.' or
     (display and 'Choose the window mode, width and tracker spacing.' or
-    'Restore hints dismissed by this character.'))
+    (#dismissedEntries > 0 and 'Restore individual hints, or restore them all.' or L.none)))
+  for index = 1, math.max(#dismissedRows, dismissed and #dismissedEntries or 0) do
+    local row = dismissedRows[index]
+    local entry = dismissed and dismissedEntries[index] or nil
+    if entry then
+      if not row then row = makeDismissedRow(index) end
+      row.hintID = entry.id
+      row.label:SetText(entry.text or '')
+      row.label:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -262 - (index - 1) * 30)
+      row.restore:SetPoint('TOPLEFT', settings, 'TOPLEFT', 462, -258 - (index - 1) * 30)
+      row.label:Show(); row.restore:Show()
+    elseif row then
+      row.hintID = nil
+      row.label:Hide(); row.restore:Hide()
+    end
+  end
 end
 
 -- FlareUI exposes its holder as a named frame. Its scroll child follows both
@@ -318,6 +351,10 @@ function EQ.RefreshInterface()
   local available = {}
   for _, hint in ipairs(hints) do
     if hint.id and not data.dismissed[hint.id] then available[#available + 1] = hint end
+  end
+  dismissedEntries = {}
+  for _, hint in ipairs(hints) do
+    if hint.id and data.dismissed[hint.id] then dismissedEntries[#dismissedEntries + 1] = hint end
   end
   local statusText
   if problem == 'missing' then statusText = L.missing
