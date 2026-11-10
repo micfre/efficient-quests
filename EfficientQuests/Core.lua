@@ -18,13 +18,27 @@ local function guideTitle(key)
     return key
 end
 
+local function guideAuthor(key, chapters)
+    -- The first chapter's registration argument wins; a package whose
+    -- chapters carry no author falls back to its manifest field, read
+    -- through the same addon-list service as the title.
+    local author = chapters[1] and chapters[1][2] or nil
+    if author then return author end
+    local addons = _G.C_AddOns
+    if addons and type(addons.GetAddOnMetadata) == "function" then
+        local manifest = addons.GetAddOnMetadata(key, "Author")
+        if type(manifest) == "string" and manifest ~= "" then return manifest end
+    end
+    return nil
+end
+
 local function guideList()
     local list = {}
     for key, chapters in pairs(guides) do
         table.insert(list, {
             key = key,
             name = guideTitle(key),
-            author = chapters[1] and chapters[1][2] or nil,
+            author = guideAuthor(key, chapters),
             chapters = #chapters,
         })
     end
