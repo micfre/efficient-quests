@@ -227,3 +227,22 @@ Buy [CI44,1 Candle].
 local unlocated = EfficientQuests.GetHints('UnlocatedCrowd')
 assert(#unlocated == 0, 'advice with no evidence of local usefulness cannot fill the compact view')
 print('ok - unlocated advice does not crowd local hints')
+
+EfficientQuests_RegisterGuide('QuestPurpose', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] because the quest requires three apples for [QC101].
+[G40,50 Elwynn Forest] Buy a weapon for the quest [QC102].
+]], 'Synthetic')
+hints = EfficientQuests.GetHints('QuestPurpose')
+assert(#hints == 2, 'practical quest requirements must remain available even when they explain why')
+assert(hints[1].text:find('quest requires', 1, true) or hints[2].text:find('quest requires', 1, true), 'the quantity and its quest condition remain together')
+print('ok - practical quest-purpose explanations and equipment remain visible')
+
+EfficientQuests_RegisterGuide('NarrativeOutcome', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] before the advisor poisoned the ruler.
+[G40,50 Elwynn Forest] Keep [CI43,2 Pears] after the guard betrayed the queen.
+]], 'Synthetic')
+hints = EfficientQuests.GetHints('NarrativeOutcome')
+assert(#hints == 0, 'narrative outcomes must not be exposed in advice or source excerpts')
+print('ok - narrative outcome variants are withheld')
