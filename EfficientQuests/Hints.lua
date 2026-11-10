@@ -3,11 +3,49 @@
 local function localStatus(advice, context)
     local zoneName = context.zoneName
     if not zoneName or zoneName == "" then return nil end
-    zoneName = string.lower(zoneName)
     if advice.location and advice.location.zone then
-        return string.lower(advice.location.zone) == zoneName
+        local name = string.lower(advice.location.zone)
+        if name == string.lower(zoneName) then return true end
+        -- A different name can be a subzone or alias. Only compare maps when
+        -- the client's own hierarchy identifies a unique matching map.
+        if not C_Map or not C_Map.GetMapInfo or not C_Map.GetMapChildrenInfo then return nil end
+        local ancestors, id, root = {}, context.zoneID, nil
+        for _ = 1, 20 do
+            local info = id and C_Map.GetMapInfo(id)
+            if not info or ancestors[id] then break end
+            ancestors[id], root = true, id
+            if not info.parentMapID or info.parentMapID == 0 then break end
+            id = info.parentMapID
+        end
+        if not root then return nil end
+        local maps = C_Map.GetMapChildrenInfo(root, nil, true)
+        if type(maps) ~= "table" then return nil end
+        local match
+        for _, info in ipairs(maps) do
+            if type(info.name) == "string" and string.lower(info.name) == name then
+                if match and match.mapID ~= info.mapID then return nil end
+                match = info
+            end
+        end
+        if not match or not match.mapID then return nil end
+        if ancestors[match.mapID] then return true end
+        id = match.mapID
+        local seen = {}
+        for _ = 1, 20 do
+            if id == context.zoneID then return true end
+            if not id or seen[id] then break end
+            seen[id] = true
+            local info = C_Map.GetMapInfo(id)
+            id = info and info.parentMapID
+        end
+        -- Separate zone-level maps are distinct; unrelated submaps are not
+        -- sufficient evidence to declare an opportunity remote.
+        local current = C_Map.GetMapInfo(context.zoneID)
+        local zoneType = Enum and Enum.UIMapType and Enum.UIMapType.Zone
+        if zoneType and current and current.mapType == zoneType and match.mapType == zoneType then return false end
+        return nil
     end
-    if advice.chapter and string.find(string.lower(advice.chapter), zoneName, 1, true) then
+    if advice.chapter and string.find(string.lower(advice.chapter), string.lower(zoneName), 1, true) then
         return true
     end
     return nil
@@ -20,11 +58,54 @@ local function questLevel(provider, id, context)
     if type(value) == "number" and value > 0 then return value end
 end
 
-local function prepare(advice, context, provider, localEvidence)
-    local focused, accepted, levelDistance = false, false, nil
+-- Client map POIs already carry their UI-map frame. QuestieDB AreaIDs do not,
+-- so do not compare provider spawn coordinates to the player position here.
+local function mapBands(context)
+    local result = {}
+    if not context.zoneID or not context.position or not C_QuestLog or not C_QuestLog.GetQuestsOnMap
+        or not C_Map or not C_Map.GetMapWorldSize then return result end
+    local width, height = C_Map.GetMapWorldSize(context.zoneID)
+    if type(width) ~= "number" or type(height) ~= "number" or width <= 0 or height <= 0 then return result end
+    local points = C_QuestLog.GetQuestsOnMap(context.zoneID)
+    if type(points) ~= "table" then return result end
+    for _, point in ipairs(points) do
+        if point.mapID == context.zoneID and type(point.questID) == "number"
+            and type(point.x) == "number" and point.x >= 0 and point.x <= 1
+            and type(point.y) == "number" and point.y >= 0 and point.y <= 1 then
+            local accepted = context.isAccepted(point.questID)
+            local phase = context.quests[point.questID] and context.quests[point.questID].phase
+            if accepted and not phase and C_QuestLog.IsComplete then
+                phase = C_QuestLog.IsComplete(point.questID) and "ready" or "active"
+            end
+            local kind
+            if accepted == false and point.isQuestStart == true then kind = "giver"
+            elseif accepted == true and phase == "active" and point.isQuestStart == false
+                and point.inProgress == true and type(point.numObjectives) == "number" and point.numObjectives > 0 then
+                kind = "target"
+            end
+            if kind then
+                local dx = (point.x - context.position.x) * width
+                local dy = (point.y - context.position.y) * height
+                local band = math.floor(math.sqrt(dx * dx + dy * dy) / 250)
+                result[point.questID] = result[point.questID] or {}
+                local previous = result[point.questID][kind]
+                if not previous or band < previous then result[point.questID][kind] = band end
+            end
+        end
+    end
+    return result
+end
+
+local function prepare(advice, context, provider, localEvidence, distances)
+    local focused, accepted, levelDistance, giverBand, targetBand = false, false, nil, nil, nil
     for _, id in ipairs(advice.questIDs or {}) do
         if id == context.focusedQuestID then focused = true end
         if context.isAccepted(id) then accepted = true end
+        local bands = distances[id]
+        if bands then
+            if bands.giver and (not giverBand or bands.giver < giverBand) then giverBand = bands.giver end
+            if bands.target and (not targetBand or bands.target < targetBand) then targetBand = bands.target end
+        end
         local level = questLevel(provider, id, context)
         if level and context.level then
             local distance = math.abs(level - context.level)
@@ -36,7 +117,7 @@ local function prepare(advice, context, provider, localEvidence)
     advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if localEvidence == nil then advice.uncertain = true end
-    advice._ranking = {focused=localFocus, accepted=accepted and localEvidence == true, levelDistance=levelDistance}
+    advice._ranking = {focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance}
     return advice
 end
 
@@ -44,6 +125,13 @@ local function before(a, b)
     local x, y = a._ranking, b._ranking
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
+    for _, field in ipairs({"giverBand", "targetBand"}) do
+        if x[field] ~= y[field] then
+            if x[field] == nil then return false end
+            if y[field] == nil then return true end
+            return x[field] < y[field]
+        end
+    end
     if x.levelDistance ~= y.levelDistance then
         if x.levelDistance == nil then return false end
         if y.levelDistance == nil then return true end
@@ -58,7 +146,8 @@ local function duplicateKey(advice)
     for _, id in ipairs(advice.questIDs or {}) do ids[#ids + 1] = tostring(id) end
     table.sort(ids)
     return table.concat({string.lower(advice.text), table.concat(ids, ","),
-        table.concat(advice.conditions or {}, "|"), advice.location and advice.location.zone or ""}, "\31")
+        table.concat(advice.conditions or {}, "|"), advice.location and advice.location.zone or "",
+        tostring(advice.itemID or ""), tostring(advice.quantity or "")}, "\31")
 end
 
 -- Returns ordered advice and, when setup is incomplete, a status code. The
@@ -69,6 +158,7 @@ function EfficientQuests.GetHints(packageName)
     if not packageName or not EfficientQuests.guides[packageName] then return {}, "guide" end
     local context = EfficientQuests.GetContext()
     local candidates = EfficientQuests.ExtractGuide(packageName, context)
+    local distances = mapBands(context)
     local output, seen = {}, {}
     for _, advice in ipairs(candidates) do
         local locality = localStatus(advice, context)
@@ -76,7 +166,7 @@ function EfficientQuests.GetHints(packageName)
             local key = duplicateKey(advice)
             if not seen[key] then
                 seen[key] = true
-                output[#output + 1] = prepare(advice, context, provider, locality)
+                output[#output + 1] = prepare(advice, context, provider, locality, distances)
             end
         end
     end

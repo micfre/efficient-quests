@@ -12,8 +12,10 @@ LibQuestieDB = {RequireContract=function(n) return n == 1 end,
 UnitFactionGroup = function() return 'Alliance' end
 UnitLevel = function() return 10 end
 C_Map = {GetBestMapForUnit=function() return 1 end,
- GetMapInfo=function() return {name='Elwynn Forest'} end,
+ GetMapInfo=function(id) return ({[1]={mapID=1,name='Elwynn Forest',mapType=3,parentMapID=100}, [2]={mapID=2,name='Duskwood',mapType=3,parentMapID=100}, [3]={mapID=3,name='Goldshire',mapType=4,parentMapID=1}, [100]={mapID=100,name='Eastern Kingdoms',mapType=2,parentMapID=0}})[id] end,
+ GetMapChildrenInfo=function() return {{mapID=1,name='Elwynn Forest',mapType=3,parentMapID=100},{mapID=2,name='Duskwood',mapType=3,parentMapID=100},{mapID=3,name='Goldshire',mapType=4,parentMapID=1}} end,
  GetPlayerMapPosition=function() return {GetXY=function() return 0.4, 0.5 end} end}
+Enum = {UIMapType={Zone=3}}
 local focus = 101
 C_SuperTrack = {GetSuperTrackedQuestID=function() return focus end}
 C_QuestLog = {GetNumQuestLogEntries=function() return 1, 1 end,
@@ -63,3 +65,40 @@ EfficientQuests_RegisterGuide('Unaccepted', [[
 hints = EfficientQuests.GetHints('Unaccepted')
 assert(hints[1].relevance == 'quest preparation', 'unaccepted associated advice is not mislabeled as an unassociated zone tip')
 print('ok - unaccepted linked advice retains its association')
+
+EfficientQuests_RegisterGuide('Subzone', [[
+[N Elwynn Forest]
+[G40,50 Goldshire] Buy [CI222,1 Candle].
+]], 'Author')
+hints = EfficientQuests.GetHints('Subzone')
+assert(#hints == 1, 'advice in a local child map must not be discarded')
+print('ok - local subzone names are retained')
+C_Map.GetMapWorldSize = function() return 1000, 1000 end
+C_QuestLog.GetQuestsOnMap = function() return {
+ {questID=102,mapID=1,x=0.9,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
+ {questID=103,mapID=1,x=0.41,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
+} end
+hints = EfficientQuests.GetHints('Levels')
+assert(hints[1].questID == 103, 'nearby available quest start ranks above remote quest start')
+print('ok - current map quest start proximity')
+C_QuestLog.IsOnQuest = function(id) return id == 102 or id == 103 end
+C_QuestLog.IsComplete = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+ {questID=102,mapID=1,x=0.41,y=0.5,isQuestStart=true,inProgress=false,numObjectives=0},
+ {questID=102,mapID=1,x=0.9,y=0.5,isQuestStart=false,inProgress=true,numObjectives=1},
+ {questID=103,mapID=1,x=0.41,y=0.5,isQuestStart=false,inProgress=true,numObjectives=1},
+} end
+hints = EfficientQuests.GetHints('Levels')
+assert(hints[1].questID == 103, 'active quests use objective POIs and ignore their original start')
+C_QuestLog.IsComplete = function(id) return id == 102 end
+hints = EfficientQuests.GetHints('Levels')
+assert(hints[1].questID == 103, 'ready quests must not use obsolete objective POIs')
+print('ok - active and ready phases do not reuse obsolete locations')
+C_Map.GetMapChildrenInfo = nil
+EfficientQuests_RegisterGuide('UnknownSubzone', [[
+[N Elwynn Forest]
+[G42,50 Northshire] Buy [CI224,1 Candle].
+]], 'Author')
+hints = EfficientQuests.GetHints('UnknownSubzone')
+assert(#hints == 1 and hints[1].uncertain, 'unmapped subzones must not be treated as remote')
+print('ok - unmapped name mismatch remains uncertain')
