@@ -2,13 +2,23 @@
 -- installed guide packages and report coverage and safety findings.
 --
 -- Usage (lua 5.1, from the repository root):
---   lua tools/audit_extraction.lua <package-dir> [<package-dir> ...]
+--   lua tools/audit_extraction.lua <package-dir> [<package-dir> ...] [--json]
 --
 -- Each package directory must contain a .toc file listing its guide files,
--- matching the layout of the installed third-party packages. The tool only
--- reads those files; it never writes them and never copies their content into
--- the repository. Printed excerpts are for local review by the operator and
--- are not committed.
+-- matching the layout of the installed third-party packages. Two guide file
+-- shapes are read: source packages whose files call
+-- `Guidelime.registerGuide([[...]], "author")` and built plugin folders whose
+-- Guides.lua calls `EfficientQuests_RegisterGuide("Plugin", [[...]], "author")`.
+-- The author argument is optional in both shapes. The tool only reads those
+-- files; it never writes them and never copies their content into the
+-- repository. Printed excerpts are for local review by the operator and are
+-- not committed.
+--
+-- Without --json the tool prints the human report described above. With
+-- --json it prints one machine-readable JSON document instead (packages,
+-- counts, and findings) and exits 0 when every package was audited, 2 when a
+-- package could not be read, and 1 on a usage error. The builder
+-- (tools/build_guide.py) consumes this mode as its extraction gate.
 
 DEFAULT_CHAT_FRAME = {AddMessage = function() end}
 SlashCmdList = {}
@@ -51,13 +61,29 @@ local watchPhrases = {' revealed', ' discover', ' secretly ', ' betrayal',
 
 local function trim(s) return (s:gsub('^%s+', ''):gsub('%s+$', '')) end
 
+-- Machine mode: --json replaces the human report with one JSON document.
+local jsonMode = false
+local function emit(...)
+  if not jsonMode then print(...) end
+end
+
 local function collectFiles(dir)
-  local tocName
-  local pipe = io.popen('ls "' .. dir .. '"')
-  for name in pipe:lines() do
-    if name:match('%.toc$') and not tocName then tocName = name end
+  -- Most packages, including every built plugin, name the TOC after the
+  -- directory; io.open settles those without a shell. The listing fallback
+  -- covers packages such as Bethink, whose TOC name differs.
+  local package = dir:match('([^/\\]+)$')
+  local tocName = package and package .. '.toc' or nil
+  if tocName then
+    local probe = io.open(dir .. '/' .. tocName, 'r')
+    if probe then probe:close() else tocName = nil end
   end
-  pipe:close()
+  if not tocName then
+    local pipe = io.popen('ls "' .. dir .. '"')
+    for name in pipe:lines() do
+      if name:match('%.toc$') and not tocName then tocName = name end
+    end
+    pipe:close()
+  end
   if not tocName then return nil, 'no .toc in ' .. dir end
   local files = {}
   for line in io.lines(dir .. '/' .. tocName) do
@@ -69,20 +95,49 @@ local function collectFiles(dir)
   return files, nil, tocName
 end
 
--- Extract every registerGuide long-string call from one guide file.
+-- Registration calls appear in two shapes: source packages call
+-- Guidelime.registerGuide([[body]], "author") and built plugins call
+-- EfficientQuests_RegisterGuide("Plugin", [[body]], "author"). Each pattern
+-- below carries the capture group of the body and, when it accepts one, of
+-- the author.
+local callPatterns = {
+  {'Guidelime%.registerGuide%s*%(%s*%[%[(.-)%]%]%s*,%s*"([^"]*)"%s*%)', 1, 2},
+  {'EfficientQuests_RegisterGuide%s*%(%s*"(.-)"%s*,%s*%[%[(.-)%]%]%s*,%s*"([^"]*)"%s*%)', 2, 3},
+  {'Guidelime%.registerGuide%s*%(%s*%[%[(.-)%]%]%s*%)', 1},
+  {'EfficientQuests_RegisterGuide%s*%(%s*"(.-)"%s*,%s*%[%[(.-)%]%]%s*%)', 2},
+}
+
+-- Extract every registration call from one guide file, in file order. A file
+-- may mix shapes and author-less calls; each call is taken once.
 local function loadGuides(path)
   local handle = io.open(path, 'r')
   if not handle then return {} end
   local content = handle:read('*a')
   handle:close()
-  local guides = {}
-  for body, author in content:gmatch('Guidelime%.registerGuide%s*%(%s*%[%[(.-)%]%]%s*,%s*"([^"]*)"') do
-    guides[#guides + 1] = {body=body, author=author}
-  end
-  if #guides == 0 then
-    for body in content:gmatch('Guidelime%.registerGuide%s*%(%s*%[%[(.-)%]%]%s*%)') do
-      guides[#guides + 1] = {body=body, author=nil}
+  local calls = {}
+  for _, pattern in ipairs(callPatterns) do
+    local init = 1
+    while true do
+      local start, finish, one, two, three = content:find(pattern[1], init)
+      if not start then break end
+      local body, author
+      if pattern[2] == 1 then body, author = one, two else body, author = two, three end
+      -- A lazy body can run past its own closing bracket, over an author
+      -- argument, and swallow the next call whole. A guide body never holds
+      -- a registration call head, so reject those matches and rescan from
+      -- the next position instead of trusting the first hit.
+      if body:find('Guidelime%.registerGuide') or body:find('EfficientQuests_RegisterGuide') then
+        init = start + 1
+      else
+        calls[#calls + 1] = {start = start, body = body, author = author}
+        init = finish + 1
+      end
     end
+  end
+  table.sort(calls, function(a, b) return a.start < b.start end)
+  local guides = {}
+  for _, call in ipairs(calls) do
+    guides[#guides + 1] = {body = call.body, author = call.author}
   end
   return guides
 end
@@ -102,6 +157,42 @@ local function isCandidate(line)
     or s:find('wind rider', 1, true) or s:find('needed for', 1, true)
     or s:find('quest items', 1, true) or s:find('%[ci%d')
     or (s:find('%[qc%d') and (s:find('while ', 1, true) or s:find('before ', 1, true)))
+end
+
+-- Minimal JSON writing for the machine mode. Guide text reaches the findings
+-- only through the fixed phrases of each screen, so the escaping below only
+-- has to keep the document valid, not beautiful.
+local jsonEscapes = {['"'] = '\\"', ['\\'] = '\\\\', ['\b'] = '\\b',
+  ['\f'] = '\\f', ['\n'] = '\\n', ['\r'] = '\\r', ['\t'] = '\\t'}
+
+local function jsonString(value)
+  local escaped = tostring(value):gsub('[%c"\\]', function(ch)
+    return jsonEscapes[ch] or string.format('\\u%04x', ch:byte())
+  end)
+  return '"' .. escaped .. '"'
+end
+
+local function jsonPairs(pairs_)
+  local parts = {}
+  for _, pair in ipairs(pairs_) do
+    parts[#parts + 1] = jsonString(pair[1]) .. ':' .. pair[2]
+  end
+  return '{' .. table.concat(parts, ',') .. '}'
+end
+
+local function jsonList(values)
+  return '[' .. table.concat(values, ',') .. ']'
+end
+
+local function jsonCounts(counts)
+  local keys = {}
+  for key in pairs(counts) do keys[#keys + 1] = key end
+  table.sort(keys)
+  local parts = {}
+  for _, key in ipairs(keys) do
+    parts[#parts + 1] = {key, string.format('%d', counts[key])}
+  end
+  return jsonPairs(parts)
 end
 
 local function checkRecord(record, report, where)
@@ -153,7 +244,10 @@ end
 local function auditPackage(dir)
   local package = dir:match('([^/\\]+)$')
   local files, err, tocName = collectFiles(dir)
-  if not files then print('SKIP ' .. package .. ': ' .. err) return end
+  if not files then
+    emit('SKIP ' .. package .. ': ' .. err)
+    return {package = package, toc = tocName, error = err}
+  end
   EfficientQuests.guides[package] = nil
   local totalGuides, totalLines, candidateLines = 0, 0, 0
   local candidates = {}
@@ -198,25 +292,25 @@ local function auditPackage(dir)
       extractedPieces[#extractedPieces + 1] = trim(record.sourceText)
     end
   end
-  print('== ' .. package .. ' (' .. tocName .. ', ' .. #files .. ' files, '
+  emit('== ' .. package .. ' (' .. tocName .. ', ' .. #files .. ' files, '
     .. totalGuides .. ' guides, ' .. totalLines .. ' lines)')
   local kinds = {}
   for kind in pairs(byKind) do kinds[#kinds + 1] = kind end
   table.sort(kinds)
   local parts = {}
   for _, kind in ipairs(kinds) do parts[#parts + 1] = kind .. '=' .. byKind[kind] end
-  print('   advice records (all contexts): ' .. table.concat(parts, ' '))
+  emit('   advice records (all contexts): ' .. table.concat(parts, ' '))
   local assoc = {}
   for a in pairs(byAssociation) do assoc[#assoc + 1] = a end
   table.sort(assoc)
   parts = {}
   for _, a in ipairs(assoc) do parts[#parts + 1] = a .. '=' .. byAssociation[a] end
-  print('   associations: ' .. table.concat(parts, ' '))
+  emit('   associations: ' .. table.concat(parts, ' '))
   local perContext = {}
   for _, context in ipairs(contexts) do
     perContext[#perContext + 1] = context.name .. '=' .. recordsByContext[context.name]
   end
-  print('   per context: ' .. table.concat(perContext, ' '))
+  emit('   per context: ' .. table.concat(perContext, ' '))
   local withheld = {}
   for _, candidate in ipairs(candidates) do
     local covered = false
@@ -229,34 +323,96 @@ local function auditPackage(dir)
     if a.file ~= b.file then return a.file < b.file end
     return a.line < b.line
   end)
-  print('   candidate lines: ' .. candidateLines .. ', withheld: ' .. #withheld)
-  local shown, findingCount = {}, 0
+  emit('   candidate lines: ' .. candidateLines .. ', withheld: ' .. #withheld)
+  -- Findings are deduplicated the same way for the human report and the
+  -- machine document: once per severity, record id, and detail.
+  local shown, findings = {}, {}
   for _, item in ipairs(report) do
     local key = item.severity .. '|' .. item.id .. '|' .. item.detail
     if not shown[key] then
       shown[key] = true
-      findingCount = findingCount + 1
-      print(string.format('   [%s] %s %s :: %s', item.severity, item.where, item.id, item.detail))
-      if item.text ~= '' then print('       text: ' .. item.text) end
+      findings[#findings + 1] = item
+      emit(string.format('   [%s] %s %s :: %s', item.severity, item.where, item.id, item.detail))
+      if item.text ~= '' then emit('       text: ' .. item.text) end
     end
   end
   if #withheld > 0 then
-    print('   withheld candidate lines (file:line, for manual review):')
+    emit('   withheld candidate lines (file:line, for manual review):')
     for _, candidate in ipairs(withheld) do
-      print('     ' .. candidate.file .. ':' .. candidate.line .. ' :: ' .. candidate.text)
+      emit('     ' .. candidate.file .. ':' .. candidate.line .. ' :: ' .. candidate.text)
     end
   end
-  return {package=package, findings=findingCount, withheld=#withheld, candidates=candidateLines}
+  return {package=package, toc=tocName, files=#files, guides=totalGuides,
+    lines=totalLines, candidate_lines=candidateLines, withheld_lines=#withheld,
+    advice_records=#extractedPieces, records_by_kind=byKind,
+    associations=byAssociation, per_context=recordsByContext, findings=findings}
 end
 
-if #arg == 0 then
-  print('usage: lua tools/audit_extraction.lua <package-dir> [<package-dir> ...]')
-  return
+local function jsonFinding(item)
+  return jsonPairs({
+    {'severity', jsonString(item.severity)},
+    {'where', jsonString(item.where)},
+    {'id', jsonString(item.id)},
+    {'detail', jsonString(item.detail)},
+  })
+end
+
+local function jsonPackage(result)
+  if result.error then
+    return jsonPairs({
+      {'package', jsonString(result.package)},
+      {'error', jsonString(result.error)},
+    })
+  end
+  local findings = {}
+  for _, item in ipairs(result.findings) do findings[#findings + 1] = jsonFinding(item) end
+  local bySeverity = {}
+  for _, item in ipairs(result.findings) do
+    bySeverity[item.severity] = (bySeverity[item.severity] or 0) + 1
+  end
+  return jsonPairs({
+    {'package', jsonString(result.package)},
+    {'toc', jsonString(result.toc)},
+    {'files', string.format('%d', result.files)},
+    {'guides', string.format('%d', result.guides)},
+    {'lines', string.format('%d', result.lines)},
+    {'candidate_lines', string.format('%d', result.candidate_lines)},
+    {'withheld_lines', string.format('%d', result.withheld_lines)},
+    {'advice_records', string.format('%d', result.advice_records)},
+    {'records_by_kind', jsonCounts(result.records_by_kind)},
+    {'associations', jsonCounts(result.associations)},
+    {'per_context', jsonCounts(result.per_context)},
+    {'findings', jsonList(findings)},
+    {'findings_by_severity', jsonCounts(bySeverity)},
+    {'error', 'null'},
+  })
+end
+
+local jsonModeArgs = {}
+for i = 1, #arg do
+  if arg[i] == '--json' then jsonMode = true else jsonModeArgs[#jsonModeArgs + 1] = arg[i] end
+end
+if #jsonModeArgs == 0 then
+  io.stderr:write('usage: lua tools/audit_extraction.lua <package-dir> [<package-dir> ...] [--json]\n')
+  os.exit(1)
 end
 local summaries = {}
-for i = 1, #arg do summaries[#summaries + 1] = auditPackage(arg[i]) end
+for i = 1, #jsonModeArgs do summaries[#summaries + 1] = auditPackage(jsonModeArgs[i]) end
+if jsonMode then
+  local packages = {}
+  for _, s in ipairs(summaries) do packages[#packages + 1] = jsonPackage(s) end
+  print(jsonPairs({{'packages', jsonList(packages)}}))
+  for _, s in ipairs(summaries) do
+    if s.error then os.exit(2) end
+  end
+  os.exit(0)
+end
 print('== summary')
 for _, s in ipairs(summaries) do
-  print(string.format('   %s: %d findings, %d/%d candidate lines withheld',
-    s.package, s.findings, s.withheld, s.candidates))
+  if s.error then
+    print(string.format('   %s: skipped (%s)', s.package, s.error))
+  else
+    print(string.format('   %s: %d findings, %d/%d candidate lines withheld',
+      s.package, #s.findings, s.withheld_lines, s.candidate_lines))
+  end
 end

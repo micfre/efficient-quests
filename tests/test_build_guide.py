@@ -71,7 +71,8 @@ class BuildOutputTests(BuilderFixture):
         plugin = self.out / self.plugin_name
         self.assertTrue(plugin.is_dir(), str(list(self.out.iterdir())))
         self.assertEqual({p.name for p in plugin.iterdir()},
-                         {self.plugin_name + ".toc", "Guides.lua"})
+                         {self.plugin_name + ".toc", "Guides.lua",
+                          "extraction-audit.json"})
 
     def test_manifest_fields(self):
         self.assertEqual(self.build().returncode, 0)
@@ -236,6 +237,70 @@ class GuardTests(BuilderFixture):
         result = self.build()
         self.assertNotEqual(result.returncode, 0)
         self.assertIn("toc", result.stderr.lower())
+
+
+class AuditGateTests(BuilderFixture):
+    """The extraction gate: every build audits the built plugin itself."""
+
+    def report(self):
+        return json.loads((self.out / self.plugin_name / "extraction-audit.json")
+                          .read_text(encoding="utf-8"))
+
+    def set_single_guide(self, body):
+        """Rewrite the fixture source with one guide chapter of the given bytes."""
+        (self.source / "chapters" / "one.lua").write_bytes(
+            b'Guidelime.registerGuide([[' + body + b']], "Fixture")\n')
+        (self.source / "chapters" / "two.lua").write_bytes(b"")
+
+    def test_healthy_build_writes_extraction_audit_report(self):
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = self.report()
+        self.assertEqual(report["plugin"], self.plugin_name)
+        self.assertEqual(report["source_package"], self.source_name)
+        self.assertEqual(report["plugin_version"], "1.28-eq1")
+        self.assertEqual(report["build_date"], BUILD_DATE)
+        audit = report["audit"]
+        # The audit read the built wrapper: all three replayed calls,
+        # including the author-less one, registered as guides.
+        self.assertEqual(audit["guides"], 3)
+        self.assertGreater(audit["advice_records"], 0)
+        self.assertEqual(audit["findings"], [])
+
+    def test_zero_advice_guide_fails_the_build_with_no_artifact(self):
+        self.set_single_guide(b"\n[GA Alliance]\n[N1 Empty]\n"
+                              b"Just walk north and enjoy the view.\n")
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no advice", result.stderr.lower())
+        self.assertFalse((self.out / self.plugin_name).exists())
+
+    def test_safety_screen_trip_fails_the_build_with_no_artifact(self):
+        # The conditional-prefix path of the extraction can carry a screened
+        # phrase into the visible text; the ROUTE finding must stop the build.
+        self.set_single_guide(b"\n[GA Alliance]\n[N1 Route]\n"
+                              b"If you are done with this guide, buy 5 apples. "
+                              b"Also save 10 silks.\n")
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("ROUTE", result.stderr)
+        self.assertFalse((self.out / self.plugin_name).exists())
+
+    def test_low_yield_guide_builds_with_a_warning(self):
+        # Three of four candidate lines are withheld (route-dependent and
+        # progression shopping); a majority-withheld guide warns, not fails.
+        self.set_single_guide(b"\n[GA Alliance]\n[N1 Yield]\n"
+                              b"Keep 5 apples.\n"
+                              b"Last chance to buy arrows.\n"
+                              b"Keep an eye out for rare spawns.\n"
+                              b"Buy a skinning knife.\n")
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("yield", result.stderr.lower())
+        self.assertIn("3 of 4", result.stderr)
+        report = self.report()
+        self.assertEqual(report["gates"]["warnings"],
+                         ["low yield: the audit withheld 3 of 4 candidate advice lines"])
 
 
 class CatalogTests(unittest.TestCase):
