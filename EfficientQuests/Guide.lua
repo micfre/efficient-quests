@@ -111,13 +111,10 @@ local function readable(line)
     prefix = prefix .. whitespace
     local zone = tag:match('^%[G%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*[^%]]*%]$')
     local nameless = tag:match('^%[CI%d+,%s*%d+%]$')
-    if not zone and not nameless then prefix = prefix .. tag end
+    local flightPoint = tag:match('^%[P%s+')
+    if not zone and not nameless and not flightPoint then prefix = prefix .. tag end
     position = position + #whitespace + #tag
   end
-  -- A named flight point tag in that marker run identifies the travel
-  -- opportunity; keep the name so the hint can name the point.
-  local point = prefix:match('%[P%s+([^%]]*%S)%]')
-  if point then prefix = prefix:gsub('%[P%s+[^%]]*%S%]', point .. ':') end
   line = prefix .. line:sub(position)
   line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
   line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
@@ -176,15 +173,20 @@ local function useful(line)
       or plain:match('^do%s*[:]') or plain:match('^run to')
       or plain:match('^follow the') or plain:match('^learn your level')
       or plain:match('^put them') then return false end
-  return s:find('buy', 1, true) or s:find('%f[%a]keep%f[%A]')
-      or s:find('save', 1, true) or s:find('sell', 1, true)
-      or s:find('stock up', 1, true) or s:find('flight path', 1, true)
-      or s:find('flightpath', 1, true) or s:find('flight master', 1, true)
-      or s:find('gryphon point', 1, true) or s:find('wind rider point', 1, true)
-      or s:find('needed for', 1, true) or s:find('quest items', 1, true)
-      or (s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true))
-      or (s:find('[qc', 1, true) and (s:find('while ', 1, true)
-          or s:find('before ', 1, true) or s:find('use ', 1, true)))
+  -- Practical wording is prose, not tag metadata, and a retention "keep"
+  -- takes an object: a bare "keep" before punctuation is a fortress name.
+  local words = s:gsub('%b[]', '')
+  return words:find('buy', 1, true) or words:find('%f[%a]keep[!%s]')
+      or words:find('save', 1, true) or words:find('sell', 1, true)
+      or words:find('stock up', 1, true) or words:find('flight path', 1, true)
+      or words:find('flightpath', 1, true) or words:find('flight master', 1, true)
+      or words:find('flight point', 1, true) or words:find('gryphon point', 1, true)
+      or words:find('wind rider point', 1, true)
+      or words:find('needed for', 1, true) or words:find('quest items', 1, true)
+      or (words:find('escort quest', 1, true) and words:find('group', 1, true)
+          and words:find('turn', 1, true))
+      or (s:find('[qc', 1, true) and (words:find('while ', 1, true)
+          or words:find('before ', 1, true) or words:find('use ', 1, true)))
 end
 
 -- Some quest directives have a self-contained practical note in parentheses.
@@ -303,8 +305,8 @@ end
 local function adviceKind(excerpt, item)
   local s = excerpt:lower()
   if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
-      or s:find('flight master', 1, true) or s:find('gryphon point', 1, true)
-      or s:find('wind rider point', 1, true) then return 'flight' end
+      or s:find('flight master', 1, true) or s:find('flight point', 1, true)
+      or s:find('gryphon point', 1, true) or s:find('wind rider point', 1, true) then return 'flight' end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
   if s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true) then return 'technique' end
   if s:gsub('questitem', 'quest item'):find('quest item', 1, true) and s:find('spawn', 1, true) then return 'technique' end
@@ -406,6 +408,16 @@ function EQ.ExtractGuide(packageName, context)
               if #quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
               if requirement then unknown[#unknown + 1] = 'requirement from an objective directive' end
               if inferred then unknown[#unknown + 1] = 'quest reference inferred from following sentence' end
+              local kind = requirement and 'supply'
+                or (inferred and 'technique' or adviceKind(excerpt, item))
+              -- A named flight point tag on the line identifies the travel
+              -- opportunity; keep the name with advice whose prose omits it.
+              if kind == 'flight' then
+                local point = line:match('%[P%s+([^%]]*%S)%]')
+                if point and not text:lower():find(point:lower(), 1, true) then
+                  text = point .. ': ' .. text
+                end
+              end
               local loc
               if location then loc = {x=location.x, y=location.y, zone=location.zone,
                 coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not x} end
@@ -417,7 +429,7 @@ function EQ.ExtractGuide(packageName, context)
                 association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
                 itemID=tonumber(item), quantity=tonumber(quantity),
                 itemSourceName=itemName,
-                kind=requirement and 'supply' or (inferred and 'technique' or adviceKind(excerpt, item)),
+                kind=kind,
                 learningState=learning,
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,

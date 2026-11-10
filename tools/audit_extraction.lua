@@ -27,6 +27,9 @@ local contexts = {
     professions={}, countCarried=function() return 0 end},
   {name='horde warrior', faction='Horde', class='Warrior', race='Orc',
     professions={mining=true}, countCarried=function() return 0 end},
+  {name='alliance warrior', faction='Alliance', class='Warrior', race='Human'},
+  {name='alliance warlock', faction='Alliance', class='Warlock', race='Gnome'},
+  {name='horde warlock', faction='Horde', class='Warlock', race='Undead'},
   {name='horde shaman', faction='Horde', class='Shaman', race='Tauren',
     professions={}, countCarried=function() return 0 end},
   {name='horde hunter', faction='Horde', class='Hunter', race='Troll'},
@@ -123,11 +126,13 @@ local function checkRecord(record, report, where)
   if text:find('%[') and trim(text:gsub('%b[]', '')) == trim(text) then
     report[#report + 1] = {severity='TAGS', where=where, id=record.id, detail='unstripped guide tag in text', text=text}
   end
-  -- Meaning preservation: quantities and item names from tags survive into text.
+  -- Meaning preservation: quantities from tags survive into the text or on
+  -- the record itself, where downstream wording can still use them.
   for id, quantity in record.sourceText:gmatch('%[CI(%d+)%s*,%s*(%d+)') do
-    if not text:find(quantity, 1, true) then
+    local carried = tostring(record.itemID) == id and tostring(record.quantity) == quantity
+    if not carried and not text:find(quantity, 1, true) then
       report[#report + 1] = {severity='QUANTITY', where=where, id=record.id,
-        detail='quantity ' .. quantity .. ' for item ' .. id .. ' missing from text', text=text}
+        detail='quantity ' .. quantity .. ' for item ' .. id .. ' missing from text and record', text=text}
     end
   end
   if record.itemSourceName and record.itemSourceName ~= ''

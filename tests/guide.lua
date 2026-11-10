@@ -331,3 +331,19 @@ assert(#directives[1].questIDs == 3 and directives[1].association == 'quests'
 assert(directives[2].text == '7 Spider Silk needed for this quest.',
   'a single directive quest reference uses the established singular wording')
 print('ok - item-bearing objective directives preserve their requirement')
+
+EfficientQuests_RegisterGuide('FlightPointWording', [[
+[N Greenfield]
+[G65.5,24.3 Greenfield] [P Northgate Keep] Ride south into the valley, then follow the road east to Northgate Keep. Collect its flight point before entering the keep.
+[G1,2 Greenfield] Repair your gear at the smith.
+]], 'synthetic')
+local flightWording = EfficientQuests.ExtractGuide('FlightPointWording', {})
+assert(#flightWording == 1, 'flight point wording is recognized as travel advice')
+assert(flightWording[1].kind == 'flight', 'collecting a flight point is a travel opportunity')
+assert(flightWording[1].text:find('Collect its flight point', 1, true),
+  'the flight point sentence is the advice, not the riding directions')
+assert(not flightWording[1].text:find('Ride south', 1, true),
+  'a fortress name must not mistake route riding for retention advice')
+assert(flightWording[1].text:find('Northgate Keep', 1, true),
+  'the named flight point stays visible with its advice')
+print('ok - flight point wording and fortress names are distinguished')
