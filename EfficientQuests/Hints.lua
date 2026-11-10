@@ -97,38 +97,127 @@ local function eligibleQuests(advice, context, provider)
     return true
 end
 
--- Client map POIs already carry their UI-map frame. QuestieDB AreaIDs do not,
--- so do not compare provider spawn coordinates to the player position here.
-local function mapBands(context)
+-- QuestieDB spawn coordinates are percentages keyed by AreaID, a different
+-- frame from client UiMapIDs. The provider's ZoneDB support data bridges the
+-- two; a spawn is compared to the player only when that bridge lands it on
+-- the player's own map. Compatibility entries for retired maps are therefore
+-- never treated as evidence, because the player's current map always exists.
+local bridgeCache = {source=nil, map=nil}
+local function decodeSupportMap(source, field)
+    local value = source[field]
+    if type(value) == "table" then
+        local copy = {}
+        for areaId, uiMapId in pairs(value) do copy[areaId] = uiMapId end
+        return copy
+    end
+    if type(value) == "string" and loadstring then
+        local chunk = loadstring(value)
+        if chunk then
+            local ok, result = pcall(chunk)
+            if ok and type(result) == "table" then return result end
+        end
+    end
+    return nil
+end
+
+local function uiMapByArea(provider)
+    local zoneData = nil
+    if type(provider.Support) == "table" and type(provider.Support.Get) == "function" then
+        local ok, data = pcall(provider.Support.Get, "ZoneDB")
+        if ok and type(data) == "table" then zoneData = data end
+    end
+    local source = type(zoneData) == "table" and type(zoneData.private) == "table"
+        and zoneData.private or nil
+    if bridgeCache.source == source then return bridgeCache.map end
+    local map = source and decodeSupportMap(source, "areaIdToUiMapId")
+    local override = source and decodeSupportMap(source, "areaIdToUiMapIdOverride")
+    if map and override then
+        for areaId, uiMapId in pairs(override) do map[areaId] = uiMapId end
+    end
+    bridgeCache.source, bridgeCache.map = source, map
+    return map
+end
+
+-- The turn-in location of a ready quest: the provider's finisher spawns.
+local function turnInBand(provider, context, questID, uiMapByAreaId, width, height)
+    local finishers = provider.Quest.Get(questID, "finishedBy")
+    if type(finishers) ~= "table" then return nil end
+    local best
+    local function scan(ids, entity)
+        if type(ids) ~= "table" or type(entity) ~= "table" or type(entity.Get) ~= "function" then return end
+        for _, id in pairs(ids) do
+            if type(id) == "number" then
+                local spawns = entity.Get(id, "spawns")
+                if type(spawns) == "table" then
+                    for areaId, points in pairs(spawns) do
+                        if uiMapByAreaId[areaId] == context.zoneID and type(points) == "table" then
+                            for _, point in ipairs(points) do
+                                local x = type(point) == "table" and tonumber(point[1]) or nil
+                                local y = type(point) == "table" and tonumber(point[2]) or nil
+                                if x and y and x >= 0 and x <= 100 and y >= 0 and y <= 100 then
+                                    local dx = (x / 100 - context.position.x) * width
+                                    local dy = (y / 100 - context.position.y) * height
+                                    local band = math.floor(math.sqrt(dx * dx + dy * dy) / 250)
+                                    if not best or band < best then best = band end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+    scan(finishers[1], provider.Npc)
+    scan(finishers[2], provider.Object)
+    return best
+end
+
+-- Distances to the quest's current-phase location: client map POIs for
+-- unaccepted starts and active objectives, provider finisher spawns for
+-- quests ready to hand in. Bands are 250-yard steps on the player's map.
+local function mapBands(context, provider, questIDs)
     local result = {}
-    if not context.zoneID or not context.position or not C_QuestLog or not C_QuestLog.GetQuestsOnMap
-        or not C_Map or not C_Map.GetMapWorldSize then return result end
+    if not context.zoneID or not context.position or not C_Map or not C_Map.GetMapWorldSize then return result end
     local width, height = C_Map.GetMapWorldSize(context.zoneID)
     if type(width) ~= "number" or type(height) ~= "number" or width <= 0 or height <= 0 then return result end
-    local points = C_QuestLog.GetQuestsOnMap(context.zoneID)
-    if type(points) ~= "table" then return result end
-    for _, point in ipairs(points) do
-        if point.mapID == context.zoneID and type(point.questID) == "number"
-            and type(point.x) == "number" and point.x >= 0 and point.x <= 1
-            and type(point.y) == "number" and point.y >= 0 and point.y <= 1 then
-            local accepted = context.isAccepted(point.questID)
-            local phase = context.quests[point.questID] and context.quests[point.questID].phase
-            if accepted and not phase and C_QuestLog.IsComplete then
-                phase = C_QuestLog.IsComplete(point.questID) and "ready" or "active"
+    if C_QuestLog and C_QuestLog.GetQuestsOnMap then
+        local points = C_QuestLog.GetQuestsOnMap(context.zoneID)
+        if type(points) == "table" then
+            for _, point in ipairs(points) do
+                if point.mapID == context.zoneID and type(point.questID) == "number"
+                    and type(point.x) == "number" and point.x >= 0 and point.x <= 1
+                    and type(point.y) == "number" and point.y >= 0 and point.y <= 1 then
+                    local accepted = context.isAccepted(point.questID)
+                    local phase = context.questPhase(point.questID)
+                    local kind
+                    if accepted == false and point.isQuestStart == true then kind = "giver"
+                    elseif accepted == true and phase == "active" and point.isQuestStart == false
+                        and point.inProgress == true and type(point.numObjectives) == "number" and point.numObjectives > 0 then
+                        kind = "target"
+                    end
+                    if kind then
+                        local dx = (point.x - context.position.x) * width
+                        local dy = (point.y - context.position.y) * height
+                        local band = math.floor(math.sqrt(dx * dx + dy * dy) / 250)
+                        result[point.questID] = result[point.questID] or {via="marker"}
+                        local previous = result[point.questID][kind]
+                        if not previous or band < previous then result[point.questID][kind] = band end
+                    end
+                end
             end
-            local kind
-            if accepted == false and point.isQuestStart == true then kind = "giver"
-            elseif accepted == true and phase == "active" and point.isQuestStart == false
-                and point.inProgress == true and type(point.numObjectives) == "number" and point.numObjectives > 0 then
-                kind = "target"
-            end
-            if kind then
-                local dx = (point.x - context.position.x) * width
-                local dy = (point.y - context.position.y) * height
-                local band = math.floor(math.sqrt(dx * dx + dy * dy) / 250)
-                result[point.questID] = result[point.questID] or {}
-                local previous = result[point.questID][kind]
-                if not previous or band < previous then result[point.questID][kind] = band end
+        end
+    end
+    local uiMapByAreaId = uiMapByArea(provider)
+    if uiMapByAreaId then
+        for questID in pairs(questIDs or {}) do
+            if context.questPhase(questID) == "ready" then
+                local band = turnInBand(provider, context, questID, uiMapByAreaId, width, height)
+                if band then
+                    result[questID] = result[questID] or {via="turnin"}
+                    local previous = result[questID].giver
+                    if not previous or band < previous then result[questID].giver = band end
+                    if result[questID].via ~= "marker" then result[questID].via = "turnin" end
+                end
             end
         end
     end
@@ -151,24 +240,39 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
             if not levelDistance or distance < levelDistance then levelDistance = distance end
         end
     end
-    -- An unknown location is not evidence that a focused quest is locally useful.
-    local localFocus = focused and localEvidence == true
+    -- Confirmed advice zones are stronger evidence than quest activity: a
+    -- local marker or turn-in never confirms where the advice itself applies.
+    local tier = localEvidence == true and 2 or (localEvidence == "quest" and 1 or 0)
+    local localFocus = focused and tier >= 1
     advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
-    if localEvidence == nil then advice.uncertain = true end
+    if tier == 0 then advice.uncertain = true end
     local words = string.lower(originalText or advice.text or '')
-    -- Only a direct unqualified purchase instruction establishes timing.
-    -- Other prose remains unknown; do not infer timing from acceptance alone.
-    local availableNow = localEvidence == true and not advice.uncertain
-        and words:match('^buy [^,;]+ now[%.!]*$') ~= nil
-        and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true)
-    advice._ranking = {localEvidence=localEvidence == true, focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance, availableNow=availableNow}
+    -- Only a direct unqualified acquisition instruction ending in "now"
+    -- establishes timing. Other prose remains unknown; do not infer timing
+    -- from acceptance alone, and never read "for now" as availability.
+    local availableNow = false
+    if tier == 2 and not advice.uncertain
+        and not words:find(' for now[%.!]*$')
+        and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true) then
+        for _, pattern in ipairs({
+            '^buy%s+[^,;]+%s+now[%.!]*$',
+            '^get%s+[^,;]+%s+now[%.!]*$',
+            '^stock%s+up%s+on%s+[^,;]+%s+now[%.!]*$',
+        }) do
+            if words:match(pattern) then availableNow = true; break end
+        end
+    end
+    advice._ranking = {localEvidence=tier, focused=localFocus,
+        accepted=accepted and tier >= 1, giverBand=giverBand, targetBand=targetBand,
+        levelDistance=levelDistance, availableNow=availableNow}
     return advice
 end
 
 local function before(a, b)
     local x, y = a._ranking, b._ranking
-    if x.localEvidence ~= y.localEvidence then return x.localEvidence end
+    -- Confirmed local advice, then quest-activity support, then the rest.
+    if x.localEvidence ~= y.localEvidence then return x.localEvidence > y.localEvidence end
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
     for _, field in ipairs({"giverBand", "targetBand"}) do
@@ -286,23 +390,31 @@ function EfficientQuests.GetHints(packageName)
     if not packageName or not EfficientQuests.guides[packageName] then return {}, "guide" end
     local context = EfficientQuests.GetContext()
     local candidates = EfficientQuests.ExtractGuide(packageName, context)
-    local distances = mapBands(context)
+    local referencedQuests = {}
+    for _, advice in ipairs(candidates) do
+        for _, id in ipairs(advice.questIDs or {}) do referencedQuests[id] = true end
+    end
+    local distances = mapBands(context, provider, referencedQuests)
     local output, seen = {}, {}
     for _, advice in ipairs(candidates) do
         local locality = localStatus(advice, context)
         local originalText = advice.text
         -- Neither a quest association nor focus alone supplies a location.
-        -- A current-phase marker on this map establishes local quest activity,
-        -- but does not establish where the unlocated advice itself applies.
+        -- A current-phase marker or provider turn-in on this map establishes
+        -- local quest activity, but does not establish where the unlocated
+        -- advice itself applies.
         local unlocated = locality == nil and not (advice.location and advice.location.zone)
         local eligible = eligibleQuests(advice, context, provider)
         if unlocated and eligible then
             for _, id in ipairs(advice.eligibleQuestIDs or advice.questIDs or {}) do
-                if distances[id] then
-                    locality, unlocated = true, false
+                local support = distances[id]
+                if support then
+                    locality, unlocated = "quest", false
                     advice.uncertain = true
                     advice.conditions = advice.conditions or {}
-                    table.insert(advice.conditions, 'Quest activity is local; the advice location is not confirmed.')
+                    table.insert(advice.conditions, support.via == "turnin"
+                        and 'The quest turn-in is in this zone; the advice location is not confirmed.'
+                        or 'Quest activity is local; the advice location is not confirmed.')
                     break
                 end
             end

@@ -274,3 +274,112 @@ EfficientQuests_RegisterGuide('UnsafeLootNote', [[
 ]], 'Synthetic')
 assert(#EfficientQuests.GetHints('UnsafeLootNote') == 0, 'unrecognized extra context is not presented as safe camera advice')
 print('ok - camera technique does not admit unreviewed added prose')
+
+-- A current-phase quest marker supports unlocated advice, but it never
+-- confirms where the advice itself applies.
+C_QuestLog.IsOnQuest = function(id) return id == 102 end
+C_QuestLog.IsComplete = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=102, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('MarkerTier', [[
+[N Shopping List]
+Use a net for [QC102].
+[G40,50 Elwynn Forest] Buy a candle.
+]], 'Author')
+local tiered = EfficientQuests.GetHints('MarkerTier')
+assert(#tiered == 2, 'both supported hints remain visible')
+assert(tiered[1].text:find('candle', 1, true), 'a confirmed advice zone outranks local quest activity')
+assert(tiered[2].questID == 102 and tiered[2].uncertain,
+  'marker-supported advice stays uncertain about its own location')
+print('ok - quest markers do not outrank confirmed local advice')
+
+-- Ready quests have no classifiable client POI, so turn-in proximity comes
+-- from the provider's finisher spawns bridged onto the player's own map.
+LibQuestieDB.Support = {Get=function(name)
+  if name == 'ZoneDB' then
+    return {private={areaIdToUiMapId='return {[12]=1,[13]=2}',
+      areaIdToUiMapIdOverride='return {}'}} end
+end}
+LibQuestieDB.Quest.Get = function(id, key)
+  if key == 'questLevel' then return 10 end
+  if key == 'finishedBy' then
+    if id == 104 then return {[1]={105}} end
+    if id == 105 then return {[1]={106}} end
+    return {}
+  end
+end
+LibQuestieDB.Npc.Get = function(id, key)
+  if key == 'spawns' then
+    if id == 105 then return {[12]={{41,50}}} end
+    if id == 106 then return {[13]={{40,50}}} end
+  end
+end
+C_QuestLog.IsOnQuest = function(id) return id == 104 or id == 105 end
+C_QuestLog.IsComplete = function() return true end
+C_QuestLog.GetQuestsOnMap = function() return {} end
+EfficientQuests_RegisterGuide('TurnInProximity', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI71,2 Flasks] for [QC105].
+[G40,50 Elwynn Forest] Buy [CI70,2 Vials] for [QC104].
+]], 'Author')
+local proximity = EfficientQuests.GetHints('TurnInProximity')
+assert(#proximity == 2, 'both ready-quest advice stays visible')
+assert(proximity[1].questID == 104, 'a local provider turn-in outranks a remote turn-in')
+print('ok - provider turn-in spawns give ready quests a local distance signal')
+EfficientQuests_RegisterGuide('TurnInSupport', [[
+[N Turn-ins]
+Buy [CI70,2 Vials] for [QC104].
+]], 'Author')
+local supported = EfficientQuests.GetHints('TurnInSupport')
+assert(#supported == 1 and supported[1].uncertain,
+  'a local turn-in supports unlocated ready-quest advice with uncertainty')
+local reasons = table.concat(supported[1].conditions or {}, ' ')
+assert(reasons:find('turn-in is in this zone', 1, true),
+  'the condition names the turn-in evidence rather than a quest marker')
+print('ok - unlocated ready-quest advice cites the local turn-in')
+LibQuestieDB.Support = nil
+assert(#EfficientQuests.GetHints('TurnInSupport') == 0,
+  'without the zone bridge the turn-in location stays unknown')
+LibQuestieDB.Support = {Get=function(name)
+  if name == 'ZoneDB' then
+    return {private={areaIdToUiMapId='return {[12]=1,[13]=2}',
+      areaIdToUiMapIdOverride='return {}'}} end
+end}
+C_QuestLog.IsComplete = function(id) return id ~= 104 end
+local activeOnly = EfficientQuests.GetHints('TurnInSupport')
+assert(#activeOnly == 0, 'an active quest does not reuse its finisher location')
+C_QuestLog.IsComplete = function() return true end
+
+-- The client's ReadyForTurnIn signal is phase-specific; IsComplete is only a
+-- fallback when it cannot answer.
+C_QuestLog.IsOnQuest = function(id) return id == 107 or id == 108 end
+C_QuestLog.ReadyForTurnIn = function(id) if id == 107 then return true end return false end
+C_QuestLog.IsComplete = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=107, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+  {questID=108, mapID=1, x=0.9, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('TurnInPhase', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC107].
+[G40,50 Elwynn Forest] Use a net for [QC108].
+]], 'Author')
+local phase = EfficientQuests.GetHints('TurnInPhase')
+assert(#phase == 1 and phase[1].questID == 108,
+  'a client-ready quest drops objective technique even when IsComplete disagrees')
+print('ok - ReadyForTurnIn is the phase-specific turn-in signal')
+C_QuestLog.ReadyForTurnIn = nil
+
+EfficientQuests_RegisterGuide('OpportunityWords', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Stock up on rope later.
+[G40,50 Elwynn Forest] Save a torch for now.
+[G40,50 Elwynn Forest] Stock up on rope now.
+]], 'Author')
+local timedWords = EfficientQuests.GetHints('OpportunityWords')
+assert(#timedWords == 3 and timedWords[1].text:find('rope now', 1, true),
+  'a stated now opportunity ranks first among other timing words')
+assert(timedWords[2].text:find('later', 1, true),
+  'for-now wording does not claim present availability')
+print('ok - acquisition timing words keep the present opportunity first')
