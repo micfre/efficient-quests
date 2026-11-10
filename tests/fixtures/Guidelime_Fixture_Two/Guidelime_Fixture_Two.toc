@@ -1,0 +1,9 @@
+## Title: Guidelime Fixture Two
+## Notes: Synthetic licensed guide styled after the Bethink package
+## Author: Fixture Author
+## Interface: 16001
+## Version: 1.0
+## X-License: Fixture license (synthetic)
+## RequiredDeps: Guidelime, QuestieDB
+
+chapters/one.lua

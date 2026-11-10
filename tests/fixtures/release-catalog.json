@@ -1,0 +1,19 @@
+{
+  "guides": [
+    {
+      "build_suffix": "-eq1",
+      "distribute": false,
+      "license": "Synthetic test fixture; not for distribution",
+      "plugin": "EfficientQuests_FixtureOne",
+      "source_package": "GuideLime_Fixture_One"
+    },
+    {
+      "build_suffix": "-eq1",
+      "distribute": true,
+      "license": "Fixture license (synthetic)",
+      "plugin": "EfficientQuests_FixtureTwo",
+      "source_package": "Guidelime_Fixture_Two"
+    }
+  ],
+  "version": 1
+}
