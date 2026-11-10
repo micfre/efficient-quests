@@ -89,5 +89,13 @@ function EfficientQuests.GetContext()
         if result.completeQuestLog then return false end
         return nil
     end
+    result.questPhase = function(questID)
+        local quest = result.quests[questID]
+        if quest and quest.phase then return quest.phase end
+        if result.isAccepted(questID) ~= true or not log or not log.IsComplete then return nil end
+        local complete = log.IsComplete(questID)
+        if complete == true then return "ready" end
+        if complete == false then return "active" end
+    end
     return result
 end

@@ -79,6 +79,14 @@ ready = true
 assert(#EfficientQuests.GetHints('Technique') == 0, 'completed objective should not keep its technique')
 assert(hint(), 'supply retention persists through ready-for-turn-in')
 print('ok - obsolete objective technique is removed while supplies remain')
+-- A collapsed quest-log header must not hide the phase of a known quest ID.
+C_QuestLog.GetNumQuestLogEntries = function() return 1,1 end
+C_QuestLog.GetInfo = function() return {isHeader=true,isCollapsed=true} end
+assert(#EfficientQuests.GetHints('Technique') == 0,
+ 'ready quest behind a collapsed header must not retain obsolete objective technique')
+assert(hint(), 'a ready hidden quest still retains its supplies')
+C_QuestLog.GetInfo = function() if accepted then return {questID=101,level=10} end end
+print('ok - collapsed quest headers do not hide ready quest phase')
 EfficientQuests_RegisterGuide('UnknownFlight', [[
 [N Elwynn Forest]
 [G40,50 Elwynn Forest] Get the flightpath at Redridge.
