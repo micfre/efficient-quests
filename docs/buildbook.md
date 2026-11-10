@@ -6,7 +6,7 @@ Run every command in this book from the root of the repository. The build needs 
 
 ## The license check
 
-A guide plugin is a copy of the guide text of its author. Shipping that copy in a release is redistribution. The license of the source package decides whether a release may contain the plugin.
+A guide plugin is a copy of the guide text of its author. Shipping that copy in a release is redistribution. The license of the source package decides whether a release is allowed to contain the plugin.
 
 - The Bethink package is GPLv3. Its plugin bundles the package license file. The plugin is effectively GPLv3. The release ships it.
 - The TUG package carries no license statement. Without a statement, the package is all rights reserved. Its plugin must not ship. The permission request is tracked in the issue tracker.
@@ -35,7 +35,7 @@ Two source packages must never derive the same plugin name. The loader rejects t
 python3 tools/build_guide.py --check-catalog
 ```
 
-The command fails when a field is missing, when a plugin name breaks the naming rule, when two entries collide, or when the catalog lists no guides.
+The command fails when a field is missing, when a plugin name breaks the naming rule, or when two entries collide. It also fails when the catalog lists no guides.
 
 ## Build a guide plugin
 
@@ -123,8 +123,8 @@ Publish the zips as a GitHub release. The version of the core zip comes from the
 The workflow `.github/workflows/ci.yml` runs on every push and pull request. It runs:
 
 - The six Lua suites in Docker (`tests/runtime.lua`, `tests/guide.lua`, `tests/hints.lua`, `tests/lifecycle.lua`, `tests/ui.lua`, `tests/manifest.lua`).
-- The bridge suite (`sh tests/bridge.sh`), which builds a synthetic fixture guide with the real builder and loads the generated plugin next to the real core addon.
+- The bridge suite (`sh tests/bridge.sh`). It builds a synthetic fixture guide with the real builder and loads the generated plugin next to the real core addon.
 - The Python tests (`python3 -m unittest discover -s tests -p 'test_*.py'`), which cover the builder and the release tool.
-- A release dry-run with the synthetic packages in `tests/fixtures` and the catalog `tests/fixtures/release-catalog.json`. The dry-run asserts the license gate: the flagged fixture guide ships as a zip, the unflagged fixture guide is built for the log and gets no zip, and exactly two zips exist. The workflow prints every extraction audit report, shipped or held back, into the log.
+- A release dry-run with the synthetic packages in `tests/fixtures` and the catalog `tests/fixtures/release-catalog.json`. The dry-run asserts the license gate: the flagged fixture guide ships as a zip, the unflagged fixture guide is built for the log and gets no zip, and exactly two zips exist. The workflow prints every extraction audit report into the log, shipped or held back.
 
-The real guide packages never run in CI. They are third-party content under licenses that do not allow us to publish them, so `prior_art/` is excluded from version control and CI only ever sees synthetic fixtures. A real release is always a step for the maintainer on a machine that holds the source packages.
+The real guide packages never run in CI. They are third-party content under licenses that do not allow us to publish them. For this reason, `prior_art/` is excluded from version control, and CI only ever sees synthetic fixtures. A real release is always a step for the maintainer on a machine that holds the source packages.
