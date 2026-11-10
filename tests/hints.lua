@@ -350,3 +350,23 @@ C_QuestLog.IsComplete = function(id) return id ~= 104 end
 local activeOnly = EfficientQuests.GetHints('TurnInSupport')
 assert(#activeOnly == 0, 'an active quest does not reuse its finisher location')
 C_QuestLog.IsComplete = function() return true end
+
+-- The client's ReadyForTurnIn signal is phase-specific; IsComplete is only a
+-- fallback when it cannot answer.
+C_QuestLog.IsOnQuest = function(id) return id == 107 or id == 108 end
+C_QuestLog.ReadyForTurnIn = function(id) if id == 107 then return true end return false end
+C_QuestLog.IsComplete = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=107, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+  {questID=108, mapID=1, x=0.9, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('TurnInPhase', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC107].
+[G40,50 Elwynn Forest] Use a net for [QC108].
+]], 'Author')
+local phase = EfficientQuests.GetHints('TurnInPhase')
+assert(#phase == 1 and phase[1].questID == 108,
+  'a client-ready quest drops objective technique even when IsComplete disagrees')
+print('ok - ReadyForTurnIn is the phase-specific turn-in signal')
+C_QuestLog.ReadyForTurnIn = nil
