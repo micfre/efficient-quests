@@ -286,6 +286,22 @@ class AuditGateTests(BuilderFixture):
         self.assertIn("ROUTE", result.stderr)
         self.assertFalse((self.out / self.plugin_name).exists())
 
+    def test_low_yield_guide_builds_with_a_warning(self):
+        # Three of four candidate lines are withheld (route-dependent and
+        # progression shopping); a majority-withheld guide warns, not fails.
+        self.set_single_guide(b"\n[GA Alliance]\n[N1 Yield]\n"
+                              b"Keep 5 apples.\n"
+                              b"Last chance to buy arrows.\n"
+                              b"Keep an eye out for rare spawns.\n"
+                              b"Buy a skinning knife.\n")
+        result = self.build()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("yield", result.stderr.lower())
+        self.assertIn("3 of 4", result.stderr)
+        report = self.report()
+        self.assertEqual(report["gates"]["warnings"],
+                         ["low yield: the audit withheld 3 of 4 candidate advice lines"])
+
 
 class CatalogTests(unittest.TestCase):
     """The shipped catalog must stay valid and list the ticket's two guides."""

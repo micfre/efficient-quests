@@ -322,7 +322,10 @@ def evaluate_gates(audit):
     """Turn one audit result into build failures and warnings.
 
     Failures: the audit extracted no advice record from any character
-    context, or a safety-screen severity was reported. Warnings: none yet.
+    context, or a safety-screen severity was reported. Warnings: more than
+    half of the candidate advice lines were withheld. The reviewed corpora
+    withheld 18% (TUG) and 44% (Bethink) of their candidate lines, so a
+    majority withheld signals a guide the extraction mostly cannot read.
     """
     failures = []
     if audit["advice_records"] == 0:
@@ -332,7 +335,12 @@ def evaluate_gates(audit):
             failures.append("safety finding [%s] %s %s: %s"
                             % (finding["severity"], finding["where"],
                                finding["id"], finding["detail"]))
-    return failures, []
+    warnings = []
+    candidates, withheld = audit["candidate_lines"], audit["withheld_lines"]
+    if candidates > 0 and 2 * withheld > candidates:
+        warnings.append("low yield: the audit withheld %d of %d candidate advice lines"
+                        % (withheld, candidates))
+    return failures, warnings
 
 
 def compose_report(plugin, package_name, fields, plugin_version, date, audit):
