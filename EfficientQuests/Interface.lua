@@ -15,13 +15,15 @@ local L = {
   none='No dismissed hints.', restored='Dismissed hints are available again.',
   source='Source', conditions='Conditions', uncertain='Some details are uncertain.',
 }
-local frame, body, scroll, status, more, settings, settingsNote, guideButton, modeButton, widthLabel, spacingLabel
+local frame, body, scroll, status, more, settings, settingsNote, modeButton, widthLabel, spacingLabel
 local background, title
 local scrollRange = 0
 local widthLess, widthMore, spacingLess, spacingMore, restore
 local rows, shownHints, page = {}, {}, 0
 local expanded, currentCategory = {}, 'guide'
 local dismissedRows, dismissedEntries = {}, {}
+local guideRows = {}
+local staleGuide
 local itemTooltipOwner
 
 -- The character's saved variables: dismissals and display preferences
@@ -37,18 +39,22 @@ local function savedCharacterData()
   return data
 end
 
-local function sortedGuides()
-  local names = {}
-  for name in pairs(EQ.guides) do names[#names + 1] = name end
-  table.sort(names)
-  return names
-end
-
+-- The saved choice wins while its plugin is registered. A choice whose
+-- guide folder disappeared leaves a note and falls back to the same rule:
+-- the only installed guide is selected automatically, several wait for an
+-- explicit pick in Settings.
 local function selectedGuide()
   local data = savedCharacterData()
-  if data.guide then return data.guide end
-  local names = sortedGuides()
-  if #names > 0 then data.guide = names[1] end
+  local list = EQ.GetGuideList()
+  staleGuide = nil
+  if data.guide then
+    for _, entry in ipairs(list) do
+      if entry.key == data.guide then return data.guide end
+    end
+    staleGuide = data.guide
+    data.guide = nil
+  end
+  if #list == 1 then data.guide = list[1].key end
   return data.guide
 end
 
@@ -160,17 +166,26 @@ local function makeDismissedRow(index)
   return row
 end
 
+-- One row per installed guide so the player picks a guide explicitly
+-- instead of cycling through them.
+local function makeGuideRow(index)
+  local row = {}
+  row.button = button(settings, 'EfficientQuestsGuideRow'..index, '', 360, 25, nil)
+  guideRows[index] = row
+  return row
+end
+
 local function refreshSettings()
   if not settings then return end
   local data = savedCharacterData()
-  guideButton:SetText(L.guide .. ': ' .. (selectedGuide() or 'None'))
+  local list = EQ.GetGuideList()
+  local chosen = selectedGuide()
   modeButton:SetText(L.display .. ': ' .. (data.display.mode == 'flare' and L.integrated or L.standalone))
   widthLabel:SetText(L.width .. ': ' .. data.display.width)
   spacingLabel:SetText(L.spacing .. ': ' .. data.display.spacing)
   local guide = currentCategory == 'guide'
   local display = currentCategory == 'display'
   local dismissed = currentCategory == 'dismissed'
-  showOrHide(guideButton, guide)
   showOrHide(modeButton, display)
   showOrHide(widthLabel, display); showOrHide(widthLess, display); showOrHide(widthMore, display)
   showOrHide(spacingLabel, display); showOrHide(spacingLess, display); showOrHide(spacingMore, display)
@@ -178,6 +193,23 @@ local function refreshSettings()
   settingsNote:SetText(guide and 'Select one installed guide.' or
     (display and 'Choose the window mode, width and tracker spacing.' or
     (#dismissedEntries > 0 and 'Restore individual hints, or restore them all.' or L.none)))
+  for index = 1, math.max(#guideRows, guide and #list or 0) do
+    local row = guideRows[index]
+    local entry = guide and list[index] or nil
+    if entry then
+      if not row then row = makeGuideRow(index) end
+      row.key = entry.key
+      local meta = {entry.name}
+      if entry.author then meta[#meta + 1] = entry.author end
+      meta[#meta + 1] = entry.chapters .. (entry.chapters == 1 and ' chapter' or ' chapters')
+      row.button:SetText((entry.key == chosen and '✓ ' or '') .. table.concat(meta, ' — '))
+      row.button:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -82 - (index - 1) * 27)
+      row.button:Show()
+    elseif row then
+      row.key = nil
+      row.button:Hide()
+    end
+  end
   for index = 1, math.max(#dismissedRows, dismissed and #dismissedEntries or 0) do
     local row = dismissedRows[index]
     local entry = dismissed and dismissedEntries[index] or nil
@@ -359,11 +391,11 @@ function EQ.RefreshInterface()
     if hint.id and data.dismissed[hint.id] then dismissedEntries[#dismissedEntries + 1] = hint end
   end
   local statusText
-  if problem == 'missing' then statusText = L.missing
+  if staleGuide then statusText = L.unavailable
+  elseif problem == 'missing' then statusText = L.missing
   elseif problem == 'incompatible' then statusText = L.incompatible
   elseif problem == 'guide' then
-    if guide and not EQ.guides[guide] then statusText = L.unavailable
-    else statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide end
+    statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide
   end
   status:SetWidth(math.max(1, width - 16))
   status:SetText(statusText or '')
@@ -498,13 +530,6 @@ local function build()
   category(L.guide, -48, 'guide', 'EfficientQuestsCategoryGuide')
   category(L.display, -78, 'display', 'EfficientQuestsCategoryDisplay')
   category(L.dismissed, -108, 'dismissed', 'EfficientQuestsCategoryDismissed')
-  guideButton = button(settings, 'EfficientQuestsGuide', '', 300, 25, function()
-    local names = sortedGuides(); if #names == 0 then return end
-    local data = savedCharacterData(); local current = selectedGuide(); local nextIndex = 1
-    for i, name in ipairs(names) do if name == current then nextIndex = i % #names + 1; break end end
-    data.guide = names[nextIndex]; page = 0; EQ.RefreshInterface()
-  end)
-  guideButton:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -82)
   modeButton = button(settings, 'EfficientQuestsMode', '', 170, 25, function()
     local display = savedCharacterData().display
     display.mode = display.mode == 'flare' and 'standalone' or 'flare'; EQ.RefreshInterface()
