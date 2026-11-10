@@ -11,6 +11,7 @@ Known examples requiring continued review:
 
 - `TUGs/Leveling ShoppingList.lua` contains compact `[CI2592,300Wool Cloth]` and mismatched page identifiers: page 10 reuses ID 2725, also used for page 1. The extractor retains the tag's source name, but provider validation of the ID/name pair remains necessary.
 - `TUGs/Horde/41-43 Part.lua` contains an ordered shopping instruction spread across two sentences. Its wording is retained for this specific reviewed pattern, but the meaning of its numbered item references is not inferred. Other multi-item or cross-sentence conditions may be withheld.
+- `TUGs/Alliance/24-25 Duskwood.lua` contains a conditional shopping list split after the Bronze Tube; the reviewed wording now retains its six Spider Legs and eight Murloc Fin together under the same condition. Other multi-sentence lists still require review.
 - `TUGs/Horde/22-24 Hillsbrad Foothills.lua` describes a quest-item encounter and a preparation precaution in separate sentences. The reviewed case remains a zone tip; no quest association is fabricated.
 - `TUGs/Horde/36-39 Desolace.lua` and `TUGs/Horde/43-45 Part.lua` contain route-relative claims about shopping chances. These are withheld rather than presented as deadlines.
 - The extractor uses conservative text patterns and a limited narrative screen. Unreviewed phrasing may still be missed, lose important context, or expose a story outcome. An adjacent quest tag is only a tentative inference, not a confirmed association.
