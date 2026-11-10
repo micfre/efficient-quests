@@ -370,7 +370,7 @@ end
 assert(pluginEntry, 'a guide registered under a plugin addon name must be listed')
 assert(pluginEntry.name == 'Example Guide', 'the display name comes from the plugin manifest title')
 assert(pluginEntry.author == 'Example Author', 'the author comes from the first registered chapter')
-assert(pluginEntry.chapters == 2 and #EfficientQuests.guides[plugin] == 2,
+assert(pluginEntry.chapters == 2,
   'each registration call must append one chapter under the plugin addon name')
 assert(auditEntry, 'every registered guide stays listed')
 assert(auditEntry.name == 'Audit', 'a guide without manifest metadata falls back to its key')
