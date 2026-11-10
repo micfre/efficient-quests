@@ -91,8 +91,14 @@ local function useful(line)
   end
   -- Explanations introduced by causal prose can carry story outcomes; without
   -- semantic analysis we cannot safely separate the practical advice from it.
-  if s:find('%f[%a]because%f[%A]')
-      and not s:match('because they depend on each other[%.!%s]*$') then return false end
+  if s:find('%f[%a]because%f[%A]') then
+    local plain = s:gsub('%b[]', ''):gsub('%s+', ' ')
+    local questQuantity = line:find('%[QC%d+')
+        and plain:match('because the quest requires [%w%s%-]+ for[%.!%s]*$')
+    if not questQuantity and not s:match('because they depend on each other[%.!%s]*$') then
+      return false
+    end
+  end
   -- Pure guide instructions and progression are not advice. Lines containing
   -- route-relative language are omitted when their meaning cannot stand alone.
   if s:find('next step', 1, true) or s:find('next two steps', 1, true)
@@ -107,7 +113,8 @@ local function useful(line)
   -- conservative screen, not proof that unrestricted guide prose is safe.
   for _, phrase in ipairs({' is murdered', ' was murdered', ' is killed',
       ' was killed', ' is secretly ', ' turns out ', ' is revealed',
-      ' betrays ', ' betrayed ', ' dies', ' death of ', ' true identity'}) do
+      ' betrays ', ' betrayed ', ' poisoned ', ' assassinates ', ' assassinated ',
+      ' dies', ' death of ', ' true identity'}) do
     if s:find(phrase, 1, true) then return false end
   end
   local plain = s:gsub('%b[]', ''):gsub('^%s+', '')
