@@ -56,8 +56,8 @@ EfficientQuests_RegisterGuide('Unknown', [[
 Use a net for [QC103].
 ]], 'Author')
 hints = EfficientQuests.GetHints('Unknown')
-assert(#hints == 1 and hints[1].uncertain and hints[1].relevance == 'quest preparation', 'missing location remains uncertain')
-print('ok - unknown locations stay conditional without invented distance')
+assert(#hints == 0, 'a quest association alone does not establish local usefulness')
+print('ok - unlocated quest advice does not imply local usefulness')
 EfficientQuests_RegisterGuide('Unaccepted', [[
 [N Elwynn Forest]
 [G40,50 Elwynn Forest] Use a torch for [QC103].
@@ -218,3 +218,12 @@ hints = EfficientQuests.GetHints('WestfallShopping')
 assert(#hints == 1 and hints[1].text:find('6 total', 1, true) and hints[1].text:find('8 Murloc Fin', 1, true), 'shopping list preserves all quantities under the original condition')
 assert(hints[1].text:find('if you did not get them yet', 1, true), 'shopping list retains the original condition')
 print('ok - TUG multi-item shopping condition and quantities remain together')
+EfficientQuests_RegisterGuide('UnlocatedCrowd', [[
+[N Shopping List]
+Buy [CI42,1 Apple].
+Buy [CI43,1 Bread].
+Buy [CI44,1 Candle].
+]], 'Author')
+local unlocated = EfficientQuests.GetHints('UnlocatedCrowd')
+assert(#unlocated == 0, 'advice with no evidence of local usefulness cannot fill the compact view')
+print('ok - unlocated advice does not crowd local hints')

@@ -503,14 +503,39 @@ events:SetScript('OnEvent', function(_, event)
   if event == 'PLAYER_LOGIN' and UIParent then build() end
   if frame then EQ.RefreshInterface() end
 end)
-local sinceUpdate, lastTrackerSignature = 0, nil
+local sinceUpdate, lastTrackerSignature, lastPosition = 0, nil, nil
+-- Polling is required because the client does not emit an event whenever the
+-- player crosses a quest-distance band. Ignore small movement to avoid
+-- repeatedly rebuilding the display while the player is standing nearby.
+local function playerMoved()
+  if not C_Map or not C_Map.GetBestMapForUnit or not C_Map.GetPlayerMapPosition then return false end
+  local map = C_Map.GetBestMapForUnit('player')
+  local position = map and C_Map.GetPlayerMapPosition(map, 'player')
+  if not position or not position.GetXY then return false end
+  local x, y = position:GetXY()
+  if type(x) ~= 'number' or type(y) ~= 'number' then return false end
+  local changed = not lastPosition or lastPosition.map ~= map
+  if not changed then
+    local dx, dy = x - lastPosition.x, y - lastPosition.y
+    local width, height
+    if C_Map.GetMapWorldSize then width, height = C_Map.GetMapWorldSize(map) end
+    if type(width) == 'number' and type(height) == 'number' and width > 0 and height > 0 then
+      changed = (dx * width)^2 + (dy * height)^2 >= 25^2
+    else
+      changed = dx * dx + dy * dy >= 0.005^2
+    end
+  end
+  if changed then lastPosition = {map=map, x=x, y=y} end
+  return changed
+end
 events:SetScript('OnUpdate', function(_, elapsed)
   if not frame then return end
   sinceUpdate = sinceUpdate + elapsed
   if sinceUpdate < 0.5 then return end
   sinceUpdate = 0
   local signature = trackerSignature(character().display)
-  if signature ~= lastTrackerSignature then
+  local moved = playerMoved()
+  if signature ~= lastTrackerSignature or moved then
     lastTrackerSignature = signature
     EQ.RefreshInterface()
   end

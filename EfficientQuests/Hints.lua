@@ -291,7 +291,10 @@ function EfficientQuests.GetHints(packageName)
     for _, advice in ipairs(candidates) do
         local locality = localStatus(advice, context)
         local originalText = advice.text
-        if locality ~= false and eligibleQuests(advice, context, provider)
+        -- Neither a quest association nor focus supplies a local location.
+        -- Keep uncertain named subzones, but omit wholly unlocated advice.
+        local unlocated = locality == nil and not (advice.location and advice.location.zone)
+        if locality ~= false and not unlocated and eligibleQuests(advice, context, provider)
             and EfficientQuests.ApplyLifecycle(advice, context, provider) then
             local key = duplicateKey(advice, originalText)
             local source = {id=advice.id, chapter=advice.chapter, sourceText=advice.sourceText,

@@ -228,3 +228,25 @@ print('ok - tracker visibility, placement, resize and fallback recovery')
 tracker.scale = 1.5; tick()
 assert(window.width == 465, 'tracker effective scale is reflected in the integrated width')
 print('ok - tracker scaling is reflected in the integrated width')
+FlareUI_ObjectiveTracker = nil
+EfficientQuestsCharacter.display.mode = 'standalone'
+local playerX = 0.2
+C_Map.GetMapWorldSize = function() return 1000, 1000 end
+C_Map.GetPlayerMapPosition = function() return {GetXY=function() return playerX, 0.5 end} end
+C_QuestLog.IsOnQuest = function() return false end
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=301,mapID=1,x=0.2,y=0.5,isQuestStart=true},
+  {questID=302,mapID=1,x=0.8,y=0.5,isQuestStart=true},
+} end
+EfficientQuests_RegisterGuide('Moving', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch before approaching for [QC301].
+[G40,50 Elwynn Forest] Use a net before approaching for [QC302].
+]], 'Author')
+EfficientQuestsCharacter.guide = 'Moving'
+event('QUEST_LOG_UPDATE'); tick()
+assert(widgets.EfficientQuestsHint1.text:find('torch',1,true), 'nearby opportunity ranks first initially')
+playerX = 0.8
+tick()
+assert(widgets.EfficientQuestsHint1.text:find('net',1,true), 'crossing distance bands refreshes visible order')
+print('ok - moving between distance bands refreshes visible hints')
