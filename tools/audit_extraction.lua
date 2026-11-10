@@ -23,8 +23,8 @@
 DEFAULT_CHAT_FRAME = {AddMessage = function() end}
 SlashCmdList = {}
 function CreateFrame() return {RegisterEvent = function() end, SetScript = function() end} end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
+for line in io.lines('dist/EfficientQuests/EfficientQuests.toc') do
+  if line:match('%.lua$') then assert(loadfile('dist/EfficientQuests/' .. line))('EfficientQuests', {}) end
 end
 
 local contexts = {

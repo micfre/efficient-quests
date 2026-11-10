@@ -11,7 +11,8 @@ from pathlib import Path
 TOOL = Path(__file__).resolve().parents[1] / "tools" / "release.py"
 REPO = Path(__file__).resolve().parents[1]
 CORE = "EfficientQuests"
-CORE_VERSION = "0.2.0"  # mirrors ## Version in EfficientQuests/EfficientQuests.toc
+CORE_DIR = REPO / "dist" / CORE
+CORE_VERSION = "0.2.0"  # mirrors ## Version in dist/EfficientQuests/EfficientQuests.toc
 BUILD_DATE = "2026-11-10"
 
 
@@ -91,7 +92,7 @@ class ReleaseTests(ReleaseFixture):
         # The core zip holds exactly the shipped addon files, nothing else.
         with zipfile.ZipFile(core_zip) as zf:
             self.assertEqual(zf.namelist(), sorted(
-                CORE + "/" + p.name for p in (REPO / CORE).iterdir() if p.is_file()))
+                CORE + "/" + p.name for p in CORE_DIR.iterdir() if p.is_file()))
 
     def test_unflagged_guide_builds_but_produces_no_zip(self):
         flagged = self.add_package("GuideLime_Flagged", True, licensed=True,

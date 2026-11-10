@@ -4,7 +4,7 @@
 Usage: python3 tools/release.py --sources DIR [--output DIR]
                                   [--catalog FILE] [--date YYYY-MM-DD]
 
-The release zips the core addon folder (EfficientQuests) and, for every
+The release zips the core addon folder (dist/EfficientQuests) and, for every
 catalog guide whose `distribute` flag is on, builds the guide plugin with the
 real builder (tools/build_guide.py, including its extraction-audit gate) and
 zips the plugin folder with its extraction-audit.json report inside. A guide
@@ -42,8 +42,9 @@ import build_guide  # tools/build_guide.py, the real builder
 
 CORE = "EfficientQuests"
 REPO_ROOT = Path(__file__).resolve().parent.parent
-CORE_TOC = REPO_ROOT / CORE / (CORE + ".toc")
 DEFAULT_OUTPUT = "dist"
+CORE_DIR = REPO_ROOT / DEFAULT_OUTPUT / CORE
+CORE_TOC = CORE_DIR / (CORE + ".toc")
 ZIP_TIMESTAMP = (1980, 1, 1, 0, 0, 0)
 
 
@@ -143,7 +144,7 @@ def main():
             stale.unlink()
             print("Removed stale release zip: " + stale.name)
 
-        core_zip = zip_folder(REPO_ROOT / CORE, CORE,
+        core_zip = zip_folder(CORE_DIR, CORE,
                               args.output / (CORE + "-" + core_version() + ".zip"))
         print("Core zip: " + str(core_zip))
         zips.append(core_zip.name)

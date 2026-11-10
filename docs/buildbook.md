@@ -116,7 +116,7 @@ What ships today: the core addon zip and the Bethink plugin zip. What is held ba
 
 Zip entries carry a fixed timestamp and permissions, and files are added in sorted order. A rerun with the same `--date` produces byte-identical zips.
 
-Publish the zips as a GitHub release. The version of the core zip comes from the `## Version:` field of `EfficientQuests/EfficientQuests.toc`, the single version source. The version of a guide zip mirrors the source package version plus the build suffix.
+Publish the zips as a GitHub release. The version of the core zip comes from the `## Version:` field of `dist/EfficientQuests/EfficientQuests.toc`, the single version source. The version of a guide zip mirrors the source package version plus the build suffix.
 
 ## CI
 

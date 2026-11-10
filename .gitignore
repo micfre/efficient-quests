@@ -10,8 +10,10 @@
 .env.*
 !.env.example
 
-# Generated artifacts
-/dist/
+# Generated artifacts. The addon source itself is tracked under
+# dist/EfficientQuests, so ignore only the other content of dist/.
+/dist/*
+!/dist/EfficientQuests/
 /build/
 *.zip
 

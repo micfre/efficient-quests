@@ -3,7 +3,7 @@
 -- this once with its own substituted game services in place, and every
 -- suite stays individually runnable from the repository root.
 return function()
-  for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-    if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
+  for line in io.lines('dist/EfficientQuests/EfficientQuests.toc') do
+    if line:match('%.lua$') then assert(loadfile('dist/EfficientQuests/' .. line))('EfficientQuests', {}) end
   end
 end

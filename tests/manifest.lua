@@ -38,7 +38,7 @@ local function standaloneMention(text, name)
   end
 end
 
-local manifestText = readAll('EfficientQuests/EfficientQuests.toc')
+local manifestText = readAll('dist/EfficientQuests/EfficientQuests.toc')
 
 local fields = {}
 for line in manifestText:gmatch('[^\n]+') do
@@ -62,9 +62,9 @@ for _, addon in ipairs({'Guidelime', 'Questie'}) do
 end
 print('ok - Guidelime and Questie are not declared')
 
-local shipped = {{path = 'EfficientQuests/EfficientQuests.toc', text = manifestText}}
+local shipped = {{path = 'dist/EfficientQuests/EfficientQuests.toc', text = manifestText}}
 for _, file in ipairs(readFileList(manifestText)) do
-  local path = 'EfficientQuests/' .. file
+  local path = 'dist/EfficientQuests/' .. file
   table.insert(shipped, {path = path, text = readAll(path)})
 end
 for _, entry in ipairs(shipped) do
