@@ -163,9 +163,11 @@ EfficientQuests_RegisterGuide('TUGConditions', [[
 Buy your missing Stranglethorn Pages as well as Frost Oil, Gyrochronatom and Patterned Bronze Bracers. For the Items: IN THIS ORDER AS WELL, If you cant get Item 1 do not buy item 2 and 3, they rely on each other as pre quests.
 ]], 'reference')
 local tugConditions = EfficientQuests.ExtractGuide('TUGConditions', {})
-assert(#tugConditions == 1, 'quest mechanic survives; ordered multi-item instruction is not truncated')
+assert(#tugConditions == 2, 'quest mechanic and ordered multi-item advice survive')
 assert(tugConditions[1].kind == 'technique' and tugConditions[1].association == 'zone', 'unlinked mechanic stays an unassociated zone tip')
 assert(tugConditions[1].text:find('everyone has turned in', 1, true), 'group turn-in condition stays visible')
+assert(tugConditions[2].text:find('do not buy item 2 and 3', 1, true), 'ordering condition remains visible')
+assert(tugConditions[2].text:find('Frost Oil', 1, true) and tugConditions[2].text:find('Patterned Bronze Bracers', 1, true), 'all ordered items remain visible')
 print('ok - TUG escort mechanics and conditional buying order')
 EfficientQuests_RegisterGuide('CrossSentence', [[
 [N Un'Goro Crater]
@@ -183,3 +185,17 @@ EfficientQuests_RegisterGuide('CrossRoute', [[
 ]], 'reference')
 assert(#EfficientQuests.ExtractGuide('CrossRoute', {}) == 0, 'route travel is not promoted to quest technique by adjacency')
 print('ok - tentative association excludes route travel')
+EfficientQuests_RegisterGuide('StoryOrdering', [[
+[N Tanaris]
+[G1,2 Tanaris] Buy Frost Oil, Gyrochronatom and Patterned Bronze Bracers. For the Items: IN THIS ORDER AS WELL, if you cant get Item 1 dont buy item 2 and 3, they rely on each other; the king is murdered.
+]], 'reference')
+assert(#EfficientQuests.ExtractGuide('StoryOrdering', {}) == 0, 'ordered advice must not reintroduce narrative outcomes')
+print('ok - ordered advice does not bypass narrative screening')
+EfficientQuests_RegisterGuide('EncounterMechanic', [[
+[N Hillsbrad]
+[G1,2 Hillsbrad Foothills] Once you use the provided QuestItem an Elite ghost will spawn. Its not "properly Elite" though but make sure youre full health and use big cooldowns if need be.
+]], 'reference')
+local encounter = EfficientQuests.ExtractGuide('EncounterMechanic', {})
+assert(#encounter == 1 and encounter[1].association == 'zone', 'TUG encounter preparation survives without invented quest association')
+assert(encounter[1].text:find('full health', 1, true) and encounter[1].text:find('Elite ghost', 1, true), 'encounter and precaution remain together')
+print('ok - practical encounter details remain available as uncertain zone advice')

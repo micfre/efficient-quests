@@ -132,6 +132,14 @@ local function usefulExcerpt(line)
   for index, piece in ipairs(pieces) do
     local bare = trim(piece:gsub('%b[]', '')):lower()
     local followingPiece = pieces[index + 1] or ''
+    local nextBare = trim(followingPiece:gsub('%b[]', '')):lower()
+    -- This TUG encounter warning contains the trigger and preparation in
+    -- separate sentences. Keep both, without inferring a quest identifier.
+    if bare:find('provided questitem', 1, true) and bare:find('elite ghost', 1, true)
+        and nextBare:find('full health', 1, true)
+        and useful(piece .. ' [QC1]') and useful(followingPiece .. ' [QC1]') then
+      return trim(piece) .. ' ' .. trim(followingPiece)
+    end
     if bare:match('^use%s') and not piece:find('%[QC%d+')
         and not piece:find('%[H%]') and not bare:find('hearthstone', 1, true) then
       local inferred, seen = {}, {}
@@ -147,6 +155,16 @@ local function usefulExcerpt(line)
       local _, itemCount = piece:gsub('%[CI%d+', '')
       if itemCount > 1 then return nil end
       local following = trim((pieces[index + 1] or ''):lower():gsub('%b[]', ''))
+      -- TUG's three-item purchase warning is a single requirement split over
+      -- two sentences. Keep its own wording and ordering condition together.
+      if bare:find('frost oil', 1, true) and bare:find('gyrochronatom', 1, true)
+          and bare:find('patterned bronze bracers', 1, true)
+          and following:match('^for the items') and following:find('in this order', 1, true)
+          and following:find('they rely on each other', 1, true)
+          and useful(pieces[index + 1])
+          and (following:find('dont buy', 1, true) or following:find('do not buy', 1, true)) then
+        return trim(piece) .. ' ' .. trim(pieces[index + 1])
+      end
       -- A following condition may qualify this sentence; without understanding
       -- the relationship, withholding the advice is safer than losing it.
       if following:match('^if%s') or following:match('^unless%s')
@@ -172,6 +190,7 @@ local function adviceKind(excerpt, item)
       or s:find('flight master', 1, true) then return 'flight' end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
   if s:find('escort quest', 1, true) and s:find('everyone has turned in', 1, true) then return 'technique' end
+  if s:find('provided questitem', 1, true) and s:find('elite ghost', 1, true) then return 'technique' end
   if s:find('[qc', 1, true) then return 'technique' end
   return nil
 end
