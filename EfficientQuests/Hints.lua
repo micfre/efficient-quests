@@ -156,12 +156,19 @@ local function prepare(advice, context, provider, localEvidence, distances)
     advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if localEvidence == nil then advice.uncertain = true end
-    advice._ranking = {focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance}
+    local words = string.lower(advice.text or '')
+    -- Only a direct unqualified purchase instruction establishes timing.
+    -- Other prose remains unknown; do not infer timing from acceptance alone.
+    local availableNow = localEvidence == true and not advice.uncertain
+        and words:match('^buy [^,;]+ now[%.!]*$') ~= nil
+        and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true)
+    advice._ranking = {localEvidence=localEvidence == true, focused=localFocus, accepted=accepted and localEvidence == true, giverBand=giverBand, targetBand=targetBand, levelDistance=levelDistance, availableNow=availableNow}
     return advice
 end
 
 local function before(a, b)
     local x, y = a._ranking, b._ranking
+    if x.localEvidence ~= y.localEvidence then return x.localEvidence end
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
     for _, field in ipairs({"giverBand", "targetBand"}) do
@@ -176,6 +183,7 @@ local function before(a, b)
         if y.levelDistance == nil then return true end
         return x.levelDistance < y.levelDistance
     end
+    if x.availableNow ~= y.availableNow then return x.availableNow end
     if a.sourceOrder ~= b.sourceOrder then return a.sourceOrder < b.sourceOrder end
     return a.id < b.id
 end
