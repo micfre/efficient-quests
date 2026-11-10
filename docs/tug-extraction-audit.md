@@ -2,6 +2,8 @@
 
 This audit checks a locally installed guide package against the extraction of the addon. It does not show that every guide sentence is safe. It does not show that arbitrary guides are supported. It does not show that the addon works in the game client. Keep installed packages in their local installation. Do not commit their files or their prose.
 
+Historical note: this page is the kept evidence of the human review of TUG 1.28 and Bethink 1.0.5 at their reviewed corpus states. Guide plugin builds no longer update it. Every build writes its own machine report, `extraction-audit.json`, into the built plugin folder, and the release and CI logs print that report. A new package version is reviewed against the fresh report of a build. See the [maintainer buildbook](buildbook.md).
+
 ## Offline corpus audit
 
 The script `tools/audit_extraction.lua` registers every guide that the TOC of a package lists. It runs `EfficientQuests.ExtractGuide` over each guide for ten character contexts. The contexts cover both factions, several classes, and several profession states. The script reports two kinds of result:
