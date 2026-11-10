@@ -1,0 +1,9 @@
+## Title: Fixture Guide
+## Notes: Synthetic fixture package for the bridge suite
+## Author: Fixture Author
+## Interface: 16001
+## Version: 1.28
+## Dependencies: Guidelime
+
+chapters\one.lua
+chapters\two.lua
