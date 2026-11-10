@@ -276,6 +276,9 @@ function EQ.ExtractGuide(packageName, context)
                 if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
               end
               local quest = #quests == 1 and quests[1] or nil
+              if quest and excerpt:match('for%s*%[QC%d+[^%]]*%]%s*[%.!]?%s*$') then
+                text = text:gsub('for%s*([%.!]?)%s*$', 'for this quest%1')
+              end
               local unknown = {}
               addUnknown(unknown, chapterUnknown)
               addUnknown(unknown, lineUnknown)
