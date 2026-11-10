@@ -17,6 +17,18 @@ The Lua tests load the addon files and simulate the game, QuestieDB, and FlareUI
 
 The bridge suite connects the builder to the addon. The command `sh tests/bridge.sh` builds the synthetic fixture package in `tests/fixtures/GuideLime_Fixture_One` with the real builder and its own test catalog. The suite then loads the generated plugin folder next to the addon, in the order that the plugin manifest lists, and it asserts the plugin's guides through the addon's public interfaces. The script runs the build with Python on the host. It then runs the Lua suite with `lua5.1`, or in the Docker image `nickblah/lua:5.1` when no `lua5.1` is installed. The Docker image has no Python, so the build always runs on the host. The build output stays under `dist/`, which Git ignores.
 
+## Release dry-run
+
+`tools/release.py` builds a release. It zips the core addon and every catalog guide whose distribution flag is on. Each shipped guide zip holds the built plugin folder with its `extraction-audit.json` report and its license file inside. A guide whose flag is off is built for the log but gets no zip. The command needs the directory that holds the source packages. The repository does not contain them. One run from the repository root:
+
+```sh
+python3 tools/release.py --sources ../prior_art --date 2026-11-10
+```
+
+The release fails before it writes anything when a distributable source package is missing or a guide fails its build gate. Zips land in `dist/`, which Git ignores. The same `--date` gives the same zips byte for byte.
+
+The CI workflow runs a dry-run of the release with the synthetic packages in `tests/fixtures` and the catalog `tests/fixtures/release-catalog.json`. The dry-run proves the license gate: the flagged fixture guide is zipped, and the unflagged fixture guide is built but produces no zip. The workflow prints the audit reports into the log. Real guide packages are private, so a real release is a step for the maintainer on a machine that has them.
+
 ## Extraction audit
 
 `tools/audit_extraction.lua` is a review aid for guide packages. It never writes the package. It reads two shapes of guide file: source packages that call `Guidelime.registerGuide`, and built plugin folders that call `EfficientQuests_RegisterGuide`. The author argument is optional in both shapes. Run it from the repository root:
