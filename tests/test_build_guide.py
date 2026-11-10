@@ -170,5 +170,87 @@ class LicensedFixture(unittest.TestCase):
         self.assertNotIn("X-License", toc)
 
 
+class GuardTests(BuilderFixture):
+    """The builder refuses unsafe or unsupported inputs with a non-zero exit."""
+
+    def test_path_traversal_in_toc_is_rejected(self):
+        self.toc.write_bytes(self.toc.read_bytes().replace(b"chapters\\one.lua", b"../escape.lua"))
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("unsafe", result.stderr.lower())
+
+    def test_absolute_path_in_toc_is_rejected(self):
+        self.toc.write_bytes(self.toc.read_bytes().replace(b"chapters\\one.lua", b"/etc/hosts"))
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_missing_listed_file_is_rejected(self):
+        (self.source / "chapters" / "one.lua").unlink()
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("missing or outside", result.stderr)
+
+    def test_catalog_collision_is_rejected(self):
+        # Underscore variants of one name both derive the same plugin name.
+        catalog = self.write_catalog([
+            {"source_package": self.source_name, "plugin": self.plugin_name,
+             "license": "All rights reserved", "distribute": False, "build_suffix": "-eq1"},
+            {"source_package": "GuideLime_FixtureOne", "plugin": self.plugin_name,
+             "license": "GPLv3", "distribute": True, "build_suffix": "-eq1"}])
+        result = self.build(catalog=catalog)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("collision", result.stderr.lower())
+
+    def test_uncatalogued_source_is_rejected(self):
+        result = self.build(catalog=self.write_catalog([
+            {"source_package": "GuideLime_Other", "plugin": "EfficientQuests_Other",
+             "license": "GPLv3", "distribute": True, "build_suffix": "-eq1"}]))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("catalog", result.stderr.lower())
+        self.assertFalse((self.out / self.plugin_name).exists())
+
+    def test_zero_registration_calls_is_rejected(self):
+        (self.source / "chapters" / "one.lua").write_bytes(b"-- no calls here\n")
+        (self.source / "chapters" / "two.lua").write_bytes(b"-- none here either\n")
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("no Guidelime.registerGuide calls", result.stderr)
+
+    def test_missing_source_version_is_rejected(self):
+        self.toc.write_bytes(self.toc.read_bytes().replace(b"## Version: 1.28\r\n", b""))
+        result = self.build()
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Version", result.stderr)
+
+
+class CatalogTests(unittest.TestCase):
+    """The shipped catalog must stay valid and list the ticket's two guides."""
+
+    def run_tool(self, *args):
+        return subprocess.run([sys.executable, str(TOOL), *args],
+                              text=True, capture_output=True)
+
+    def test_real_catalog_is_valid_and_lists_both_guides(self):
+        result = self.run_tool("--check-catalog")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("GuideLime_TUGs_Forever -> EfficientQuests_TUGsForever", result.stdout)
+        self.assertIn("Guidelime_Bethink -> EfficientQuests_Bethink", result.stdout)
+        entries = {e["source_package"]: e
+                   for e in json.loads(REAL_CATALOG.read_text(encoding="utf-8"))["guides"]}
+        self.assertFalse(entries["GuideLime_TUGs_Forever"]["distribute"])
+        self.assertTrue(entries["Guidelime_Bethink"]["distribute"])
+        self.assertEqual(entries["Guidelime_Bethink"]["license"], "GPLv3")
+
+    def test_empty_derived_name_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            catalog = Path(tmp) / "catalog.json"
+            catalog.write_text(json.dumps({"version": 1, "guides": [
+                {"source_package": "Guidelime", "plugin": "EfficientQuests_",
+                 "license": "GPLv3", "distribute": True, "build_suffix": "-eq1"}]}), encoding="utf-8")
+            result = self.run_tool("--check-catalog", "--catalog", str(catalog))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("empty", result.stderr.lower())
+
+
 if __name__ == "__main__":
     unittest.main()
