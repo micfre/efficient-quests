@@ -18,7 +18,7 @@ lua5.1 tools/audit_extraction.lua /path/to/GuideLime_TUGs_Forever [/path/to/Guid
 Results at the reviewed corpus state (TUG package version 1.28, Bethink package version 1.0.5):
 
 - TUG (80 files, 6748 lines): 903 advice records across all contexts (253 flight, 557 supply, 28 technique, 65 unclassified), zero safety findings, 23 of 127 candidate lines withheld.
-- Bethink (63 files, 8590 lines): 1907 advice records (275 flight, 68 supply, 673 technique, 1128 unclassified), zero safety findings, 362 of 828 candidate lines withheld; two informational watch entries for the phrase "revealed" used mechanically (parasites revealed by a quest item), reviewed and accepted as non-narrative.
+- Bethink (63 files, 8590 lines): 2144 advice records (275 flight, 68 supply, 673 technique, 1128 unclassified), zero safety findings, 362 of 828 candidate lines withheld; two informational watch entries for the phrase "revealed" used mechanically (parasites revealed by a quest item), reviewed and accepted as non-narrative.
 
 The audit drove these extraction fixes, each covered by synthetic behavioral tests in `tests/guide.lua`:
 

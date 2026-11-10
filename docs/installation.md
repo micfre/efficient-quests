@@ -42,7 +42,7 @@ The tool adds registration files and changes the guide's loading metadata. The a
 
 Type `/eq` in chat or select **Settings** in the hint window. In the Guide category, select the installed guide. Efficient Quests uses one guide package at a time.
 
-In the Display category, select Standalone or FlareUI. You can change the standalone window width and the space below the FlareUI tracker. If FlareUI or its tracker is unavailable, the addon uses the standalone window and remembers the FlareUI choice.
+In the Display category, select Standalone or FlareUI. You can change the standalone window width and the space below the FlareUI tracker. You can drag the standalone window to another screen position; while the FlareUI tracker is in use, the window follows the tracker instead. If FlareUI or its tracker is unavailable, the addon uses the standalone window and remembers the FlareUI choice.
 
 The default view shows up to three hints. Select a hint for its source and more detail. Select **More** to see additional hints. Select **Dismiss** to hide a hint for the current character. In the Dismissed category, select **Restore dismissed hints** to restore them.
 
@@ -56,4 +56,4 @@ If there are no relevant hints, the hint body is hidden. Settings remain availab
 
 ## Test the repository
 
-The [test guide](../tests/README.md) lists the offline commands. The [MVP specification](specs/efficient-quests-mvp.md) lists the required checks in the game client. Record the exact Forever build and the FlareUI version when you perform those checks.
+The [test guide](../tests/README.md) lists the offline commands. It also explains the extraction audit, a review aid that reads an installed guide package and reports what the addon extracts and what it withholds. The [MVP specification](specs/efficient-quests-mvp.md) lists the required checks in the game client. Record the exact Forever build and the FlareUI version when you perform those checks.
