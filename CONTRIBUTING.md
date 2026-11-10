@@ -6,4 +6,4 @@ Discuss substantial changes in an issue before implementation. For pull requests
 
 The local `prior_art/` directory contains third-party reference material and is excluded from version control. Do not copy reference code, assets, or guide text into this project without checking the applicable permissions. QuestieDB and supported guides are intended to be installed separately.
 
-No development toolchain or automated test suite has been established yet. Add setup and test commands here as those are introduced. The specification describes the agreed addon-level test boundary and in-client checks.
+The [test guide](tests/README.md) lists the offline test commands. The specification describes the addon-level test boundary and the separate in-client checks.
