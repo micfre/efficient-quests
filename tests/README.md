@@ -20,3 +20,5 @@ lua5.1 tests/guide.lua
 `lua5.1 tests/guide.lua` exercises extraction from registered guide chapters.
 `lua5.1 tests/hints.lua` exercises the composed guide, provider, client-context,
 and relevance path, including focus, acceptance, remote advice and uncertainty.
+`lua5.1 tests/lifecycle.lua` exercises supply, quest and flight observations
+through registered guide advice and simulated client and provider data.
