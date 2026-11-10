@@ -16,3 +16,7 @@ Guide registration and extraction scenarios run at the same addon boundary:
 ```sh
 lua5.1 tests/guide.lua
 ```
+
+`lua5.1 tests/guide.lua` exercises extraction from registered guide chapters.
+`lua5.1 tests/hints.lua` exercises the composed guide, provider, client-context,
+and relevance path, including focus, acceptance, remote advice and uncertainty.

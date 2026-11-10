@@ -3,8 +3,8 @@
 function EfficientQuests.GetContext()
     local result = { quests = {}, completedQuestIDs = {}, completeQuestLog = false }
     if UnitFactionGroup then result.faction = UnitFactionGroup("player") end
-    if UnitClass then local _, token = UnitClass("player"); result.class = token end
-    if UnitRace then local _, token = UnitRace("player"); result.race = token end
+    if UnitClass then local _, token, id = UnitClass("player"); result.class, result.classID = token, id end
+    if UnitRace then local _, token, id = UnitRace("player"); result.race, result.raceID = token, id end
     if UnitLevel then result.level = UnitLevel("player") end
     result.professions = {}
     if C_SkillInfo and C_SkillInfo.GetNumSkillLines and C_SkillInfo.GetSkillLineInfo then
@@ -21,6 +21,10 @@ function EfficientQuests.GetContext()
     end
     if C_Map and C_Map.GetBestMapForUnit then
         result.zoneID = C_Map.GetBestMapForUnit("player")
+        if result.zoneID and C_Map.GetMapInfo then
+            local mapInfo = C_Map.GetMapInfo(result.zoneID)
+            if mapInfo then result.zoneName = mapInfo.name end
+        end
         if result.zoneID and C_Map.GetPlayerMapPosition then
             local position = C_Map.GetPlayerMapPosition(result.zoneID, "player")
             if position and position.GetXY then

@@ -9,3 +9,4 @@ Core.lua
 Provider.lua
 Context.lua
 Guide.lua
+Hints.lua
