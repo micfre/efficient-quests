@@ -135,7 +135,7 @@ local function mapBands(context)
     return result
 end
 
-local function prepare(advice, context, provider, localEvidence, distances)
+local function prepare(advice, context, provider, localEvidence, distances, originalText)
     local focused, accepted, levelDistance, giverBand, targetBand = false, false, nil, nil, nil
     for _, id in ipairs(advice.eligibleQuestIDs or advice.questIDs or {}) do
         if id == context.focusedQuestID then focused = true end
@@ -156,7 +156,7 @@ local function prepare(advice, context, provider, localEvidence, distances)
     advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if localEvidence == nil then advice.uncertain = true end
-    local words = string.lower(advice.text or '')
+    local words = string.lower(originalText or advice.text or '')
     -- Only a direct unqualified purchase instruction establishes timing.
     -- Other prose remains unknown; do not infer timing from acceptance alone.
     local availableNow = localEvidence == true and not advice.uncertain
@@ -229,7 +229,7 @@ function EfficientQuests.GetHints(packageName)
             if not seen[key] then
                 advice.sources = {source}
                 seen[key] = advice
-                output[#output + 1] = prepare(advice, context, provider, locality, distances)
+                output[#output + 1] = prepare(advice, context, provider, locality, distances, originalText)
             else
                 local prior = seen[key]
                 table.insert(prior.sources, source)

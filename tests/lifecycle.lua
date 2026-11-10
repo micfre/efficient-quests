@@ -127,3 +127,11 @@ local separate = EfficientQuests.GetHints('IndependentUnknown')
 assert(#separate == 2, 'different quests must not be combined without consumption evidence')
 assert(separate[1].quantity == 3 and separate[2].quantity == 5, 'unconfirmed requirements are not speculatively added')
 print('ok - different quest requirements are not added without evidence')
+EfficientQuests_RegisterGuide('TimedSupplies', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI42,3 Apples] later.
+[G40,50 Elwynn Forest] Buy [CI42,5 Apples] now.
+]], 'Author')
+local timed = EfficientQuests.GetHints('TimedSupplies')
+assert(#timed == 2 and timed[1].text:find('now', 1, true), 'current opportunity remains first after inventory wording changes')
+print('ok - inventory wording preserves available-now ranking')
