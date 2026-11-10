@@ -247,11 +247,21 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if tier == 0 then advice.uncertain = true end
     local words = string.lower(originalText or advice.text or '')
-    -- Only a direct unqualified purchase instruction establishes timing.
-    -- Other prose remains unknown; do not infer timing from acceptance alone.
-    local availableNow = tier == 2 and not advice.uncertain
-        and words:match('^buy [^,;]+ now[%.!]*$') ~= nil
-        and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true)
+    -- Only a direct unqualified acquisition instruction ending in "now"
+    -- establishes timing. Other prose remains unknown; do not infer timing
+    -- from acceptance alone, and never read "for now" as availability.
+    local availableNow = false
+    if tier == 2 and not advice.uncertain
+        and not words:find(' for now[%.!]*$')
+        and not words:find(' if ', 1, true) and not words:find(' unless ', 1, true) then
+        for _, pattern in ipairs({
+            '^buy%s+[^,;]+%s+now[%.!]*$',
+            '^get%s+[^,;]+%s+now[%.!]*$',
+            '^stock%s+up%s+on%s+[^,;]+%s+now[%.!]*$',
+        }) do
+            if words:match(pattern) then availableNow = true; break end
+        end
+    end
     advice._ranking = {localEvidence=tier, focused=localFocus,
         accepted=accepted and tier >= 1, giverBand=giverBand, targetBand=targetBand,
         levelDistance=levelDistance, availableNow=availableNow}

@@ -370,3 +370,16 @@ assert(#phase == 1 and phase[1].questID == 108,
   'a client-ready quest drops objective technique even when IsComplete disagrees')
 print('ok - ReadyForTurnIn is the phase-specific turn-in signal')
 C_QuestLog.ReadyForTurnIn = nil
+
+EfficientQuests_RegisterGuide('OpportunityWords', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Stock up on rope later.
+[G40,50 Elwynn Forest] Save a torch for now.
+[G40,50 Elwynn Forest] Stock up on rope now.
+]], 'Author')
+local timedWords = EfficientQuests.GetHints('OpportunityWords')
+assert(#timedWords == 3 and timedWords[1].text:find('rope now', 1, true),
+  'a stated now opportunity ranks first among other timing words')
+assert(timedWords[2].text:find('later', 1, true),
+  'for-now wording does not claim present availability')
+print('ok - acquisition timing words keep the present opportunity first')
