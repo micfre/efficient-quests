@@ -287,3 +287,27 @@ assert(prefixed[2].text == 'Buy a usable early wand at the auction house.',
 assert(prefixed[3].text == 'Buy one Simple Wood from the merchant for your first campfire kit.',
   'a nameless item tag before the prose must not render as a bare count')
 print('ok - position-marker tags do not leak into visible advice')
+
+EfficientQuests_RegisterGuide('FlightPoints', [[
+[N Greenfield]
+[A Druid,Night Elf] [G58.38,94.01 Greenfield] [P Rut'theran Village] Take the regular gryphon point before boarding the boat.
+[A Druid,Night Elf] [G36.33,45.09 Greenfield] [P Auberdine] Take the gryphon point on arrival.
+[G70.95,72.51 Greenfield] [P Stormwind] Collect the gryphon point if you don't already have it.
+[G51.50,30.34 Greenfield] [P The Crossroads] Take the wind rider point on arrival.
+[G55.50,47.74 Greenfield] Learn the flight path at the mountain outpost.
+]], 'synthetic')
+local points = EfficientQuests.ExtractGuide('FlightPoints', {class='Druid', race='Night Elf'})
+assert(#points == 5, 'gryphon and wind rider advice is available alongside flight paths')
+for _, point in ipairs(points) do
+  assert(point.kind == 'flight', 'gryphon and wind rider points are travel opportunities')
+end
+assert(points[1].text:find("Rut'theran Village", 1, true),
+  'a named flight point tag keeps its name in the visible text')
+assert(points[2].text:find('Auberdine', 1, true) and points[2].text:find('gryphon point', 1, true),
+  'the flight point name and action stay together')
+assert(points[3].text:find('if you don', 1, true),
+  "the guide's own conditional wording is preserved")
+assert(points[4].text:find('The Crossroads', 1, true) and points[4].text:find('wind rider', 1, true),
+  'horde flight points use their own wording')
+assert(not points[5].text:find('%['), 'existing flight path advice is unchanged')
+print('ok - gryphon and wind rider points become named travel advice')

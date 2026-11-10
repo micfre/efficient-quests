@@ -114,6 +114,10 @@ local function readable(line)
     if not zone and not nameless then prefix = prefix .. tag end
     position = position + #whitespace + #tag
   end
+  -- A named flight point tag in that marker run identifies the travel
+  -- opportunity; keep the name so the hint can name the point.
+  local point = prefix:match('%[P%s+([^%]]*%S)%]')
+  if point then prefix = prefix:gsub('%[P%s+[^%]]*%S%]', point .. ':') end
   line = prefix .. line:sub(position)
   line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
   line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
@@ -176,6 +180,7 @@ local function useful(line)
       or s:find('save', 1, true) or s:find('sell', 1, true)
       or s:find('stock up', 1, true) or s:find('flight path', 1, true)
       or s:find('flightpath', 1, true) or s:find('flight master', 1, true)
+      or s:find('gryphon point', 1, true) or s:find('wind rider point', 1, true)
       or s:find('needed for', 1, true) or s:find('quest items', 1, true)
       or (s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true))
       or (s:find('[qc', 1, true) and (s:find('while ', 1, true)
@@ -278,7 +283,8 @@ end
 local function adviceKind(excerpt, item)
   local s = excerpt:lower()
   if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
-      or s:find('flight master', 1, true) then return 'flight' end
+      or s:find('flight master', 1, true) or s:find('gryphon point', 1, true)
+      or s:find('wind rider point', 1, true) then return 'flight' end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
   if s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true) then return 'technique' end
   if s:gsub('questitem', 'quest item'):find('quest item', 1, true) and s:find('spawn', 1, true) then return 'technique' end
