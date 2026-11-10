@@ -55,12 +55,20 @@ local function reconcileGuides()
     local warnings = {}
     local addons = addonList()
     if not addons then return warnings end
+    local declared = {}
     for index = 1, addons.GetNumAddOns() do
         local name = addons.GetAddOnInfo(index)
-        if type(name) == "string"
-            and addons.GetAddOnMetadata(name, GUIDE_MARKER)
-            and not guides[name] then
-            table.insert(warnings, name .. " did not register. Check that the guide plugin is enabled.")
+        if type(name) == "string" and addons.GetAddOnMetadata(name, GUIDE_MARKER) then
+            declared[name] = true
+            if not guides[name] then
+                table.insert(warnings, name .. " did not register. Check that the guide plugin is enabled.")
+            end
+        end
+    end
+    for key in pairs(guides) do
+        if not declared[key] then
+            table.insert(warnings, key .. " registered without declaring " .. GUIDE_MARKER
+                .. ". Reinstall the guide plugin from a current release.")
         end
     end
     table.sort(warnings)
