@@ -14,4 +14,5 @@ Known examples requiring continued review:
 - `TUGs/Alliance/24-25 Duskwood.lua` contains a conditional shopping list split after the Bronze Tube; the reviewed wording now retains its six Spider Legs and eight Murloc Fin together under the same condition. Other multi-sentence lists still require review.
 - `TUGs/Horde/22-24 Hillsbrad Foothills.lua` describes a quest-item encounter and a preparation precaution in separate sentences. The reviewed case remains a zone tip; no quest association is fabricated.
 - `TUGs/Horde/36-39 Desolace.lua` and `TUGs/Horde/43-45 Part.lua` contain route-relative claims about shopping chances. These are withheld rather than presented as deadlines.
+- `TUGs/Alliance/14-15 Westfall.lua` contains a camera-angle loot note attached to a quest directive. A narrowly recognized camera note is retained with its explicit quest reference; other quest-directive notes remain unreviewed.
 - The extractor uses conservative text patterns and a limited narrative screen. Unreviewed phrasing may still be missed, lose important context, or expose a story outcome. An adjacent quest tag is only a tentative inference, not a confirmed association.

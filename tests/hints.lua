@@ -254,3 +254,18 @@ EfficientQuests_RegisterGuide('NarrativeOutcome', [[
 hints = EfficientQuests.GetHints('NarrativeOutcome')
 assert(#hints == 0, 'narrative outcomes must not be exposed in advice or source excerpts')
 print('ok - narrative outcome variants are withheld')
+
+EfficientQuests_RegisterGuide('LootTechnique', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Do: [QC101] (You can loot it from outside using a camera angle.)
+]], 'Synthetic')
+hints = EfficientQuests.GetHints('LootTechnique')
+assert(#hints == 1 and hints[1].questID == 101, 'quest technique remains associated with its explicit quest')
+assert(hints[1].text:find('loot', 1, true) and hints[1].text:find('camera angle', 1, true), 'camera technique is visible without a route directive')
+print('ok - practical technique in a quest directive is preserved')
+EfficientQuests_RegisterGuide('UnsafeLootNote', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Do: [QC101] (You can loot it from outside using a camera angle after the mayor betrayed the town.)
+]], 'Synthetic')
+assert(#EfficientQuests.GetHints('UnsafeLootNote') == 0, 'unrecognized extra context is not presented as safe camera advice')
+print('ok - camera technique does not admit unreviewed added prose')

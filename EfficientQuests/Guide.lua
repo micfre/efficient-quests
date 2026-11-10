@@ -132,9 +132,24 @@ local function useful(line)
           or s:find('before ', 1, true) or s:find('use ', 1, true)))
 end
 
+-- Some quest directives have a self-contained practical note in parentheses.
+-- Recognize only the camera technique whose action and condition are clear;
+-- arbitrary parenthetical prose can contain spoilers or route instructions.
+local function cameraLootNote(line)
+  if not line:find('%[QC%d+') then return nil end
+  local plain = line:gsub('%b[]', '')
+  local note = plain:match('^%s*[Dd]o%s*:%s*%((.-)%)%s*$')
+  if not note then return nil end
+  local normalized = note:lower():gsub('%f[%a]the%f[%A]%s*', '')
+      :gsub('%f[%a]proper%f[%A]%s*', ''):gsub('%f[%a]a%f[%A]%s*', '')
+      :gsub('%f[%a]with%f[%A]', 'using'):gsub('[%.!%s]+$', ''):gsub('%s+', ' ')
+  if normalized == 'you can loot it from outside using camera angle' then return trim(note) end
+end
+
 -- A line can mix a route instruction with a separate practical sentence.
 -- Split only at sentence punctuation, never at decimal points or tags.
 local function usefulExcerpt(line)
+  if cameraLootNote(line) then return trim(line) end
   local pieces, start, insideTag = {}, 1, false
   for i = 1, #line do
     local char = line:sub(i, i)
@@ -287,7 +302,7 @@ function EQ.ExtractGuide(packageName, context)
           if excerpt and #learning > 0 and not excerpt:find('%[QC%d+')
               and not excerpt:lower():find('quest', 1, true) then excerpt = nil end
           if excerpt then
-            local text = readable(excerpt)
+            local text = cameraLootNote(excerpt) or readable(excerpt)
             if text ~= '' then
               local item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
               local itemTag = excerpt:match('%[CI([^%]]+)%]')
