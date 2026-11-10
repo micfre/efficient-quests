@@ -19,6 +19,7 @@ local scrollRange = 0
 local widthLess, widthMore, spacingLess, spacingMore, restore
 local rows, shownHints, page = {}, {}, 0
 local expanded, currentCategory = {}, 'guide'
+local itemTooltipOwner
 
 local function character()
   EfficientQuestsCharacter = EfficientQuestsCharacter or {}
@@ -84,7 +85,16 @@ local function openItem(hint, owner)
     GameTooltip:SetOwner(owner, 'ANCHOR_RIGHT')
     GameTooltip:SetHyperlink('item:' .. hint.verifiedItemID)
     GameTooltip:Show()
+    itemTooltipOwner = owner
   end
+end
+local function closeItemTooltip(owner)
+  if not itemTooltipOwner or (owner and owner ~= itemTooltipOwner) then return end
+  if GameTooltip and GameTooltip.Hide and
+      (not GameTooltip.IsOwned or GameTooltip:IsOwned(itemTooltipOwner)) then
+    GameTooltip:Hide()
+  end
+  itemTooltipOwner = nil
 end
 local function openMap(hint)
   local context = EQ.GetContext()
@@ -117,6 +127,7 @@ local function makeRow(index)
   row.item = button(body, 'EfficientQuestsItem'..index, L.item, 48, 20, function(self)
     local hint = shownHints[index]; if hint then openItem(hint, self) end
   end)
+  row.item:SetScript('OnLeave', closeItemTooltip)
   row.map = button(body, 'EfficientQuestsMap'..index, L.map, 48, 20, function()
     local hint = shownHints[index]; if hint then openMap(hint) end
   end)
@@ -150,6 +161,7 @@ end
 
 function EQ.RefreshInterface()
   if not frame then return end
+  closeItemTooltip()
   local data = character()
   frame:SetWidth(data.display.width)
   local guide = selectedGuide()
@@ -179,10 +191,19 @@ function EQ.RefreshInterface()
     local hint, row = available[page * 3 + i], rows[i] or makeRow(i)
     shownHints[i] = hint
     row.hint:ClearAllPoints(); row.hint:SetPoint('TOPLEFT', body, 'TOPLEFT', 0, y)
-    row.hint:SetWidth(math.max(120, data.display.width - 92)); row.hint:SetText(hint.text or '')
+    local hintWidth = math.max(120, data.display.width - 92)
+    row.hint:SetWidth(hintWidth); row.hint:SetText(hint.text or '')
+    local hintFont = row.hint:GetFontString()
+    if hintFont then
+      hintFont:SetWidth(hintWidth - 16)
+      hintFont:SetWordWrap(true)
+      hintFont:SetJustifyH('LEFT')
+    end
+    local hintHeight = math.max(36, (hintFont and hintFont:GetStringHeight() or 0) + 12)
+    row.hint:SetHeight(hintHeight)
     row.dismiss:ClearAllPoints(); row.dismiss:SetPoint('TOPRIGHT', body, 'TOPRIGHT', 0, y)
     row.hint:Show(); row.dismiss:Show()
-    y = y - 38
+    y = y - hintHeight - 2
     local open = expanded[hint.id] == true
     row.detail:SetText(open and details(hint) or '')
     row.detail:ClearAllPoints(); row.detail:SetPoint('TOPLEFT', body, 'TOPLEFT', 4, y)
@@ -234,6 +255,7 @@ local function build()
   frame:SetSize(340, 46); frame:SetMovable(true); frame:EnableMouse(true)
   frame:RegisterForDrag('LeftButton'); frame:SetClampedToScreen(true)
   frame:SetScript('OnDragStart', function(self) self:StartMoving() end)
+  frame:SetScript('OnHide', function() closeItemTooltip() end)
   frame:SetScript('OnDragStop', function(self)
     self:StopMovingOrSizing()
     local point, _, relativePoint, x, y = self:GetPoint()
