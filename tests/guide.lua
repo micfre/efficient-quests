@@ -311,3 +311,23 @@ assert(points[4].text:find('The Crossroads', 1, true) and points[4].text:find('w
   'horde flight points use their own wording')
 assert(not points[5].text:find('%['), 'existing flight path advice is unchanged')
 print('ok - gryphon and wind rider points become named travel advice')
+
+EfficientQuests_RegisterGuide('DirectiveItems', [[
+[N Greenfield]
+Do: [QC201-][QC202-][QC203][CI501,7 Spider Silk]
+[O]Do: [QC204][CI501,7 Spider Silk]
+Do: [QC205][CI501,7 Spider Silk][CI502,4 Turtle Meat]
+Do: [QC206]
+Now get [CI501,7 Spider Silk].
+]], 'synthetic')
+local directives = EfficientQuests.ExtractGuide('DirectiveItems', {})
+assert(#directives == 2, 'only item-bearing objective directives carry extractable knowledge')
+assert(directives[1].kind == 'supply' and directives[1].itemID == 501 and directives[1].quantity == 7,
+  'the directive item and quantity become a supply requirement')
+assert(directives[1].text == '7 Spider Silk needed for these quests.',
+  'the requirement is stated without adopting the route directive')
+assert(#directives[1].questIDs == 3 and directives[1].association == 'quests'
+  and directives[1].uncertain, 'directive requirements stay quest-linked and uncertain')
+assert(directives[2].text == '7 Spider Silk needed for this quest.',
+  'a single directive quest reference uses the established singular wording')
+print('ok - item-bearing objective directives preserve their requirement')

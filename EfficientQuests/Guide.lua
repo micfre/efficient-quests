@@ -201,10 +201,30 @@ local function cameraLootNote(line)
   if normalized == 'you can loot it from outside using camera angle' then return trim(note) end
 end
 
+-- A bare objective directive can still carry the guide's knowledge of what
+-- its quests require. Keep that requirement without adopting the directive.
+local function directiveRequirement(line)
+  local bare = trim((line:gsub('%[[^%]]+%]', '')):gsub('%s+', ' '))
+  if bare:lower() ~= 'do:' and bare:lower() ~= 'do' then return nil end
+  local _, itemCount = line:gsub('%[CI%d+', '')
+  if itemCount ~= 1 then return nil end
+  local id, quantity, name = line:match('%[CI(%d+)%s*,%s*(%d+)%s+([^%]]+)%]')
+  if not name then return nil end
+  local quests, seen = {}, {}
+  for questID in line:gmatch('%[QC(%d+)') do
+    local numeric = tonumber(questID)
+    if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
+  end
+  if #quests == 0 then return nil end
+  return {itemID=tonumber(id), quantity=tonumber(quantity), name=trim(name), quests=quests}
+end
+
 -- A line can mix a route instruction with a separate practical sentence.
 -- Split only at sentence punctuation, never at decimal points or tags.
 local function usefulExcerpt(line)
   if cameraLootNote(line) then return trim(line) end
+  local requirement = directiveRequirement(line)
+  if requirement then return trim(line), nil, requirement end
   local pieces, start, insideTag = {}, 1, false
   for i = 1, #line do
     local char = line:sub(i, i)
@@ -350,8 +370,8 @@ function EQ.ExtractGuide(packageName, context)
             location = {x=tonumber(x), y=tonumber(y), zone=trim(zone),
               conditions=lineUnknown}
           end
-          local excerpt, inferred
-          if lineAllowed then excerpt, inferred = usefulExcerpt(line) end
+          local excerpt, inferred, requirement
+          if lineAllowed then excerpt, inferred, requirement = usefulExcerpt(line) end
           local learning = excerpt and learningStates(line, context) or {}
           -- General class/profession progression is outside the quest-focused
           -- view. Keep explicitly quest-related learning advice available.
@@ -359,6 +379,11 @@ function EQ.ExtractGuide(packageName, context)
               and not excerpt:lower():find('quest', 1, true) then excerpt = nil end
           if excerpt then
             local text = cameraLootNote(excerpt) or readable(excerpt)
+            if requirement then
+              text = requirement.quantity .. ' ' .. requirement.name
+                .. ' needed for '
+                .. (#requirement.quests == 1 and 'this quest' or 'these quests') .. '.'
+            end
             if text ~= '' then
               local item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
               local itemTag = excerpt:match('%[CI([^%]]+)%]')
@@ -379,6 +404,7 @@ function EQ.ExtractGuide(packageName, context)
                 if state.known == nil then unknown[#unknown + 1] = 'learning state unknown' end
               end
               if #quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
+              if requirement then unknown[#unknown + 1] = 'requirement from an objective directive' end
               if inferred then unknown[#unknown + 1] = 'quest reference inferred from following sentence' end
               local loc
               if location then loc = {x=location.x, y=location.y, zone=location.zone,
@@ -391,7 +417,7 @@ function EQ.ExtractGuide(packageName, context)
                 association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
                 itemID=tonumber(item), quantity=tonumber(quantity),
                 itemSourceName=itemName,
-                kind=inferred and 'technique' or adviceKind(excerpt, item),
+                kind=requirement and 'supply' or (inferred and 'technique' or adviceKind(excerpt, item)),
                 learningState=learning,
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,
