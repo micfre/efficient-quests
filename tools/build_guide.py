@@ -81,7 +81,7 @@ def plugin_name_for(source_name):
 def load_catalog(path):
     """Read the catalog and enforce the naming rule and the collision guard."""
     data = json.loads(path.read_text(encoding="utf-8"))
-    entries = {}
+    entries, by_plugin = {}, {}
     for entry in data.get("guides", []):
         missing = [f for f in REQUIRED_ENTRY_FIELDS if f not in entry]
         if missing:
@@ -91,9 +91,10 @@ def load_catalog(path):
         if plugin != expected:
             raise ValueError("Catalog plugin name " + plugin + " does not match the naming rule ("
                              + expected + ") for " + source + ".")
-        if plugin in entries:
+        if plugin in by_plugin:
             raise ValueError("Catalog collision: " + source + " and "
-                             + entries[plugin]["source_package"] + " both derive " + plugin + ".")
+                             + by_plugin[plugin] + " both derive " + plugin + ".")
+        by_plugin[plugin] = source
         entries[source] = entry
     if not entries:
         raise ValueError("The catalog lists no guides.")
