@@ -11,6 +11,11 @@ function Widget:GetText() return self.text end
 function Widget:Show() self.shown = true end
 function Widget:Hide() self.shown = false end
 function Widget:IsShown() return self.shown end
+function Widget:GetStringHeight() return math.ceil(#(self.text or '') / 25) * 14 end
+function Widget:SetScrollChild(child) self.child = child end
+function Widget:EnableMouseWheel() end
+function Widget:SetVerticalScroll(value) self.scroll = value end
+function Widget:GetVerticalScroll() return self.scroll or 0 end
 function Widget:CreateFontString(name)
   local child = setmetatable({scripts={},events={},shown=true}, {__index=Widget})
   if name then widgets[name] = child; _G[name] = child end
@@ -73,3 +78,52 @@ event('PLAYER_ENTERING_WORLD')
 assert(widgets.EfficientQuestsStatus.text:find('QuestieDB',1,true), 'provider failure is visible')
 assert(not widgets.EfficientQuestsBody:IsShown(), 'setup failure does not show stale hints')
 print('ok - missing provider is distinct from an empty hint body')
+local openedQuest, openedMap, openedItem
+QuestMapFrame_OpenToQuestDetails=function(id) openedQuest=id end
+WorldMapFrame={SetMapID=function(_,id) openedMap=id end, Show=function() end}
+GameTooltip={SetOwner=function() end, SetHyperlink=function(_,item) openedItem=item end, Show=function() end}
+LibQuestieDB = {RequireContract=function(n) return n == 1 end,
+  Quest=entity, Npc=entity, Object=entity,
+  Item={Get=function(id, field) if id == 11 and field == 'name' then return 'Apple' end end}}
+EfficientQuests_RegisterGuide('Links', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch before approaching for [QC77].
+[G40,50 Elwynn Forest] Buy [CI11,1 Apple].
+[G40,50 Elwynn Forest] Buy [CI12,1 Bread].
+]], 'Author')
+EfficientQuestsCharacter.guide = 'Links'
+event('QUEST_LOG_UPDATE')
+click('EfficientQuestsHint1')
+click('EfficientQuestsQuest1')
+click('EfficientQuestsMap1')
+assert(openedQuest == 77 and openedMap == 1, 'quest and location controls open existing game interfaces')
+click('EfficientQuestsHint2')
+click('EfficientQuestsItem2')
+assert(openedItem == 'item:11', 'provider-verified item opens an existing tooltip')
+click('EfficientQuestsHint3')
+assert(not widgets.EfficientQuestsItem3:IsShown(), 'unverified guide item must not produce an item link')
+print('ok - quest, map and verified item links use existing interfaces')
+
+EfficientQuests_RegisterGuide('Long', '[N Elwynn Forest]\n[G40,50 Elwynn Forest] Buy [CI11,1 Apple] ' .. string.rep('for later use ', 90), 'Author')
+EfficientQuestsCharacter.guide = 'Long'
+event('QUEST_LOG_UPDATE')
+click('EfficientQuestsHint1')
+local scroll = assert(widgets.EfficientQuestsScroll, 'long explanations need a deliberate scroll control')
+assert(scroll.scripts.OnMouseWheel, 'long explanations support mouse-wheel navigation')
+scroll.scripts.OnMouseWheel(scroll, -1)
+assert(scroll:GetVerticalScroll() > 0, 'player can reach the rest of a long explanation')
+print('ok - long source details remain reachable through deliberate scrolling')
+EfficientQuests_RegisterGuide('Empty', '[N Elwynn Forest]\nAccept [QA77].', 'Author')
+EfficientQuestsCharacter.guide = 'Empty'
+event('QUEST_LOG_UPDATE')
+assert(not widgets.EfficientQuestsBody:IsShown(), 'valid empty results hide the hint body')
+assert(not widgets.EfficientQuestsStatus:IsShown(), 'valid empty results are not a setup failure')
+assert(widgets.EfficientQuestsOpenSettings:IsShown(), 'settings remain accessible when no hint matches')
+print('ok - valid empty results hide advice and keep settings available')
+click('EfficientQuestsCategoryDisplay')
+local previousWidth = EfficientQuestsCharacter.display.width
+click('EfficientQuestsWidthMore')
+assert(EfficientQuestsCharacter.display.width == previousWidth + 20, 'standalone width preference is saved')
+click('EfficientQuestsMode')
+assert(EfficientQuestsCharacter.display.mode == 'flare' and widgets.EfficientQuestsWindow:IsShown(), 'integration preference is remembered while standalone remains available')
+print('ok - display choices persist with a standalone fallback')

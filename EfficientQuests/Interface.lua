@@ -14,7 +14,8 @@ local L = {
   none='No dismissed hints.', restored='Dismissed hints are available again.',
   source='Source', conditions='Conditions', uncertain='Some details are uncertain.',
 }
-local frame, body, status, more, settings, settingsNote, guideButton, modeButton, widthLabel, spacingLabel
+local frame, body, scroll, status, more, settings, settingsNote, guideButton, modeButton, widthLabel, spacingLabel
+local scrollRange = 0
 local widthLess, widthMore, spacingLess, spacingMore, restore
 local rows, shownHints, page = {}, {}, 0
 local expanded, currentCategory = {}, 'guide'
@@ -161,10 +162,14 @@ function EQ.RefreshInterface()
   local statusText
   if problem == 'missing' then statusText = L.missing
   elseif problem == 'incompatible' then statusText = L.incompatible
-  elseif problem == 'guide' then statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or (guide and L.unavailable or L.noGuide) end
+  elseif problem == 'guide' then
+    if guide and not EQ.guides[guide] then statusText = L.unavailable
+    else statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide end
+  end
   status:SetText(statusText or '')
   showOrHide(status, statusText ~= nil)
   showOrHide(body, #available > 0 and not statusText)
+  showOrHide(scroll, #available > 0 and not statusText)
   local lastPage = math.max(0, math.ceil(#available / 3) - 1)
   page = math.min(page, lastPage)
   local count = math.min(3, #available - page * 3)
@@ -183,7 +188,9 @@ function EQ.RefreshInterface()
     row.detail:ClearAllPoints(); row.detail:SetPoint('TOPLEFT', body, 'TOPLEFT', 4, y)
     row.detail:SetWidth(data.display.width - 20)
     showOrHide(row.detail, open)
-    row.quest:ClearAllPoints(); row.quest:SetPoint('TOPLEFT', body, 'TOPLEFT', 4, y - 68)
+    local detailHeight = open and math.max(32, row.detail:GetStringHeight() or 0) or 0
+    row.detail:SetHeight(math.max(1, detailHeight))
+    row.quest:ClearAllPoints(); row.quest:SetPoint('TOPLEFT', body, 'TOPLEFT', 4, y - detailHeight - 3)
     row.item:ClearAllPoints(); row.item:SetPoint('LEFT', row.quest, 'RIGHT', 3, 0)
     row.map:ClearAllPoints(); row.map:SetPoint('LEFT', row.item, 'RIGHT', 3, 0)
     showOrHide(row.quest, open and hint.questID ~= nil and QuestMapFrame_OpenToQuestDetails ~= nil)
@@ -192,7 +199,7 @@ function EQ.RefreshInterface()
     local localMap = hint.location and context.zoneID and context.zoneName and hint.location.zone and
       hint.location.zone:lower() == context.zoneName:lower() and WorldMapFrame and WorldMapFrame.SetMapID
     showOrHide(row.map, open and localMap)
-    if open then y = y - 92 end
+    if open then y = y - detailHeight - 27 end
   end
   for i=count+1,#rows do
     local row = rows[i]
@@ -200,8 +207,13 @@ function EQ.RefreshInterface()
   end
   more:SetText(page == lastPage and page > 0 and L.first or L.more)
   showOrHide(more, #available > 3)
-  body:SetHeight(math.max(1, -y))
-  frame:SetHeight(46 + (statusText and 28 or (#available > 0 and -y or 0)))
+  local contentHeight = math.max(1, -y)
+  local viewportHeight = math.min(400, contentHeight)
+  body:SetWidth(data.display.width - 16); body:SetHeight(contentHeight)
+  scroll:SetSize(data.display.width - 16, viewportHeight)
+  scrollRange = math.max(0, contentHeight - viewportHeight)
+  if scroll:GetVerticalScroll() > scrollRange then scroll:SetVerticalScroll(scrollRange) end
+  frame:SetHeight(46 + (statusText and 28 or (#available > 0 and viewportHeight or 0)))
   refreshSettings()
 end
 
@@ -242,8 +254,14 @@ local function build()
   end)
   more:SetPoint('RIGHT', configure, 'LEFT', -4, 0)
   status = text(frame, 'EfficientQuestsStatus'); status:SetPoint('TOPLEFT', frame, 'TOPLEFT', 8, -32); status:SetWidth(320)
-  body = CreateFrame('Frame', 'EfficientQuestsBody', frame)
-  body:SetPoint('TOPLEFT', frame, 'TOPLEFT', 8, -32); body:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -8, -32)
+  scroll = CreateFrame('ScrollFrame', 'EfficientQuestsScroll', frame)
+  scroll:SetPoint('TOPLEFT', frame, 'TOPLEFT', 8, -32)
+  scroll:SetSize(324, 1); scroll:EnableMouseWheel(true)
+  scroll:SetScript('OnMouseWheel', function(self, delta)
+    self:SetVerticalScroll(math.max(0, math.min(scrollRange, self:GetVerticalScroll() - delta * 40)))
+  end)
+  body = CreateFrame('Frame', 'EfficientQuestsBody', scroll)
+  body:SetSize(324, 1); scroll:SetScrollChild(body)
 
   settings = CreateFrame('Frame', 'EfficientQuestsSettings', UIParent, 'BackdropTemplate')
   settings:SetPoint('CENTER'); settings:SetSize(540, 360); settings:SetFrameStrata('DIALOG')
@@ -263,7 +281,7 @@ local function build()
     local names = sortedGuides(); if #names == 0 then return end
     local data = character(); local current = selectedGuide(); local nextIndex = 1
     for i, name in ipairs(names) do if name == current then nextIndex = i % #names + 1; break end end
-    data.guide = names[nextIndex]; EQ.RefreshInterface()
+    data.guide = names[nextIndex]; page = 0; EQ.RefreshInterface()
   end)
   guideButton:SetPoint('TOPLEFT', settings, 'TOPLEFT', 160, -82)
   modeButton = button(settings, 'EfficientQuestsMode', '', 170, 25, function()

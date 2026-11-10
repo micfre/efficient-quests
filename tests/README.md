@@ -22,3 +22,12 @@ lua5.1 tests/guide.lua
 and relevance path, including focus, acceptance, remote advice and uncertainty.
 `lua5.1 tests/lifecycle.lua` exercises supply, quest and flight observations
 through registered guide advice and simulated client and provider data.
+
+The standalone presentation scenarios load the addon with simulated game
+widgets and external APIs:
+
+```sh
+lua5.1 tests/ui.lua
+```
+
+These tests do not replace visual review in the Forever client.
