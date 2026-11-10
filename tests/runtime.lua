@@ -143,6 +143,11 @@ assert(silentWarning and silentWarning:find('did not register', 1, true),
 assert(rogueWarning and rogueWarning:find('without declaring', 1, true),
   'a guide that registers without declaring the marker must warn distinctly')
 print('ok - registered guide without the marker warns at login')
+local setup = status()
+assert(setup:find('EfficientQuests_Rogue', 1, true) and setup:find('without declaring', 1, true),
+  'reconciliation mismatches should reach the setup status')
+assert(not setup:find('Ready', 1, true), 'a setup with mismatch warnings must not report ready')
+print('ok - mismatch warnings surface in the setup status')
 
 clearGuides()
 EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired again]', 'Paired Author')
@@ -153,6 +158,8 @@ handlers.OnEvent(nil, 'PLAYER_LOGIN')
 assert(#EfficientQuests.GetGuideWarnings() == 0,
   'a matching declared and registered set must produce no warnings')
 print('ok - matching declared and registered set stays silent')
+assert(status():find('Ready', 1, true), 'a reconciled setup must still report ready')
+print('ok - reconciled setup reports ready')
 
 clearGuides()
 EfficientQuests_RegisterGuide('EfficientQuests_Opaque', '[N Opaque]', 'Opaque Author')
