@@ -10,3 +10,9 @@ The test loads the same files as the addon TOC and supplies minimal game APIs.
 Extend this boundary with simulated client, provider and tracker inputs and
 assert player-visible hints and interactions. These offline tests do not prove
 compatibility with a particular Forever build or UI scale.
+
+Guide registration and extraction scenarios run at the same addon boundary:
+
+```sh
+lua5.1 tests/guide.lua
+```
