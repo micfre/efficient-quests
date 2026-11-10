@@ -157,6 +157,12 @@ local function usefulExcerpt(line)
       local _, itemCount = piece:gsub('%[CI%d+', '')
       if itemCount > 1 then return nil end
       local following = trim((pieces[index + 1] or ''):lower():gsub('%b[]', ''))
+      -- This TUG shopping list continues after the first item. The opening
+      -- condition applies to both parts, so retain the reviewed list intact.
+      if bare:find('if you did not get them yet: 1 bronze tube', 1, true)
+          and following:match('^gooey spider legs %(you need 6 total%) and 8 murloc fin[%.!]*$') then
+        return trim(piece) .. ' ' .. trim(pieces[index + 1])
+      end
       -- TUG's three-item purchase warning is a single requirement split over
       -- two sentences. Keep its own wording and ordering condition together.
       if bare:find('frost oil', 1, true) and bare:find('gyrochronatom', 1, true)
