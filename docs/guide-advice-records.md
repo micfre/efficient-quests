@@ -6,6 +6,8 @@ Each record contains a stable source `id`, `package`, `sourceAuthor`, `chapter`,
 
 `association` is `zone`, `quest`, or `quests`. A single explicit quest reference has `questID` and a one-element `questIDs` list. Multiple quest references have `questIDs` and no `questID`; `uncertain` remains true because the prose does not prove which part applies to each quest. No quest reference produces an empty list and does not invent an association.
 
+`inferredQuestIDs`, when present, records a possible relationship between a standalone technique and quest references in its following source sentence. These IDs are not confirmed associations: the record remains a zone tip, carries no `questID`, and is marked uncertain. Consumers must not present this inference as a guide or provider fact.
+
 `location`, when present, has `x`, `y`, `zone`, `coordinateSystem = "guide-percent"`, `zoneSource = "guide-name"`, and an `inherited` flag. Its named zone and 0–100 coordinates must not be compared directly to a numeric client map ID or 0–1 position without a reliable mapping. `conditions` lists unsupported or unobserved restrictions and `uncertain` identifies candidates needing qualification.
 
 `learningState` contains any guide learning markers as `{kind, id or name, rank, suffix, known}`. `known` is present only when supported by a positive or negative observation. Such a marker describes the guide step's learning target; it does not prove that a linked quest is complete. The context can provide `isSpellKnown(id)` and `skillRanks` for observations. Unavailable observations remain unknown.

@@ -107,6 +107,7 @@ local function useful(line)
       or s:find('stock up', 1, true) or s:find('flight path', 1, true)
       or s:find('flightpath', 1, true) or s:find('flight master', 1, true)
       or s:find('needed for', 1, true) or s:find('quest items', 1, true)
+      or (s:find('escort quest', 1, true) and s:find('everyone has turned in', 1, true))
       or (s:find('[qc', 1, true) and (s:find('while ', 1, true)
           or s:find('before ', 1, true) or s:find('use ', 1, true)))
 end
@@ -129,14 +130,46 @@ local function usefulExcerpt(line)
   end
   if start <= #line then pieces[#pieces + 1] = line:sub(start) end
   for index, piece in ipairs(pieces) do
+    local bare = trim(piece:gsub('%b[]', '')):lower()
+    local followingPiece = pieces[index + 1] or ''
+    local nextBare = trim(followingPiece:gsub('%b[]', '')):lower()
+    -- This TUG encounter warning contains the trigger and preparation in
+    -- separate sentences. Keep both, without inferring a quest identifier.
+    if bare:find('provided questitem', 1, true) and bare:find('elite ghost', 1, true)
+        and nextBare:find('full health', 1, true)
+        and useful(piece .. ' [QC1]') and useful(followingPiece .. ' [QC1]') then
+      return trim(piece) .. ' ' .. trim(followingPiece)
+    end
+    if bare:match('^use%s') and not piece:find('%[QC%d+')
+        and not piece:find('%[H%]') and not bare:find('hearthstone', 1, true) then
+      local inferred, seen = {}, {}
+      for id in followingPiece:gmatch('%[QC(%d+)') do
+        id = tonumber(id)
+        if not seen[id] then inferred[#inferred + 1] = id; seen[id] = true end
+      end
+      if #inferred > 0 and useful(piece .. ' [QC' .. inferred[1] .. ']') then
+        return trim(piece), inferred
+      end
+    end
     if useful(piece) then
       local _, itemCount = piece:gsub('%[CI%d+', '')
       if itemCount > 1 then return nil end
       local following = trim((pieces[index + 1] or ''):lower():gsub('%b[]', ''))
+      -- TUG's three-item purchase warning is a single requirement split over
+      -- two sentences. Keep its own wording and ordering condition together.
+      if bare:find('frost oil', 1, true) and bare:find('gyrochronatom', 1, true)
+          and bare:find('patterned bronze bracers', 1, true)
+          and following:match('^for the items') and following:find('in this order', 1, true)
+          and following:find('they rely on each other', 1, true)
+          and useful(pieces[index + 1])
+          and (following:find('dont buy', 1, true) or following:find('do not buy', 1, true)) then
+        return trim(piece) .. ' ' .. trim(pieces[index + 1])
+      end
       -- A following condition may qualify this sentence; without understanding
       -- the relationship, withholding the advice is safer than losing it.
       if following:match('^if%s') or following:match('^unless%s')
           or following:match('^only if%s') or following:find('you need', 1, true)
+          or following:match('^for the items') or following:find('in this order', 1, true)
           then return nil end
       local previous = index > 1 and trim(pieces[index - 1]) or ''
       local lower = trim(previous:lower():gsub('%b[]', ''))
@@ -156,6 +189,8 @@ local function adviceKind(excerpt, item)
   if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
       or s:find('flight master', 1, true) then return 'flight' end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
+  if s:find('escort quest', 1, true) and s:find('everyone has turned in', 1, true) then return 'technique' end
+  if s:find('provided questitem', 1, true) and s:find('elite ghost', 1, true) then return 'technique' end
   if s:find('[qc', 1, true) then return 'technique' end
   return nil
 end
@@ -218,7 +253,8 @@ function EQ.ExtractGuide(packageName, context)
             location = {x=tonumber(x), y=tonumber(y), zone=trim(zone),
               conditions=lineUnknown}
           end
-          local excerpt = lineAllowed and usefulExcerpt(line)
+          local excerpt, inferred
+          if lineAllowed then excerpt, inferred = usefulExcerpt(line) end
           local learning = excerpt and learningStates(line, context) or {}
           -- General class/profession progression is outside the quest-focused
           -- view. Keep explicitly quest-related learning advice available.
@@ -242,6 +278,7 @@ function EQ.ExtractGuide(packageName, context)
                 if state.known == nil then unknown[#unknown + 1] = 'learning state unknown' end
               end
               if #quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
+              if inferred then unknown[#unknown + 1] = 'quest reference inferred from following sentence' end
               local loc
               if location then loc = {x=location.x, y=location.y, zone=location.zone,
                 coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not x} end
@@ -249,9 +286,10 @@ function EQ.ExtractGuide(packageName, context)
                 id=packageName .. ':' .. chapterIndex .. ':' .. lineIndex,
                 package=packageName, sourceAuthor=author, chapter=title,
                 sourceText=excerpt, text=text, questID=quest, questIDs=quests,
+                inferredQuestIDs=inferred,
                 association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
                 itemID=tonumber(item), quantity=tonumber(quantity),
-                kind=adviceKind(excerpt, item),
+                kind=inferred and 'technique' or adviceKind(excerpt, item),
                 learningState=learning,
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,

@@ -157,3 +157,45 @@ EfficientQuests_RegisterGuide('Training', [[
 ]], 'reference')
 assert(#EfficientQuests.ExtractGuide('Training', {class='Priest'}) == 0, 'general class training must not become a questing tip')
 print('ok - unrelated class training is excluded')
+EfficientQuests_RegisterGuide('TUGConditions', [[
+[N Tanaris]
+[G1,2 Tanaris] Escort quest inv,if youre in a group, dont accept the follow before everyone has turned in!
+Buy your missing Stranglethorn Pages as well as Frost Oil, Gyrochronatom and Patterned Bronze Bracers. For the Items: IN THIS ORDER AS WELL, If you cant get Item 1 do not buy item 2 and 3, they rely on each other as pre quests.
+]], 'reference')
+local tugConditions = EfficientQuests.ExtractGuide('TUGConditions', {})
+assert(#tugConditions == 2, 'quest mechanic and ordered multi-item advice survive')
+assert(tugConditions[1].kind == 'technique' and tugConditions[1].association == 'zone', 'unlinked mechanic stays an unassociated zone tip')
+assert(tugConditions[1].text:find('everyone has turned in', 1, true), 'group turn-in condition stays visible')
+assert(tugConditions[2].text:find('do not buy item 2 and 3', 1, true), 'ordering condition remains visible')
+assert(tugConditions[2].text:find('Frost Oil', 1, true) and tugConditions[2].text:find('Patterned Bronze Bracers', 1, true), 'all ordered items remain visible')
+print('ok - TUG escort mechanics and conditional buying order')
+EfficientQuests_RegisterGuide('CrossSentence', [[
+[N Un'Goro Crater]
+[G79.65,49.83 Un'Goro Crater] Use the Preserved Threshadon Meat and Pheromone Mixture at the summoning site. Defeat the summoned creature for [QC4292].
+]], 'reference')
+local cross = EfficientQuests.ExtractGuide('CrossSentence', {})
+assert(#cross == 1 and cross[1].kind == 'technique', 'a nearby practical technique remains available')
+assert(cross[1].questID == nil and cross[1].association == 'zone', 'cross-sentence references are not presented as confirmed associations')
+assert(cross[1].inferredQuestIDs[1] == 4292 and cross[1].uncertain, 'cross-sentence evidence remains explicitly inferred')
+assert(not cross[1].sourceText:find('Defeat', 1, true), 'excerpt omits unrelated outcome prose')
+print('ok - tentative cross-sentence association stays distinct from source fact')
+EfficientQuests_RegisterGuide('CrossRoute', [[
+[N Example]
+[G2,3 Example] Use your [H] Hearthstone. Defeat ten enemies for [QC7].
+]], 'reference')
+assert(#EfficientQuests.ExtractGuide('CrossRoute', {}) == 0, 'route travel is not promoted to quest technique by adjacency')
+print('ok - tentative association excludes route travel')
+EfficientQuests_RegisterGuide('StoryOrdering', [[
+[N Tanaris]
+[G1,2 Tanaris] Buy Frost Oil, Gyrochronatom and Patterned Bronze Bracers. For the Items: IN THIS ORDER AS WELL, if you cant get Item 1 dont buy item 2 and 3, they rely on each other; the king is murdered.
+]], 'reference')
+assert(#EfficientQuests.ExtractGuide('StoryOrdering', {}) == 0, 'ordered advice must not reintroduce narrative outcomes')
+print('ok - ordered advice does not bypass narrative screening')
+EfficientQuests_RegisterGuide('EncounterMechanic', [[
+[N Hillsbrad]
+[G1,2 Hillsbrad Foothills] Once you use the provided QuestItem an Elite ghost will spawn. Its not "properly Elite" though but make sure youre full health and use big cooldowns if need be.
+]], 'reference')
+local encounter = EfficientQuests.ExtractGuide('EncounterMechanic', {})
+assert(#encounter == 1 and encounter[1].association == 'zone', 'TUG encounter preparation survives without invented quest association')
+assert(encounter[1].text:find('full health', 1, true) and encounter[1].text:find('Elite ghost', 1, true), 'encounter and precaution remain together')
+print('ok - practical encounter details remain available as uncertain zone advice')
