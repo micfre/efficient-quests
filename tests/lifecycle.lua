@@ -126,3 +126,27 @@ local separate = EfficientQuests.GetHints('IndependentUnknown')
 assert(#separate == 2, 'different quests must not be combined without consumption evidence')
 assert(separate[1].quantity == 3 and separate[2].quantity == 5, 'unconfirmed requirements are not speculatively added')
 print('ok - different quest requirements are not added without evidence')
+EfficientQuests_RegisterGuide('TravelGet', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use the flightpath at Stormwind to get to Redridge.
+]], 'Author')
+local travelGet = EfficientQuests.GetHints('TravelGet')
+assert(#travelGet == 1 and not travelGet[1].text:find('if you have not already learned', 1, true),
+ 'travel instructions containing get must not become acquisition reminders')
+print('ok - travel using get is not treated as learning a path')
+EfficientQuests_RegisterGuide('DifferentFlight', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Get the flightpath at Redridge after passing Stormwind.
+]], 'Author')
+local different = EfficientQuests.GetHints('DifferentFlight')
+assert(#different == 1 and different[1].text:find('if you have not already learned', 1, true),
+ 'a different known location in the text must not suppress an unknown flight path')
+print('ok - incidental known locations do not establish flight path identity')
+EfficientQuests_RegisterGuide('SimilarFlight', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Get the flightpath at Stormwind Outpost.
+]], 'Author')
+local similar = EfficientQuests.GetHints('SimilarFlight')
+assert(#similar == 1 and similar[1].text:find('if you have not already learned', 1, true),
+ 'a longer place name is not the known path with a shorter prefix')
+print('ok - partial place-name matches remain unknown')

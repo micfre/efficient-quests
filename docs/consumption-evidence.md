@@ -1,0 +1,7 @@
+# Independent supply requirements
+
+Different quest IDs and item objectives do not, by themselves, prove that separate quantities of an item are consumed. The supported QuestieDB public objective structure records item identity and optional text/icon; it does not supply a structured quantity or a consumed-at-hand-in flag. See [QuestieDB's normalization schema](https://github.com/Questie/QuestieDB/blob/master/src/meta/normalize.lua) and its [public API](https://github.com/Questie/QuestieDB/blob/master/docs/api.md). A quest-log disappearance or inventory decrease also cannot reliably attribute consumption to a particular quest.
+
+Until a compatible source supplies positive evidence for distinct consumable uses, keep the requirements separate and do not add their quantities. Repeated equivalent requirements for the same quest can use their largest stated minimum. If a future verified source identifies separate active consumptions, aggregation must preserve each use and its evidence, explain the sum to the player, and recalculate after an observed fulfillment. An item tag or a generic objective must not be promoted into that evidence.
+
+Flight-path observations follow the same positive-evidence rule. A learned-path reminder is suppressed only for a uniquely matching observed taxi node in the current map and an explicit acquisition instruction. Missing or unreachable nodes are not evidence of an unlearned path. A guide location name or an incidental place name does not by itself identify a taxi node.

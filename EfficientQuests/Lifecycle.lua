@@ -77,12 +77,20 @@ local function knownFlight(advice, context)
     local paths = EfficientQuestsCharacter and EfficientQuestsCharacter.flightPaths
     if not paths or not context.zoneID then return false end
     local text, matches = string.lower(advice.text), 0
+    -- A location mentioned elsewhere in the instruction is not the path's
+    -- identity. Only compare a name immediately after its destination phrase.
+    local destination = text:match('flight%s*path%s+at%s*:%s*(.+)')
+        or text:match('flight%s*path%s+at%s+(.+)')
+        or text:match('flight%s*path%s+in%s*:%s*(.+)')
+        or text:match('flight%s*path%s+in%s+(.+)')
+    if not destination then return false end
     for _, node in pairs(paths) do
         if node.mapID == context.zoneID and type(node.name) == "string" then
             local name = string.lower(node.name)
-            local startAt, endAt = string.find(text, name, 1, true)
-            if startAt and (startAt == 1 or not text:sub(startAt - 1, startAt - 1):match("[%w]"))
-                and (endAt == #text or not text:sub(endAt + 1, endAt + 1):match("[%w]")) then
+            local startAt, endAt = string.find(destination, name, 1, true)
+            local rest = endAt and destination:sub(endAt + 1) or ''
+            if startAt == 1 and (rest:match('^%s*$') or rest:match('^[%.!,]')
+                or rest:match('^%s+if%s')) then
                 matches = matches + 1
             end
         end
@@ -128,9 +136,11 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
     if advice.kind == "supply" then supplies(advice, context, provider) end
     if advice.kind == "flight" then
         local text = string.lower(advice.text)
-        local acquisition = text:find("%f[%a]get%f[%A]") or text:find("%f[%a]learn%f[%A]")
-            or text:find("%f[%a]grab%f[%A]") or text:find("pick up", 1, true)
-            or text:find("%f[%a]acquire%f[%A]")
+        -- Only a leading acquisition directive is evidence that the guide
+        -- asks the player to learn a path. "Use ... to get to ..." is travel.
+        local acquisition = text:match("^%s*get%f[%A]") or text:match("^%s*learn%f[%A]")
+            or text:match("^%s*grab%f[%A]") or text:match("^%s*pick%s+up%f[%A]")
+            or text:match("^%s*acquire%f[%A]")
         if acquisition then
             if knownFlight(advice, context) then return false end
             advice.text = advice.text .. " (if you have not already learned it)"
