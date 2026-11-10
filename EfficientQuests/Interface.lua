@@ -15,6 +15,7 @@ local L = {
   source='Source', conditions='Conditions', uncertain='Some details are uncertain.',
 }
 local frame, body, scroll, status, more, settings, settingsNote, guideButton, modeButton, widthLabel, spacingLabel
+local background, title
 local scrollRange = 0
 local widthLess, widthMore, spacingLess, spacingMore, restore
 local rows, shownHints, page = {}, {}, 0
@@ -148,10 +149,157 @@ local function refreshSettings()
     'Restore hints dismissed by this character.'))
 end
 
+-- FlareUI exposes its holder as a named frame. Its scroll child follows both
+-- manual and automatic minimization, including the header-only style.
+local function trackerScroll(tracker)
+  if not tracker.GetChildren then return nil end
+  for _, child in ipairs({tracker:GetChildren()}) do
+    if child.GetObjectType and child:GetObjectType() == 'ScrollFrame' then return child end
+  end
+end
+
+local function trackerFor(display)
+  if display.mode ~= 'flare' then return nil end
+  local tracker = _G.FlareUI_ObjectiveTracker
+  if not tracker or not tracker.GetWidth or not tracker.GetEffectiveScale or not trackerScroll(tracker) then return nil end
+  local width = tracker:GetWidth()
+  if type(width) ~= 'number' or width <= 0 then return nil end
+  return tracker
+end
+
+local function effectiveWidth(tracker, fallback)
+  if not tracker then return fallback end
+  local scale = tracker:GetEffectiveScale()
+  local parentScale = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()
+  if type(scale) ~= 'number' or type(parentScale) ~= 'number' or parentScale <= 0 then return fallback end
+  return tracker:GetWidth() * scale / parentScale
+end
+
+local function copyTrackerAppearance(tracker)
+  if not tracker then
+    if frame.SetBackdrop then frame:SetBackdrop(nil) end
+    if background then background:Show() end
+    return
+  end
+  local backdrop = tracker.GetBackdrop and tracker:GetBackdrop()
+  if backdrop and frame.SetBackdrop then
+    frame:SetBackdrop(backdrop)
+    if tracker.GetBackdropColor and frame.SetBackdropColor then frame:SetBackdropColor(tracker:GetBackdropColor()) end
+    if tracker.GetBackdropBorderColor and frame.SetBackdropBorderColor then frame:SetBackdropBorderColor(tracker:GetBackdropBorderColor()) end
+    if background then background:Hide() end
+  else
+    if frame.SetBackdrop then frame:SetBackdrop(nil) end
+    if background then background:Show() end
+  end
+end
+
+local function trackerFonts(tracker)
+  if not tracker or not tracker.GetChildren then return nil, nil end
+  local heading, content
+  for _, child in ipairs({tracker:GetChildren()}) do
+    if child.title and child.title.GetFont then heading = child.title end
+    if child.GetObjectType and child:GetObjectType() == 'ScrollFrame' and child.GetScrollChild then
+      local container = child:GetScrollChild()
+      if container and container.GetChildren then
+        for _, line in ipairs({container:GetChildren()}) do
+          if line.text and line.text.GetFont and (not line.IsShown or line:IsShown()) then content = line.text; break end
+        end
+      end
+    end
+  end
+  return heading, content or heading
+end
+
+local originalFonts = setmetatable({}, {__mode='k'})
+local function applyFont(target, source)
+  if not target or not target.GetFont or not target.SetFont then return end
+  if not originalFonts[target] then
+    local path, size, flags = target:GetFont()
+    if not path then return end
+    local r, g, b, a
+    if target.GetTextColor then r, g, b, a = target:GetTextColor() end
+    originalFonts[target] = {path, size, flags, r, g, b, a}
+  end
+  local font = originalFonts[target]
+  if source and source.GetFont then
+    local path, size, flags = source:GetFont()
+    if path and size then target:SetFont(path, size, flags or '') end
+    if source.GetTextColor and target.SetTextColor then target:SetTextColor(source:GetTextColor()) end
+  else
+    target:SetFont(font[1], font[2], font[3] or '')
+    if font[4] and target.SetTextColor then target:SetTextColor(font[4], font[5], font[6], font[7]) end
+  end
+end
+
+local function applyTrackerFonts(tracker)
+  local heading, content = trackerFonts(tracker)
+  applyFont(title, heading)
+  applyFont(status, content)
+  for _, row in ipairs(rows) do
+    local label = row.hint.GetFontString and row.hint:GetFontString()
+    applyFont(label, content)
+    applyFont(row.detail, content)
+  end
+end
+
+local function trackerSignature(display)
+  local tracker = trackerFor(display)
+  if not tracker then return tostring(display.mode) .. ':fallback' end
+  local list = trackerScroll(tracker)
+  local header, content = trackerFonts(tracker)
+  local function fontKey(font)
+    if not font or not font.GetFont then return '' end
+    local face, size, flags = font:GetFont()
+    local r, g, b, a
+    if font.GetTextColor then r,g,b,a = font:GetTextColor() end
+    return table.concat({tostring(face), tostring(size), tostring(flags), tostring(r), tostring(g), tostring(b), tostring(a)}, ':')
+  end
+  local backdrop = tracker.GetBackdrop and tracker:GetBackdrop()
+  local r,g,b,a, br,bg,bb,ba
+  if tracker.GetBackdropColor then r,g,b,a = tracker:GetBackdropColor() end
+  if tracker.GetBackdropBorderColor then br,bg,bb,ba = tracker:GetBackdropBorderColor() end
+  return table.concat({tostring(tracker), tostring(tracker:GetWidth()),
+    tostring(tracker.GetTop and tracker:GetTop()), tostring(tracker.GetBottom and tracker:GetBottom()),
+    tostring(tracker:GetEffectiveScale()), tostring(not tracker.IsVisible or tracker:IsVisible()),
+    tostring(not list or not list.IsShown or list:IsShown()), tostring(backdrop and backdrop.bgFile),
+    tostring(backdrop and backdrop.edgeFile), tostring(backdrop and backdrop.edgeSize),
+    tostring(r), tostring(g), tostring(b), tostring(a), tostring(br), tostring(bg), tostring(bb), tostring(ba),
+    fontKey(header), fontKey(content)}, '|')
+end
+
+local function placeWindow(tracker, display)
+  frame:ClearAllPoints()
+  if not tracker then
+    local p = display.position
+    if p and p.point and p.relativePoint and type(p.x) == 'number' and type(p.y) == 'number' then
+      frame:SetPoint(p.point, UIParent, p.relativePoint, p.x, p.y)
+    else
+      frame:SetPoint('TOPRIGHT', UIParent, 'TOPRIGHT', -30, -180)
+    end
+    frame:Show()
+    return
+  end
+  local scale = tracker:GetEffectiveScale()
+  local parentScale = UIParent.GetEffectiveScale and UIParent:GetEffectiveScale()
+  local bottom = tracker.GetBottom and tracker:GetBottom()
+  local height = frame.GetHeight and frame:GetHeight()
+  local above = type(bottom) == 'number' and type(height) == 'number' and type(scale) == 'number'
+    and type(parentScale) == 'number' and parentScale > 0 and bottom * scale / parentScale < height + display.spacing
+  if above then frame:SetPoint('BOTTOMLEFT', tracker, 'TOPLEFT', 0, display.spacing)
+  else frame:SetPoint('TOPLEFT', tracker, 'BOTTOMLEFT', 0, -display.spacing) end
+  local visible = not tracker.IsVisible or tracker:IsVisible()
+  local list = trackerScroll(tracker)
+  if list and list.IsShown and not list:IsShown() then visible = false end
+  showOrHide(frame, visible)
+end
+
 function EQ.RefreshInterface()
   if not frame then return end
   local data = character()
-  frame:SetWidth(data.display.width)
+  local tracker = trackerFor(data.display)
+  local width = effectiveWidth(tracker, data.display.width)
+  frame:SetWidth(width)
+  copyTrackerAppearance(tracker)
   local guide = selectedGuide()
   local hints, problem = EQ.GetHints(guide)
   hints = hints or {}
@@ -166,6 +314,7 @@ function EQ.RefreshInterface()
     if guide and not EQ.guides[guide] then statusText = L.unavailable
     else statusText = EQ.GetSetupStatus and EQ.GetSetupStatus() or L.noGuide end
   end
+  status:SetWidth(math.max(1, width - 16))
   status:SetText(statusText or '')
   showOrHide(status, statusText ~= nil)
   showOrHide(body, #available > 0 and not statusText)
@@ -177,16 +326,19 @@ function EQ.RefreshInterface()
   local y = -3
   for i=1,count do
     local hint, row = available[page * 3 + i], rows[i] or makeRow(i)
+    local _, contentFont = trackerFonts(tracker)
+    applyFont(row.hint.GetFontString and row.hint:GetFontString(), contentFont)
+    applyFont(row.detail, contentFont)
     shownHints[i] = hint
     row.hint:ClearAllPoints(); row.hint:SetPoint('TOPLEFT', body, 'TOPLEFT', 0, y)
-    row.hint:SetWidth(math.max(120, data.display.width - 92)); row.hint:SetText(hint.text or '')
+    row.hint:SetWidth(math.max(120, width - 92)); row.hint:SetText(hint.text or '')
     row.dismiss:ClearAllPoints(); row.dismiss:SetPoint('TOPRIGHT', body, 'TOPRIGHT', 0, y)
     row.hint:Show(); row.dismiss:Show()
     y = y - 38
     local open = expanded[hint.id] == true
     row.detail:SetText(open and details(hint) or '')
     row.detail:ClearAllPoints(); row.detail:SetPoint('TOPLEFT', body, 'TOPLEFT', 4, y)
-    row.detail:SetWidth(data.display.width - 20)
+    row.detail:SetWidth(width - 20)
     showOrHide(row.detail, open)
     local detailHeight = open and math.max(32, row.detail:GetStringHeight() or 0) or 0
     row.detail:SetHeight(math.max(1, detailHeight))
@@ -209,11 +361,13 @@ function EQ.RefreshInterface()
   showOrHide(more, #available > 3)
   local contentHeight = math.max(1, -y)
   local viewportHeight = math.min(400, contentHeight)
-  body:SetWidth(data.display.width - 16); body:SetHeight(contentHeight)
-  scroll:SetSize(data.display.width - 16, viewportHeight)
+  body:SetWidth(width - 16); body:SetHeight(contentHeight)
+  scroll:SetSize(width - 16, viewportHeight)
   scrollRange = math.max(0, contentHeight - viewportHeight)
   if scroll:GetVerticalScroll() > scrollRange then scroll:SetVerticalScroll(scrollRange) end
   frame:SetHeight(46 + (statusText and 28 or (#available > 0 and viewportHeight or 0)))
+  applyTrackerFonts(tracker)
+  placeWindow(tracker, data.display)
   refreshSettings()
 end
 
@@ -233,15 +387,15 @@ local function build()
   end
   frame:SetSize(340, 46); frame:SetMovable(true); frame:EnableMouse(true)
   frame:RegisterForDrag('LeftButton'); frame:SetClampedToScreen(true)
-  frame:SetScript('OnDragStart', function(self) self:StartMoving() end)
+  frame:SetScript('OnDragStart', function(self) if not trackerFor(character().display) then self:StartMoving() end end)
   frame:SetScript('OnDragStop', function(self)
     self:StopMovingOrSizing()
     local point, _, relativePoint, x, y = self:GetPoint()
     character().display.position = {point=point, relativePoint=relativePoint, x=x, y=y}
   end)
-  local background = frame:CreateTexture(nil, 'BACKGROUND')
+  background = frame:CreateTexture(nil, 'BACKGROUND')
   background:SetAllPoints(frame); background:SetColorTexture(0.06, 0.06, 0.08, 0.88)
-  local title = text(frame, nil, 'GameFontNormal'); title:SetPoint('TOPLEFT', frame, 'TOPLEFT', 8, -8); title:SetText(L.title)
+  title = text(frame, nil, 'GameFontNormal'); title:SetPoint('TOPLEFT', frame, 'TOPLEFT', 8, -8); title:SetText(L.title)
   local configure = button(frame, 'EfficientQuestsOpenSettings', L.settings, 68, 22, EQ.ShowSettings)
   configure:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -4, -4)
   more = button(frame, 'EfficientQuestsMore', L.more, 50, 22, function()
@@ -314,11 +468,23 @@ local events = CreateFrame('Frame')
 for _, event in ipairs({'PLAYER_LOGIN', 'PLAYER_ENTERING_WORLD', 'BAG_UPDATE_DELAYED',
   'QUEST_LOG_UPDATE', 'QUEST_TURNED_IN', 'SUPER_TRACKED_QUEST_CHANGED',
   'ZONE_CHANGED_NEW_AREA', 'TAXIMAP_OPENED', 'TAXIMAP_CLOSED',
-  'TAXI_NODE_STATUS_CHANGED', 'BANKFRAME_OPENED', 'BANKFRAME_CLOSED', 'PLAYERBANKSLOTS_CHANGED'}) do
+  'TAXI_NODE_STATUS_CHANGED', 'BANKFRAME_OPENED', 'BANKFRAME_CLOSED', 'PLAYERBANKSLOTS_CHANGED', 'ADDON_LOADED'}) do
   pcall(events.RegisterEvent, events, event)
 end
 events:SetScript('OnEvent', function(_, event)
   if event == 'PLAYER_LOGIN' and UIParent then build() end
   if frame then EQ.RefreshInterface() end
+end)
+local sinceUpdate, lastTrackerSignature = 0, nil
+events:SetScript('OnUpdate', function(_, elapsed)
+  if not frame then return end
+  sinceUpdate = sinceUpdate + elapsed
+  if sinceUpdate < 0.5 then return end
+  sinceUpdate = 0
+  local signature = trackerSignature(character().display)
+  if signature ~= lastTrackerSignature then
+    lastTrackerSignature = signature
+    EQ.RefreshInterface()
+  end
 end)
 end

@@ -8,6 +8,25 @@ function Widget:RegisterEvent(event) self.events[event] = true end
 function Widget:SetScript(name, handler) self.scripts[name] = handler end
 function Widget:SetText(text) self.text = text end
 function Widget:GetText() return self.text end
+function Widget:IsVisible() return self.shown ~= false end
+function Widget:GetObjectType() return self.kind end
+function Widget:GetFont() return unpack(self.font or {'default-font', 12, ''}) end
+function Widget:SetFont(face, size, flags) self.font = {face, size, flags} end
+function Widget:GetTextColor() return unpack(self.color or {1,1,1,1}) end
+function Widget:GetFontString()
+  if not self.fontString then self.fontString = self:CreateFontString() end
+  return self.fontString
+end
+function Widget:GetWidth() return self.width end
+function Widget:GetHeight() return self.height end
+function Widget:GetTop() return self.top end
+function Widget:GetBottom() return self.bottom end
+function Widget:GetEffectiveScale() return self.scale or 1 end
+function Widget:GetChildren() return unpack(self.children or {}) end
+function Widget:GetRegions() return unpack(self.regions or {}) end
+function Widget:GetBackdrop() return self.backdrop end
+function Widget:GetBackdropColor() return 1,1,1,0.6 end
+function Widget:GetBackdropBorderColor() return 0.6,0.5,0.3,1 end
 function Widget:Show() self.shown = true end
 function Widget:Hide() self.shown = false end
 function Widget:IsShown() return self.shown end
@@ -18,14 +37,26 @@ function Widget:SetVerticalScroll(value) self.scroll = value end
 function Widget:GetVerticalScroll() return self.scroll or 0 end
 function Widget:CreateFontString(name)
   local child = setmetatable({scripts={},events={},shown=true}, {__index=Widget})
+  self.regions = self.regions or {}; table.insert(self.regions, child)
+  child.kind = "FontString"
   if name then widgets[name] = child; _G[name] = child end
   return child
 end
 function Widget:CreateTexture() return setmetatable({scripts={},events={},shown=true}, {__index=Widget}) end
-for _, name in ipairs({'SetPoint','ClearAllPoints','SetSize','SetWidth','SetHeight','SetAllPoints','SetColorTexture','SetTextColor','SetJustifyH','SetJustifyV','SetWordWrap','SetMovable','EnableMouse','RegisterForDrag','StartMoving','StopMovingOrSizing','SetClampedToScreen','SetFrameStrata','SetBackdrop','SetBackdropColor','SetNormalFontObject','SetHighlightFontObject','SetScale'}) do Widget[name] = function() end end
+for _, name in ipairs({'SetAllPoints','SetColorTexture','SetJustifyH','SetJustifyV','SetWordWrap','SetMovable','EnableMouse','RegisterForDrag','StartMoving','StopMovingOrSizing','SetClampedToScreen','SetFrameStrata','SetBackdrop','SetBackdropColor','SetNormalFontObject','SetHighlightFontObject','SetScale'}) do Widget[name] = function() end end
+function Widget:SetTextColor(...) self.color = {...} end
+function Widget:SetPoint(...) self.point = {...} end
+function Widget:ClearAllPoints() self.point = nil end
+function Widget:SetSize(w,h) self.width, self.height = w,h end
+function Widget:SetWidth(w) self.width = w end
+function Widget:SetHeight(h) self.height = h end
+function Widget:SetBackdrop(value) self.backdrop = value end
+function Widget:SetBackdropBorderColor(...) self.border = {...} end
+UIParent = setmetatable({width=1000,height=800,shown=true,children={}}, {__index=Widget})
 function CreateFrame(kind, name, parent)
   local frame = setmetatable({kind=kind,parent=parent,scripts={},events={},shown=true}, {__index=Widget})
   frames[#frames+1] = frame
+  if parent and parent.children then table.insert(parent.children, frame) end
   if name then widgets[name] = frame; _G[name] = frame end
   return frame
 end
@@ -127,3 +158,45 @@ assert(EfficientQuestsCharacter.display.width == previousWidth + 20, 'standalone
 click('EfficientQuestsMode')
 assert(EfficientQuestsCharacter.display.mode == 'flare' and widgets.EfficientQuestsWindow:IsShown(), 'integration preference is remembered while standalone remains available')
 print('ok - display choices persist with a standalone fallback')
+
+local tracker = CreateFrame('Frame', 'FlareUI_ObjectiveTracker', UIParent)
+tracker:SetSize(250, 200); tracker.bottom=400; tracker.top=600
+tracker:SetBackdrop({bgFile='tracker-background'})
+tracker.children = {}
+local trackerHeader = CreateFrame('Frame', nil, tracker)
+trackerHeader.title = trackerHeader:CreateFontString()
+trackerHeader.title:SetFont('flare-font', 17, 'OUTLINE')
+trackerHeader.title:SetTextColor(0.8, 0.6, 0.3, 1)
+local trackerScroll = CreateFrame('ScrollFrame', nil, tracker)
+trackerScroll:Show()
+event('PLAYER_ENTERING_WORLD')
+local window = widgets.EfficientQuestsWindow
+assert(window.width == 250 and window.point[2] == tracker and window.point[3] == 'BOTTOMLEFT', 'integrated window attaches below tracker at its width')
+assert(window.backdrop and window.backdrop.bgFile == 'tracker-background', 'integrated window follows tracker backdrop')
+assert(widgets.EfficientQuestsStatus:GetFont() == 'flare-font', 'integrated text matches tracker font')
+print('ok - Flare tracker geometry and backdrop')
+local function tick()
+  for _, value in ipairs(frames) do if value.scripts.OnUpdate then value.scripts.OnUpdate(value, 1) end end
+end
+tracker.bottom=5; tracker.top=205
+tick()
+assert(window.point[1] == 'BOTTOMLEFT' and window.point[3] == 'TOPLEFT', 'insufficient space below places the window above')
+trackerScroll:Hide(); tick()
+assert(not window:IsShown(), 'minimizing tracker hides integrated hints')
+trackerScroll:Show(); tick()
+assert(window:IsShown(), 'expanding tracker restores integrated hints')
+tracker:Hide(); tick()
+assert(not window:IsShown(), 'hidden tracker hides integrated hints')
+tracker:Show(); tracker:SetWidth(310); trackerHeader.title:SetFont('changed-font', 18, ''); tick()
+assert(window:IsShown() and window.width == 310, 'tracker appearance and width changes are followed')
+assert(widgets.EfficientQuestsStatus:GetFont() == 'changed-font', 'font changes are followed')
+FlareUI_ObjectiveTracker = nil; tick()
+assert(window:IsShown() and window.width == EfficientQuestsCharacter.display.width and EfficientQuestsCharacter.display.mode == 'flare', 'unavailable tracker falls back without changing preference')
+assert(widgets.EfficientQuestsStatus:GetFont() == 'default-font', 'fallback restores standalone text styling')
+FlareUI_ObjectiveTracker = tracker; tick()
+assert(window.point[2] == tracker and window.width == 310, 'integration resumes when tracker returns')
+print('ok - tracker visibility, placement, resize and fallback recovery')
+
+tracker.scale = 1.5; tick()
+assert(window.width == 465, 'tracker effective scale is reflected in the integrated width')
+print('ok - tracker scaling is reflected in the integrated width')

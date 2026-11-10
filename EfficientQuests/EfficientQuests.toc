@@ -2,7 +2,7 @@
 ## Title: Efficient Quests
 ## Notes: Practical questing advice without a prescribed route.
 ## Version: 0.1.0
-## OptionalDeps: QuestieDB
+## OptionalDeps: QuestieDB, FlareUI
 ## SavedVariablesPerCharacter: EfficientQuestsCharacter
 
 Core.lua
