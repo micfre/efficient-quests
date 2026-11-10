@@ -9,4 +9,5 @@ Core.lua
 Provider.lua
 Context.lua
 Guide.lua
+Lifecycle.lua
 Hints.lua

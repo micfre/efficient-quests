@@ -38,11 +38,32 @@ end
 local events = CreateFrame("Frame")
 events:RegisterEvent("PLAYER_LOGIN")
 events:RegisterEvent("QUEST_TURNED_IN")
+events:RegisterEvent("BANKFRAME_OPENED")
+events:RegisterEvent("BANKFRAME_CLOSED")
+events:RegisterEvent("PLAYERBANKSLOTS_CHANGED")
+events:RegisterEvent("TAXIMAP_OPENED")
+events:RegisterEvent("TAXIMAP_CLOSED")
+events:RegisterEvent("TAXI_NODE_STATUS_CHANGED")
 events:SetScript("OnEvent", function(_, event, questID)
     if event == "PLAYER_LOGIN" then
         EfficientQuestsCharacter = EfficientQuestsCharacter or {}
         SLASH_EFFICIENTQUESTS1 = "/eq"
         SlashCmdList.EFFICIENTQUESTS = showStatus
+    elseif event == "TAXIMAP_OPENED" then
+        EfficientQuests.taxiOpen = true
+        if EfficientQuests.ObserveTaxiNodes then EfficientQuests.ObserveTaxiNodes() end
+    elseif event == "TAXI_NODE_STATUS_CHANGED" and EfficientQuests.taxiOpen then
+        if EfficientQuests.ObserveTaxiNodes then EfficientQuests.ObserveTaxiNodes() end
+    elseif event == "TAXIMAP_CLOSED" then
+        EfficientQuests.taxiOpen = false
+    elseif event == "BANKFRAME_OPENED" then
+        EfficientQuests.bankOpen = true
+        EfficientQuests.bankFresh = false
+    elseif event == "PLAYERBANKSLOTS_CHANGED" and EfficientQuests.bankOpen then
+        EfficientQuests.bankFresh = true
+    elseif event == "BANKFRAME_CLOSED" then
+        EfficientQuests.bankOpen = false
+        EfficientQuests.bankFresh = false
     elseif event == "QUEST_TURNED_IN" and type(questID) == "number" and questID > 0 then
         EfficientQuestsCharacter = EfficientQuestsCharacter or {}
         EfficientQuestsCharacter.turnedIn = EfficientQuestsCharacter.turnedIn or {}

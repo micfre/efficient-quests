@@ -37,6 +37,12 @@ function EfficientQuests.GetContext()
         if not GetItemCount or not itemID then return nil end
         return GetItemCount(itemID, false)
     end
+    result.countBank = function(itemID)
+        if not EfficientQuests.bankOpen or not EfficientQuests.bankFresh or not GetItemCount or not itemID then return nil end
+        local total, carried = GetItemCount(itemID, true), GetItemCount(itemID, false)
+        if type(total) ~= "number" or type(carried) ~= "number" or total < carried then return nil end
+        return total - carried
+    end
     local saved = EfficientQuestsCharacter
     if saved and saved.turnedIn then
         for id in pairs(saved.turnedIn) do result.completedQuestIDs[id] = true end

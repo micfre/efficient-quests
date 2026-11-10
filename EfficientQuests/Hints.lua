@@ -204,7 +204,8 @@ function EfficientQuests.GetHints(packageName)
     local output, seen = {}, {}
     for _, advice in ipairs(candidates) do
         local locality = localStatus(advice, context)
-        if locality ~= false and eligibleQuests(advice, context, provider) then
+        if locality ~= false and eligibleQuests(advice, context, provider)
+            and EfficientQuests.ApplyLifecycle(advice, context, provider) then
             local key = duplicateKey(advice)
             local source = {id=advice.id, chapter=advice.chapter, sourceText=advice.sourceText,
                 sourceAuthor=advice.sourceAuthor, location=advice.location}
