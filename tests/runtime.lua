@@ -25,11 +25,14 @@ loadAddon()
 assert(status():find('QuestieDB', 1, true), 'missing provider should produce actionable status')
 print('ok - missing provider status without optional addons')
 LibQuestieDB = {}
-assert(status():find('guide', 1, true), 'missing guide should be distinguished from a missing provider')
-print('ok - missing guide status')
-EfficientQuests_RegisterGuide('TUG', '[NExample advice]', 'TUG')
-assert(not status():find('No compatible guide', 1, true), 'adapted guide should be recognized')
-print('ok - adapted guide registers independently')
+local message = status()
+assert(message:find('guide', 1, true), 'missing guide should be distinguished from a missing provider')
+assert(message:find('github.com/micfre/efficient-quests/releases', 1, true),
+  'missing guide status should point at the releases page')
+print('ok - missing guide status points at the releases page')
+EfficientQuests_RegisterGuide('Example', '[NExample advice]', 'reference')
+assert(not status():find('releases', 1, true), 'a registered guide removes the releases pointer')
+print('ok - registered guide recognized without a releases pointer')
 assert(not status():find('No relevant tips', 1, true), 'unverified dependencies must not be presented as a valid empty state')
 print('ok - unverified dependencies do not look like an empty result')
 assert(status():find('incompatible', 1, true), 'provider without a supported contract should be reported as incompatible')
@@ -74,12 +77,6 @@ C_QuestLog.IsOnQuest = nil
 context = EfficientQuests.GetContext()
 assert(context.isAccepted(103) == nil, 'incomplete log must not imply unaccepted')
 print('ok - hidden quests can be checked without treating unknown as false')
-EfficientQuests.guides.TUG = nil
-C_AddOns = { GetAddOnInfo = function(name) if name == 'GuideLime_TUGs_Forever' then return {name = name} end end,
- GetAddOnMetadata = function() return nil end }
-assert(status():find('reapply', 1, true) and status():find('TUG', 1, true),
-  'installed guide missing adaptation should give an actionable setup status')
-print('ok - unadapted guide status')
 handlers.OnEvent(nil, 'QUEST_TURNED_IN', 105)
 context = EfficientQuests.GetContext()
 assert(context.completedQuestIDs[105], 'observed turn-in should be remembered')
