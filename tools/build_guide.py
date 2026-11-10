@@ -305,8 +305,21 @@ def _detail(completed, limit=400):
     return " ".join(note.split())[:limit]
 
 
+def evaluate_gates(audit):
+    """Turn one audit result into build failures and warnings.
+
+    Failures: the audit extracted no advice record from any character
+    context. Warnings: none yet.
+    """
+    failures = []
+    if audit["advice_records"] == 0:
+        failures.append("the audit extracted no advice records from any context")
+    return failures, []
+
+
 def compose_report(plugin, package_name, fields, plugin_version, date, audit):
     """The per-guide extraction audit report shipped inside the plugin."""
+    failures, warnings = evaluate_gates(audit)
     return {
         "plugin": plugin,
         "source_package": package_name,
@@ -325,6 +338,7 @@ def compose_report(plugin, package_name, fields, plugin_version, date, audit):
             "findings": audit["findings"],
             "findings_by_severity": audit["findings_by_severity"],
         },
+        "gates": {"failures": failures, "warnings": warnings},
     }
 
 
@@ -353,9 +367,15 @@ def build(source, entry, output, date):
     except ValueError:
         shutil.rmtree(target, ignore_errors=True)
         raise
+    failures, warnings = evaluate_gates(audit)
+    if failures:
+        shutil.rmtree(target, ignore_errors=True)
+        raise ValueError("extraction audit gate: " + "; ".join(failures))
     (target / AUDIT_REPORT).write_text(
         json.dumps(compose_report(plugin, source.name, fields, plugin_version, date, audit),
                    indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    for warning in warnings:
+        print("Guide plugin build: warning: " + warning, file=sys.stderr)
     print("Built " + plugin + " " + plugin_version + " (" + str(len(calls))
           + " guides) in " + str(target))
     print("Extraction audit: " + str(audit["guides"]) + " guides, "
