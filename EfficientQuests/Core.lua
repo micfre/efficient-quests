@@ -28,11 +28,16 @@ local function status()
     if problem then
         return "QuestieDB is incompatible. Update or reinstall a supported QuestieDB provider."
     end
-    return "Guide processing is not yet available."
+    return "Ready."
 end
+EfficientQuests.GetSetupStatus = status
 
-local function showStatus()
-    DEFAULT_CHAT_FRAME:AddMessage("Efficient Quests: " .. status())
+local function showStatus(message)
+    if message ~= "status" and EfficientQuests.ShowSettings then
+        EfficientQuests.ShowSettings()
+    else
+        DEFAULT_CHAT_FRAME:AddMessage("Efficient Quests: " .. status())
+    end
 end
 
 local events = CreateFrame("Frame")
