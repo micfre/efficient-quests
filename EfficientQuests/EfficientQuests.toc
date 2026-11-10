@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: Efficient Quests
 ## Notes: Practical questing advice without a prescribed route.
-## Version: 0.1.0
-## OptionalDeps: QuestieDB, FlareUI
+## Version: 0.2.0
+## Dependencies: QuestieDB
+## OptionalDeps: FlareUI
 ## SavedVariablesPerCharacter: EfficientQuestsCharacter
 
 Core.lua
