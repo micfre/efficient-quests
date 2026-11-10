@@ -87,3 +87,9 @@ context = EfficientQuests.GetContext()
 assert(context.completedQuestIDs[105], 'observed turn-in should be remembered')
 assert(not context.completedQuestIDs[101], 'a quest absent from the log is not a turn-in')
 print('ok - observed turn-in is distinct from abandonment')
+C_SkillInfo = { GetNumSkillLines = function() return 1 end,
+ GetSkillLineInfo = function() return {name='Mining', rank=10, isHeader=false} end }
+context = EfficientQuests.GetContext()
+assert(context.professions.mining == true and context.professions.alchemy == nil,
+  'known professions should be available while absent skills remain unknown')
+print('ok - profession observations preserve unknowns')

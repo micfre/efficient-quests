@@ -6,6 +6,15 @@ function EfficientQuests.GetContext()
     if UnitClass then local _, token = UnitClass("player"); result.class = token end
     if UnitRace then local _, token = UnitRace("player"); result.race = token end
     if UnitLevel then result.level = UnitLevel("player") end
+    result.professions = {}
+    if C_SkillInfo and C_SkillInfo.GetNumSkillLines and C_SkillInfo.GetSkillLineInfo then
+        for i = 1, C_SkillInfo.GetNumSkillLines() do
+            local skill = C_SkillInfo.GetSkillLineInfo(i)
+            if skill and not skill.isHeader and type(skill.name) == "string" and skill.rank and skill.rank > 0 then
+                result.professions[string.lower(skill.name)] = true
+            end
+        end
+    end
     if C_SuperTrack and C_SuperTrack.GetSuperTrackedQuestID then
         local id = C_SuperTrack.GetSuperTrackedQuestID()
         if id and id ~= 0 then result.focusedQuestID = id end
