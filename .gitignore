@@ -1,0 +1,21 @@
+# Third-party local reference copies
+/prior_art/
+
+# Local tooling and credentials
+/.agents/
+/.codex/
+/.aws/
+.env
+.env.*
+!.env.example
+
+# Generated artifacts
+/dist/
+/build/
+*.zip
+
+# Editor and operating-system files
+.DS_Store
+Thumbs.db
+*.swp
+*~

@@ -1,0 +1,23 @@
+name: Bug report
+description: Report behavior that is not working as expected.
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Include the expected behavior and steps to reproduce it.
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: Forever client version and build
+  - type: input
+    id: versions
+    attributes:
+      label: Addon, QuestieDB, guide, and UI versions
+  - type: textarea
+    id: details
+    attributes:
+      label: Additional details
+      description: Include relevant error text or screenshots if available.
