@@ -68,6 +68,7 @@ local function readable(line)
   line = line:gsub('^%s*%[G[^%]]+%]%s*', '')
   line = line:gsub('%s+[Aa]t%s*%[TAR%d+%]', ' ')
   line = line:gsub('at%s*%[TAR%d+%]', ' ')
+  line = line:gsub('%[CI%d+,%s*(%d+)([%a][^%]]*)%]', '%1 %2 ')
   line = line:gsub('%[CI%d+,%s*(%d+)%s+([^%]]+)%]', '%1 %2 ')
   line = line:gsub('%[CI%d+,%s*(%d+)%]', '%1 item ')
   line = line:gsub('%[G%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*,%s*%d+%.?%d*%s*([^%]]+)%]', '%1')
@@ -89,6 +90,7 @@ local function useful(line)
       or s:find('each time you do', 1, true) or s:find('sell grey', 1, true)
       or s:find('sell gray', 1, true) or s:find('sell it all', 1, true)
       or s:find('this guide', 1, true) or s:find('keep an eye', 1, true)
+      or s:find('last chance', 1, true) or s:find('more chances', 1, true)
       or s:find('keep group', 1, true) or s:find('keep skinning', 1, true) then return false end
   -- Suppress sentences that disclose common narrative outcomes. This is a
   -- conservative screen, not proof that unrestricted guide prose is safe.
@@ -264,6 +266,10 @@ function EQ.ExtractGuide(packageName, context)
             local text = readable(excerpt)
             if text ~= '' then
               local item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
+              local itemTag = excerpt:match('%[CI([^%]]+)%]')
+              local itemName = itemTag and itemTag:match('^%d+%s*,%s*%d+%s*(.*)$')
+              if itemName then itemName = trim(itemName) end
+              if itemName == '' or itemName == '-' then itemName = nil end
               local quests, seen = {}, {}
               for id in excerpt:gmatch('%[QC(%d+)') do
                 local numeric = tonumber(id)
@@ -289,6 +295,7 @@ function EQ.ExtractGuide(packageName, context)
                 inferredQuestIDs=inferred,
                 association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
                 itemID=tonumber(item), quantity=tonumber(quantity),
+                itemSourceName=itemName,
                 kind=inferred and 'technique' or adviceKind(excerpt, item),
                 learningState=learning,
                 location=loc, conditions=unknown, uncertain=#unknown > 0,

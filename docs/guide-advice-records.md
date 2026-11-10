@@ -4,6 +4,8 @@
 
 Each record contains a stable source `id`, `package`, `sourceAuthor`, `chapter`, selected `sourceText`, shortened `text`, `sourceOrder`, and optional `kind` (`supply`, `flight`, or `technique`). An item `itemID` and `quantity` are supplied only when present in an item tag; an item tag does not establish a retention requirement or independent consumption.
 
+`itemSourceName` is the optional item label written in that same tag. It is guide text, not provider-verified metadata. TUG's shopping list contains inconsistent IDs and names (for example, its page 10 entry reuses page 1's ID), so downstream code must not assume the tag's ID and label identify the same item. Verify them against available provider facts before linking or combining requirements; if that cannot be done, retain the uncertainty.
+
 `association` is `zone`, `quest`, or `quests`. A single explicit quest reference has `questID` and a one-element `questIDs` list. Multiple quest references have `questIDs` and no `questID`; `uncertain` remains true because the prose does not prove which part applies to each quest. No quest reference produces an empty list and does not invent an association.
 
 `inferredQuestIDs`, when present, records a possible relationship between a standalone technique and quest references in its following source sentence. These IDs are not confirmed associations: the record remains a zone tip, carries no `questID`, and is marked uncertain. Consumers must not present this inference as a guide or provider fact.
