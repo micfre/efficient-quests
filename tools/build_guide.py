@@ -305,15 +305,33 @@ def _detail(completed, limit=400):
     return " ".join(note.split())[:limit]
 
 
+# The audit severities that fail a build. Everything the audit calls a
+# safety finding trips the screen: ROUTE and SPOILER mean the addon showed
+# prose its own route and narrative screens were meant to withhold, DANGLING
+# and TAGS mean malformed text or unstripped markup reached the hint, and
+# QUANTITY, NAME, and QUEST mean the visible text lost a quantity, an item
+# name, or a quest link. ERROR means ExtractGuide itself failed. WATCH is
+# the one severity kept out: it flags phrases that need human eyes but are
+# often mechanical, and the reviewed corpus shipped with accepted WATCH
+# entries, so it stays advisory in the report.
+SAFETY_SEVERITIES = ("ROUTE", "SPOILER", "DANGLING", "TAGS",
+                     "QUANTITY", "NAME", "QUEST", "ERROR")
+
+
 def evaluate_gates(audit):
     """Turn one audit result into build failures and warnings.
 
     Failures: the audit extracted no advice record from any character
-    context. Warnings: none yet.
+    context, or a safety-screen severity was reported. Warnings: none yet.
     """
     failures = []
     if audit["advice_records"] == 0:
         failures.append("the audit extracted no advice records from any context")
+    for finding in audit["findings"]:
+        if finding["severity"] in SAFETY_SEVERITIES:
+            failures.append("safety finding [%s] %s %s: %s"
+                            % (finding["severity"], finding["where"],
+                               finding["id"], finding["detail"]))
     return failures, []
 
 
@@ -338,7 +356,8 @@ def compose_report(plugin, package_name, fields, plugin_version, date, audit):
             "findings": audit["findings"],
             "findings_by_severity": audit["findings_by_severity"],
         },
-        "gates": {"failures": failures, "warnings": warnings},
+        "gates": {"safety_screen": list(SAFETY_SEVERITIES),
+                  "failures": failures, "warnings": warnings},
     }
 
 
