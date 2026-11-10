@@ -1,0 +1,19 @@
+{
+  "guides": [
+    {
+      "build_suffix": "-eq1",
+      "distribute": false,
+      "license": "All rights reserved; redistribution permission pending",
+      "plugin": "EfficientQuests_TUGsForever",
+      "source_package": "GuideLime_TUGs_Forever"
+    },
+    {
+      "build_suffix": "-eq1",
+      "distribute": true,
+      "license": "GPLv3",
+      "plugin": "EfficientQuests_Bethink",
+      "source_package": "Guidelime_Bethink"
+    }
+  ],
+  "version": 1
+}
