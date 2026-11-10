@@ -13,6 +13,18 @@ local function qualify(advice, message)
     table.insert(advice.conditions, message)
 end
 
+-- Wording that refers to handing a quest in, shared by the lifecycle
+-- screens that must agree on it; "after" belongs because the reviewed
+-- guides use it for post-turn-in sequencing.
+local handInWords = {"after", "turn in", "turn-in", "hand in"}
+
+local function mentionsAny(text, words)
+    for _, phrase in ipairs(words) do
+        if text:find(phrase, 1, true) then return true end
+    end
+    return false
+end
+
 local function supplyKey(questID, itemID) return questID .. "\31" .. itemID end
 
 local function isConsumedFor(itemID, questID)
@@ -118,7 +130,27 @@ function EfficientQuests.ForgetConsumption(questID)
     end
 end
 
--- Persist only explicit positive observations, scoped to the current character.
+-- Persist observed taxi nodes with the client's raw state, scoped to the
+-- current character. Current and Reachable are positive learning evidence
+-- and sticky: a path cannot be unlearned. Only a state the client's own
+-- enum names as unlearned counts as negative evidence; Unreachable is
+-- ambiguous because a learned node can also be unreachable, and a node
+-- with no observation at all is simply unknown. Absence is never proof
+-- that a path is unlearned.
+local UNLEARNED_STATE_NAMES = { unlearned = true, notlearned = true, undiscovered = true }
+
+local function unlearnedStates()
+    local states = {}
+    if type(Enum) ~= "table" or type(Enum.FlightPathState) ~= "table" then return states end
+    for name, value in pairs(Enum.FlightPathState) do
+        local normalized = string.lower(tostring(name)):gsub("[^%a]", "")
+        if UNLEARNED_STATE_NAMES[normalized] and type(value) == "number" then
+            states[value] = true
+        end
+    end
+    return states
+end
+
 function EfficientQuests.ObserveTaxiNodes()
     if not C_TaxiMap or not C_TaxiMap.GetAllTaxiNodes or not C_Map or not C_Map.GetBestMapForUnit
         or not Enum or not Enum.FlightPathState then return end
@@ -126,22 +158,48 @@ function EfficientQuests.ObserveTaxiNodes()
     if not mapID then return end
     local nodes = C_TaxiMap.GetAllTaxiNodes(mapID)
     if type(nodes) ~= "table" then return end
+    local unlearned = unlearnedStates()
     for _, node in ipairs(nodes) do
         if type(node.nodeID) == "number" and type(node.name) == "string" and node.name ~= ""
-            and type(node.state) == "number"
-            and ((type(Enum.FlightPathState.Current) == "number" and node.state == Enum.FlightPathState.Current)
-                or (type(Enum.FlightPathState.Reachable) == "number" and node.state == Enum.FlightPathState.Reachable)) then
+            and type(node.state) == "number" then
             EfficientQuestsCharacter = EfficientQuestsCharacter or {}
-            EfficientQuestsCharacter.flightPaths = EfficientQuestsCharacter.flightPaths or {}
-            EfficientQuestsCharacter.flightPaths[node.nodeID] = {name=node.name, mapID=mapID}
+            local saved = EfficientQuestsCharacter
+            saved.flightPaths = saved.flightPaths or {}
+            local record = saved.flightPaths[node.nodeID]
+            if not record then
+                record = {}
+                saved.flightPaths[node.nodeID] = record
+            end
+            record.name, record.mapID, record.state = node.name, mapID, node.state
+            local learned = (type(Enum.FlightPathState.Current) == "number"
+                and node.state == Enum.FlightPathState.Current)
+                or (type(Enum.FlightPathState.Reachable) == "number"
+                and node.state == Enum.FlightPathState.Reachable)
+            if learned then
+                record.learned = true
+            elseif unlearned[node.state] and record.learned ~= true then
+                record.learned = false
+            end
         end
     end
 end
 
-local function knownFlight(advice, context)
+-- A saved record's learning classification. Entries written before the raw
+-- state was recorded only ever hold positive observations.
+local function learnedObservation(record)
+    if type(record) ~= "table" then return nil end
+    if record.learned == true then return true end
+    if record.learned == false then return false end
+    if record.state == nil then return true end
+    return nil
+end
+
+-- The single observed node this advice's destination identifies on the
+-- current map, or nil when nothing matches or the name is ambiguous.
+local function identifiedFlight(advice, context)
     local paths = EfficientQuestsCharacter and EfficientQuestsCharacter.flightPaths
-    if not paths or not context.zoneID then return false end
-    local text, matches = string.lower(advice.text), 0
+    if not paths or not context.zoneID then return nil end
+    local text = string.lower(advice.text)
     -- A location mentioned elsewhere in the instruction is not the path's
     -- identity. Only compare a name immediately after its destination phrase,
     -- or a flight point named by a leading guide tag.
@@ -150,41 +208,49 @@ local function knownFlight(advice, context)
         or text:match('flight%s*path%s+in%s*:%s*(.+)')
         or text:match('flight%s*path%s+in%s+(.+)')
         or text:match('^%s*([^:]+):%s')
-    if not destination then
-        -- Without a named destination in the sentence, the guide's own
-        -- location tag can identify the path: an exact, unique observed
-        -- node name on the current map.
-        local zone = advice.location and advice.location.zone
-        if type(zone) ~= "string" or zone == "" then return false end
-        local zoneMatches = 0
-        for _, node in pairs(paths) do
-            if node.mapID == context.zoneID and type(node.name) == "string"
-                and string.lower(node.name) == string.lower(zone) then
-                zoneMatches = zoneMatches + 1
-            end
-        end
-        return zoneMatches == 1
-    end
+    local match
     for _, node in pairs(paths) do
         if node.mapID == context.zoneID and type(node.name) == "string" then
-            local name = string.lower(node.name)
-            local startAt, endAt = string.find(destination, name, 1, true)
-            local rest = endAt and destination:sub(endAt + 1) or ''
-            if startAt == 1 and (rest:match('^%s*$') or rest:match('^[%.!,]')
-                or rest:match('^%s+if%s')) then
-                matches = matches + 1
+            local identified = false
+            if destination then
+                local name = string.lower(node.name)
+                local startAt, endAt = string.find(destination, name, 1, true)
+                local rest = endAt and destination:sub(endAt + 1) or ''
+                identified = startAt == 1 and (rest:match('^%s*$') or rest:match('^[%.!,]')
+                    or rest:match('^%s+if%s'))
+            else
+                -- Without a named destination in the sentence, the guide's own
+                -- location tag can identify the path: an exact observed node
+                -- name on the current map.
+                local zone = advice.location and advice.location.zone
+                identified = type(zone) == "string" and zone ~= ""
+                    and string.lower(node.name) == string.lower(zone)
+            end
+            if identified then
+                if match then return nil end
+                match = node
             end
         end
     end
-    return matches == 1
+    return match
+end
+
+local function knownFlight(advice, context)
+    local record = identifiedFlight(advice, context)
+    return record ~= nil and learnedObservation(record) == true
+end
+
+-- The client itself stated this path is not learned, so the guide's
+-- acquisition directive needs no conditional hedge.
+local function explicitlyUnlearnedFlight(advice, context)
+    local record = identifiedFlight(advice, context)
+    return record ~= nil and learnedObservation(record) == false
 end
 
 local function obsoleteOnTurnIn(advice, questID)
     local source = string.lower(advice.sourceText or advice.text or "")
-    if source:find("after", 1, true) or source:find("next quest", 1, true)
-        or source:find("follow-up", 1, true) or source:find("follow up", 1, true)
-        or source:find("turn in", 1, true) or source:find("turn-in", 1, true)
-        or source:find("hand in", 1, true) then return false end
+    if mentionsAny(source, handInWords)
+        or mentionsAny(source, {"next quest", "follow-up", "follow up"}) then return false end
     if advice.kind == "technique" then return true end
     if advice.kind == "supply" then
         return source:find("for%s*%[qc%s*" .. questID .. "[%],]") ~= nil
@@ -224,8 +290,7 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
     if advice.kind == "technique" and advice.questID
         and context.questPhase(advice.questID) == "ready" then
         local text = string.lower(advice.text)
-        if not text:find("turn in", 1, true) and not text:find("turn-in", 1, true)
-            and not text:find("hand in", 1, true) and not text:find("after", 1, true)
+        if not mentionsAny(text, handInWords)
             and not text:find("completion", 1, true) then return false end
     end
     if advice.kind == "supply" then supplies(advice, context, provider) end
@@ -243,7 +308,10 @@ function EfficientQuests.ApplyLifecycle(advice, context, provider)
         local body = text:match("^%s*[^:]+:%s*(.+)$")
         if acquisition(text) or (body and acquisition(body)) then
             if knownFlight(advice, context) then return false end
-            if not text:find("already", 1, true) then
+            -- The conditional hedge stands unless the client itself stated
+            -- the path is not learned; a missing observation proves nothing.
+            if not explicitlyUnlearnedFlight(advice, context)
+                and not text:find("already", 1, true) then
                 advice.text = advice.text .. " (if you have not already learned it)"
             end
         end

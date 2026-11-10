@@ -8,6 +8,16 @@ Status: **offline verification complete; in-client and visual checks not perform
 - Offline result: all five Lua behavioral suites and both Python adaptation tests pass (103 Lua checks, 2 Python tests).
 - Nothing in this record was checked against a running Forever client, a real QuestieDB installation, a real guide installation, or FlareUI on screen. Sections "In-client checks" and "Visual checks" are checklists, not results.
 
+### Fix-round update
+
+Branch `fix/code-review-round` (code-review findings, 2026-11-10) re-verified everything offline after behavioral fixes: all five Lua suites and both Python tests pass (110 Lua checks, 2 Python tests). Changes that affect this record:
+
+- The ranking-precedence gap below is closed: `hints` now has differential tests where two candidates differ at two priorities at once and the higher must win (focused over accepted, accepted over giver distance, giver over target distance, target over level, locality tiers at an equal distance signal). The comparator was also corrected to the spec's fixed precedence — focus and acceptance now outrank the local-evidence tiers, which only order candidates equal at a location priority; the two #12-era tests that encoded tier-above-focus assert the spec order instead.
+- Chapter titles confirm locality only on exact zone-name equality; a title merely containing the zone name is unresolved and uncertain.
+- Taxi-node observations keep the client's raw state, and a state the client's enum names unlearned is explicit negative evidence (see the [consumption evidence note](consumption-evidence.md)); IC-16 below reflects that.
+- Dismissed hints are restored individually from the settings' dismissed category; restore-all remains a secondary action.
+
+
 ## What earlier rounds left open
 
 Each implementation round recorded which checks it could not perform. Consolidated, they are:
@@ -66,7 +76,7 @@ Every scenario row in the specification's acceptance table maps to offline evide
 | Useful prose has no reliable quest association | `guide`: unlinked preparation is a zone tip; `hints`: "unassociated local advice is identified" | Offline |
 | Future or remote quest needs supplies sold locally | `hints`: "local preparation for a remote focused quest" | Offline |
 | Remote focus has no locally useful advice | `hints`: "known remote advice is excluded" (remote advice for the focused quest does not fill the view) | Offline |
-| Ranking candidates differ at each priority | `hints`: focus first, accepted second; "current map quest start proximity"; "proximity and focus take precedence over lower ranking signals"; "active and ready phases do not reuse obsolete locations"; "provider turn-in spawns give ready quests a local distance signal" | Partial — no differential test isolates giver-before-target or accepted-before-giver precedence with both signals present; that order exists only in the comparator. See IC-7. |
+| Ranking candidates differ at each priority | `hints`: focus first, accepted second; "current map quest start proximity"; "proximity and focus take precedence over lower ranking signals"; "active and ready phases do not reuse obsolete locations"; "provider turn-in spawns give ready quests a local distance signal"; differential tests "focused outranks accepted with both signals competing", "accepted outranks a nearer quest start", "giver proximity outranks a nearer objective", "target proximity outranks level proximity", "locality tiers order equal distance signals" | Offline — real-client ranking (map hierarchy, actual distances, focus behavior) still needs IC-7. |
 | Player moves slightly within a distance band | `hints`: "small movement does not shuffle hints"; `ui`: "moving between distance bands refreshes visible hints" (the complement) | Offline |
 | Quest levels equally far above and below | `hints`: "equally distant levels retain stable source order" | Offline |
 | Coordinates or metadata are missing | `hints`: "unlocated quest advice does not imply local usefulness", "unmapped name mismatch remains uncertain", "unclassified waypoints do not establish turn-in proximity", missing ZoneDB bridge; `runtime`: collapsed-log uncertainty | Offline |
@@ -100,7 +110,7 @@ Every scenario row in the specification's acceptance table maps to offline evide
 ### Offline gaps, precisely
 
 - Rows "focus changes through native/Flare focus controls" and "opens details, watches, or pins" are the only rows whose offline evidence is partly or wholly structural. The addon never writes focus and never reads watch or pin state as focus; that is verified by code inspection, not by a behavioral test, because the remaining question (what the client and FlareUI do to the supertrack signal) cannot be answered offline.
-- The ranking-precedence row has no differential test for giver-before-target or accepted-before-giver ordering with both signals competing. The order is implemented in one comparator and each signal is tested separately.
+- The ranking-precedence row's offline gap (no differential test with both signals competing) was closed in the fix round above; what remains for IC-7 is the client's own map hierarchy, distance, and focus behavior.
 - The new-session row verifies persistence only within a session and the per-character saved-variables declaration. It does not verify a real reload, relogin, or a second character.
 - The Guidelime-coexistence row verifies the adaptation output only. Load order, duplicate dispatch, and namespace behavior with a genuine Guidelime need a client.
 - All "Offline (simulated ...)" rows substitute a fake tracker, bank, or map hierarchy. They verify the addon's logic, not the real interfaces' behavior or appearance.
@@ -246,9 +256,9 @@ Result: \*
 
 ### IC-16. Taxi observations
 
-Steps: find "get the flight path" advice for a point in your current zone. Open a flight master's taxi map in that zone.
+Steps: find "get the flight path" advice for a point in your current zone. Open a flight master's taxi map in that zone. Also record `/dump Enum.FlightPathState` so this build's state names are known.
 
-Expected: with unknown history, the advice says "(if you have not already learned it)". When the taxi map shows the named node as known or reachable on the current map, the acquisition reminder is suppressed and stays suppressed after the map closes. An unreachable or absent node does not change the wording. Learning a new path while the map is open is observed without reopening.
+Expected: with unknown history, the advice says "(if you have not already learned it)". When the taxi map shows the named node as known or reachable on the current map, the acquisition reminder is suppressed and stays suppressed after the map closes. An unreachable or absent node does not change the wording. If this build's `FlightPathState` enum defines a state meaning unlearned/undiscovered, a node observed in that state keeps its reminder without the conditional hedge, and learning the path later suppresses it; if the build expresses unlearned nodes any other way, those observations stay unknown (conditional wording), which is the safe direction. Learning a new path while the map is open is observed without reopening.
 
 Result: \*
 

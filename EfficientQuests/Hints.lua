@@ -1,14 +1,31 @@
 -- Rank only after local applicability has been evaluated. Guide and provider
 -- coordinate systems are not interchangeable with a client UI map ID.
+
+-- Named local-evidence classes; a bare boolean or magic string hides which
+-- claim the code is making. CONFIRMED: the client's own map data places the
+-- advice's named zone on the player's map (or an exact chapter-title match).
+-- REMOTE: the map data places that zone elsewhere, so the advice is
+-- excluded. QUEST_SUPPORTED: the advice has no location of its own, but
+-- current-phase quest activity on this map supports it. UNRESOLVED: no
+-- usable evidence; the advice stays uncertain and ranks last.
+local Locality = {
+    CONFIRMED = "confirmed",
+    REMOTE = "remote",
+    QUEST_SUPPORTED = "quest-supported",
+    UNRESOLVED = "unresolved",
+}
+
 local function localStatus(advice, context)
     local zoneName = context.zoneName
-    if not zoneName or zoneName == "" then return nil end
+    if not zoneName or zoneName == "" then return Locality.UNRESOLVED end
     if advice.location and advice.location.zone then
         local name = string.lower(advice.location.zone)
-        if name == string.lower(zoneName) then return true end
+        if name == string.lower(zoneName) then return Locality.CONFIRMED end
         -- A different name can be a subzone or alias. Only compare maps when
         -- the client's own hierarchy identifies a unique matching map.
-        if not C_Map or not C_Map.GetMapInfo or not C_Map.GetMapChildrenInfo then return nil end
+        if not C_Map or not C_Map.GetMapInfo or not C_Map.GetMapChildrenInfo then
+            return Locality.UNRESOLVED
+        end
         local ancestors, id, root = {}, context.zoneID, nil
         for _ = 1, 20 do
             local info = id and C_Map.GetMapInfo(id)
@@ -17,22 +34,22 @@ local function localStatus(advice, context)
             if not info.parentMapID or info.parentMapID == 0 then break end
             id = info.parentMapID
         end
-        if not root then return nil end
+        if not root then return Locality.UNRESOLVED end
         local maps = C_Map.GetMapChildrenInfo(root, nil, true)
-        if type(maps) ~= "table" then return nil end
+        if type(maps) ~= "table" then return Locality.UNRESOLVED end
         local match
         for _, info in ipairs(maps) do
             if type(info.name) == "string" and string.lower(info.name) == name then
-                if match and match.mapID ~= info.mapID then return nil end
+                if match and match.mapID ~= info.mapID then return Locality.UNRESOLVED end
                 match = info
             end
         end
-        if not match or not match.mapID then return nil end
-        if ancestors[match.mapID] then return true end
+        if not match or not match.mapID then return Locality.UNRESOLVED end
+        if ancestors[match.mapID] then return Locality.CONFIRMED end
         id = match.mapID
         local seen = {}
         for _ = 1, 20 do
-            if id == context.zoneID then return true end
+            if id == context.zoneID then return Locality.CONFIRMED end
             if not id or seen[id] then break end
             seen[id] = true
             local info = C_Map.GetMapInfo(id)
@@ -42,13 +59,19 @@ local function localStatus(advice, context)
         -- sufficient evidence to declare an opportunity remote.
         local current = C_Map.GetMapInfo(context.zoneID)
         local zoneType = Enum and Enum.UIMapType and Enum.UIMapType.Zone
-        if zoneType and current and current.mapType == zoneType and match.mapType == zoneType then return false end
-        return nil
+        if zoneType and current and current.mapType == zoneType and match.mapType == zoneType then
+            return Locality.REMOTE
+        end
+        return Locality.UNRESOLVED
     end
-    if advice.chapter and string.find(string.lower(advice.chapter), string.lower(zoneName), 1, true) then
-        return true
+    -- An exact chapter-title match confirms locality. A title that merely
+    -- contains the zone name ("6-9 Elwynn Forest") is an inference about
+    -- the chapter's setting, not a confirmed source fact, so it stays
+    -- unresolved and uncertain.
+    if advice.chapter and string.lower(advice.chapter) == string.lower(zoneName) then
+        return Locality.CONFIRMED
     end
-    return nil
+    return Locality.UNRESOLVED
 end
 
 local function questLevel(provider, id, context)
@@ -240,11 +263,13 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
             if not levelDistance or distance < levelDistance then levelDistance = distance end
         end
     end
-    -- Confirmed advice zones are stronger evidence than quest activity: a
-    -- local marker or turn-in never confirms where the advice itself applies.
-    local tier = localEvidence == true and 2 or (localEvidence == "quest" and 1 or 0)
-    local localFocus = focused and tier >= 1
-    advice.relevance = localFocus and "focused quest" or (accepted and "accepted quest"
+    -- Spec priority order: native focused quest, accepted quest, then the
+    -- location signals. Focus and acceptance are never gated by the
+    -- local-evidence tier; the tier only orders candidates that tie at a
+    -- location priority.
+    local tier = localEvidence == Locality.CONFIRMED and 2
+        or (localEvidence == Locality.QUEST_SUPPORTED and 1 or 0)
+    advice.relevance = focused and "focused quest" or (accepted and "accepted quest"
         or (advice.association ~= "zone" and "quest preparation" or "zone tip"))
     if tier == 0 then advice.uncertain = true end
     local words = string.lower(originalText or advice.text or '')
@@ -263,16 +288,20 @@ local function prepare(advice, context, provider, localEvidence, distances, orig
             if words:match(pattern) then availableNow = true; break end
         end
     end
-    advice._ranking = {localEvidence=tier, focused=localFocus,
-        accepted=accepted and tier >= 1, giverBand=giverBand, targetBand=targetBand,
+    advice._ranking = {localEvidence=tier, focused=focused,
+        accepted=accepted, giverBand=giverBand, targetBand=targetBand,
         levelDistance=levelDistance, availableNow=availableNow}
     return advice
 end
 
 local function before(a, b)
     local x, y = a._ranking, b._ranking
-    -- Confirmed local advice, then quest-activity support, then the rest.
-    if x.localEvidence ~= y.localEvidence then return x.localEvidence > y.localEvidence end
+    -- Fixed spec precedence: native focused quest, accepted quest, distance
+    -- to the relevant quest giver/start, distance to the relevant quest
+    -- target, proximity to level. The local-evidence tier never overrides
+    -- focus or acceptance; it orders candidates that are equal at a
+    -- location priority (a confirmed advice zone beats quest-activity
+    -- support beats unresolved at the same distance signal).
     if x.focused ~= y.focused then return x.focused end
     if x.accepted ~= y.accepted then return x.accepted end
     for _, field in ipairs({"giverBand", "targetBand"}) do
@@ -281,6 +310,7 @@ local function before(a, b)
             if y[field] == nil then return true end
             return x[field] < y[field]
         end
+        if x.localEvidence ~= y.localEvidence then return x.localEvidence > y.localEvidence end
     end
     if x.levelDistance ~= y.levelDistance then
         if x.levelDistance == nil then return false end
@@ -313,22 +343,24 @@ local function duplicateKey(advice, originalText)
 end
 
 -- A separate quest and a matching item do not prove consumption. Recognize
--- only a direct, quantified source assertion about that exact quest's use.
+-- only a direct, quantified source assertion about that exact quest's use,
+-- parsed by the guide reader into an explicit record: the same verified
+-- item, the same stated quantity repeated in the assertion, the same single
+-- quest, and no unparsed conditions.
 local function consumptionEvidence(advice, context)
-    if advice.kind ~= 'supply' or not advice.verifiedItemID or not advice.itemSourceName
-        or not advice.questID or not advice.quantity or not advice._ranking.localEvidence
+    local record = advice.consumption
+    if advice.kind ~= 'supply' or not advice.verifiedItemID or type(record) ~= 'table'
+        or type(advice.itemSourceName) ~= 'string' or type(record.itemName) ~= 'string'
+        or record.itemID ~= advice.verifiedItemID or record.questID ~= advice.questID
+        or record.quantity ~= advice.quantity or record.statedQuantity ~= record.quantity
+        or string.lower(record.itemName) ~= string.lower(advice.itemSourceName)
+        or string.lower(record.statedItemName or '') ~= string.lower(record.itemName)
+        or not advice._ranking.localEvidence
         or context.isAccepted(advice.questID) ~= true then return false end
     for _, condition in ipairs(advice.conditions or {}) do
         if condition ~= 'Quest restrictions may be incomplete.' then return false end
     end
-    local source = string.lower(advice.sourceText or ''):gsub('%s+', ' '):gsub('[%.!]%s*$', '')
-    source = source:gsub('^%s*%[g[^%]]+%]%s*', '')
-    local name = string.lower(advice.itemSourceName)
-    local assertion = '; all ' .. advice.quantity .. ' ' .. string.lower(advice.itemSourceName)
-        .. ' are consumed by that quest'
-    local expected = 'buy [ci' .. advice.verifiedItemID .. ',' .. advice.quantity .. ' ' .. name
-        .. '] for [qc' .. advice.questID .. ']' .. assertion
-    return source == expected
+    return true
 end
 
 local function aggregateConsumptions(output, context, provider, distances)
@@ -374,7 +406,7 @@ local function aggregateConsumptions(output, context, provider, distances)
             EfficientQuests.ApplyLifecycle(lead, context, provider)
             lead.uncertain = true
             lead.text = lead.text .. ' (if the guide’s stated uses apply)'
-            prepare(lead, context, provider, true, distances, lead.text)
+            prepare(lead, context, provider, Locality.CONFIRMED, distances, lead.text)
         end
     end
     local result = {}
@@ -403,13 +435,13 @@ function EfficientQuests.GetHints(packageName)
         -- A current-phase marker or provider turn-in on this map establishes
         -- local quest activity, but does not establish where the unlocated
         -- advice itself applies.
-        local unlocated = locality == nil and not (advice.location and advice.location.zone)
+        local unlocated = locality == Locality.UNRESOLVED and not (advice.location and advice.location.zone)
         local eligible = eligibleQuests(advice, context, provider)
         if unlocated and eligible then
             for _, id in ipairs(advice.eligibleQuestIDs or advice.questIDs or {}) do
                 local support = distances[id]
                 if support then
-                    locality, unlocated = "quest", false
+                    locality, unlocated = Locality.QUEST_SUPPORTED, false
                     advice.uncertain = true
                     advice.conditions = advice.conditions or {}
                     table.insert(advice.conditions, support.via == "turnin"
@@ -419,7 +451,7 @@ function EfficientQuests.GetHints(packageName)
                 end
             end
         end
-        if locality ~= false and not unlocated and eligible
+        if locality ~= Locality.REMOTE and not unlocated and eligible
             and EfficientQuests.ApplyLifecycle(advice, context, provider) then
             local key = duplicateKey(advice, originalText)
             local source = {id=advice.id, chapter=advice.chapter, sourceText=advice.sourceText,

@@ -1,5 +1,21 @@
 -- Capture current client observations. A nil value means the client could not
 -- supply the fact; absence from a partial quest log is never completion.
+
+-- The client's turn-in signal is phase-specific; IsComplete only answers
+-- when ReadyForTurnIn cannot. Neither answering leaves the phase unknown.
+local function logPhase(log, questID)
+    if log and log.ReadyForTurnIn then
+        local ready = log.ReadyForTurnIn(questID)
+        if ready ~= nil then return ready and "ready" or "active" end
+    end
+    if log and log.IsComplete then
+        local complete = log.IsComplete(questID)
+        if complete == true then return "ready" end
+        if complete == false then return "active" end
+    end
+    return nil
+end
+
 function EfficientQuests.GetContext()
     local result = { quests = {}, completedQuestIDs = {}, completeQuestLog = false }
     if UnitFactionGroup then result.faction = UnitFactionGroup("player") end
@@ -67,14 +83,7 @@ function EfficientQuests.GetContext()
                     if info.isCollapsed then complete = false end
                 elseif info.questID and info.questID ~= 0 then
                     local quest = { id = info.questID, title = info.title, level = info.level }
-                    -- ReadyForTurnIn is the phase-specific signal; IsComplete
-                    -- only answers when the client cannot.
-                    local ready = log.ReadyForTurnIn and log.ReadyForTurnIn(info.questID)
-                    if ready ~= nil then quest.phase = ready and "ready" or "active"
-                    elseif log.IsComplete then
-                        if log.IsComplete(info.questID) then quest.phase = "ready"
-                        else quest.phase = "active" end
-                    end
+                    quest.phase = logPhase(log, info.questID)
                     if log.GetQuestObjectives then quest.objectives = log.GetQuestObjectives(info.questID) end
                     result.quests[info.questID] = quest
                     count = count + 1
@@ -97,17 +106,7 @@ function EfficientQuests.GetContext()
         local quest = result.quests[questID]
         if quest and quest.phase then return quest.phase end
         if result.isAccepted(questID) ~= true then return nil end
-        -- The client's turn-in signal is phase-specific; fall back to
-        -- IsComplete only when ReadyForTurnIn cannot answer.
-        if log and log.ReadyForTurnIn then
-            local ready = log.ReadyForTurnIn(questID)
-            if ready ~= nil then return ready and "ready" or "active" end
-        end
-        if log and log.IsComplete then
-            local complete = log.IsComplete(questID)
-            if complete == true then return "ready" end
-            if complete == false then return "active" end
-        end
+        return logPhase(log, questID)
     end
     return result
 end

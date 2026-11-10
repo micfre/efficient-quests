@@ -2,9 +2,7 @@
 DEFAULT_CHAT_FRAME = {AddMessage=function() end}
 SlashCmdList = {}
 function CreateFrame() return {RegisterEvent=function() end, SetScript=function() end} end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-end
+dofile('tests/addon.lua')()
 local entity = {Get = function() end}
 LibQuestieDB = {RequireContract=function(n) return n == 1 end,
  Quest={Get=function(id, key) if key == 'questLevel' then return ({[101]=10, [102]=12, [103]=8})[id] end end},
@@ -34,7 +32,7 @@ assert(#hints == 3, 'known remote advice is excluded')
 assert(hints[1].questID == 101 and hints[1].relevance == 'focused quest', 'local focus ranks first')
 assert(hints[2].questID == 102 and hints[2].relevance == 'accepted quest', 'unwatched quest hidden by header ranks second')
 assert(hints[3].association == 'zone' and hints[3].relevance == 'zone tip', 'unassociated local advice is identified')
-print('ok - focus and accepted quests are ranked only after local relevance')
+print('ok - focused and accepted quests rank above zone tips by fixed precedence')
 focus = nil
 C_QuestLog.IsOnQuest = function() return false end
 EfficientQuests_RegisterGuide('Levels', [[
@@ -220,9 +218,11 @@ EfficientQuests_RegisterGuide('LocalFirst', [[
 ]], 'Author')
 focus = 101
 hints = EfficientQuests.GetHints('LocalFirst')
-assert(#hints == 2 and hints[1].text:find('candle'), 'known local advice precedes uncertain remote focus')
-assert(hints[2].uncertain, 'unknown location remains available with uncertainty')
-print('ok - known local advice precedes advice with uncertain location')
+assert(#hints == 2 and hints[1].text:find('torch'),
+  'native focus outranks locality evidence per the spec priority order')
+assert(hints[1].uncertain, 'focused advice with unresolved locality keeps its uncertainty flag')
+assert(hints[2].text:find('candle'), 'the confirmed local advice remains available')
+print('ok - native focus outranks locality tiers within the location signals')
 EfficientQuests_RegisterGuide('WestfallShopping', [[
 [N Elwynn Forest]
 [G40,50 Elwynn Forest] Buy these if they are missing: 1 Copper Flask. Yellow Seeds (you need 6 total) and 8 Blue Petals.
@@ -289,10 +289,12 @@ Use a net for [QC102].
 ]], 'Author')
 local tiered = EfficientQuests.GetHints('MarkerTier')
 assert(#tiered == 2, 'both supported hints remain visible')
-assert(tiered[1].text:find('candle', 1, true), 'a confirmed advice zone outranks local quest activity')
-assert(tiered[2].questID == 102 and tiered[2].uncertain,
-  'marker-supported advice stays uncertain about its own location')
-print('ok - quest markers do not outrank confirmed local advice')
+assert(tiered[1].questID == 102 and tiered[1].uncertain,
+  'acceptance outranks locality evidence per the spec priority order')
+assert(tiered[1].conditions and table.concat(tiered[1].conditions, ' '):find('Quest activity is local', 1, true),
+  'marker-supported advice keeps its visible support condition')
+assert(tiered[2].text:find('candle', 1, true), 'the confirmed zone tip remains available')
+print('ok - acceptance outranks locality tiers within the location signals')
 
 -- Ready quests have no classifiable client POI, so turn-in proximity comes
 -- from the provider's finisher spawns bridged onto the player's own map.
@@ -383,3 +385,138 @@ assert(#timedWords == 3 and timedWords[1].text:find('rope now', 1, true),
 assert(timedWords[2].text:find('later', 1, true),
   'for-now wording does not claim present availability')
 print('ok - acquisition timing words keep the present opportunity first')
+
+-- Differential ranking: two candidates that differ at two priorities at
+-- once must be ordered by the higher one. Spec precedence: native focus,
+-- acceptance, giver/start distance, target distance, level proximity.
+local levels = {}
+LibQuestieDB.Quest.Get = function(id, key) if key == 'questLevel' then return levels[id] end end
+LibQuestieDB.Support = nil
+LibQuestieDB.Npc.Get = function() end
+C_QuestLog.ReadyForTurnIn = nil
+C_QuestLog.IsComplete = function() return false end
+C_QuestLog.IsOnQuest = function(id) return id == 502 end
+focus = 501
+levels[501], levels[502] = 40, 10
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=501, mapID=1, x=0.95, y=0.5, isQuestStart=true, inProgress=false, numObjectives=0},
+  {questID=502, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('FocusBeatsAccepted', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC501].
+[G40,50 Elwynn Forest] Use a net for [QC502].
+]], 'Author')
+local focusAccepted = EfficientQuests.GetHints('FocusBeatsAccepted')
+assert(#focusAccepted == 2 and focusAccepted[1].questID == 501,
+  'native focus outranks acceptance even when the accepted quest is nearer and better leveled')
+print('ok - focused outranks accepted with both signals competing')
+
+focus = nil
+C_QuestLog.IsOnQuest = function(id) return id == 512 end
+levels[511], levels[512] = 10, 60
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=511, mapID=1, x=0.41, y=0.5, isQuestStart=true, inProgress=false, numObjectives=0},
+} end
+EfficientQuests_RegisterGuide('AcceptedBeatsGiver', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC511].
+[G40,50 Elwynn Forest] Use a net for [QC512].
+]], 'Author')
+local acceptedGiver = EfficientQuests.GetHints('AcceptedBeatsGiver')
+assert(#acceptedGiver == 2 and acceptedGiver[1].questID == 512,
+  'an accepted quest outranks an unaccepted quest with a near start and closer level')
+print('ok - accepted outranks a nearer quest start')
+
+-- A ready quest's turn-in occupies the giver slot, so it must outrank a
+-- strictly nearer objective of an active quest.
+LibQuestieDB.Support = {Get=function(name)
+  if name == 'ZoneDB' then
+    return {private={areaIdToUiMapId='return {[12]=1}',
+      areaIdToUiMapIdOverride='return {}'}} end
+end}
+LibQuestieDB.Quest.Get = function(id, key)
+  if key == 'questLevel' then return levels[id] end
+  if key == 'finishedBy' then if id == 521 then return {[1]={520}} end return {} end
+end
+LibQuestieDB.Npc.Get = function(id, key)
+  if key == 'spawns' and id == 520 then return {[12]={{65,50}}} end
+end
+C_QuestLog.IsOnQuest = function(id) return id == 521 or id == 522 end
+C_QuestLog.IsComplete = function(id) return id == 521 end
+levels[521], levels[522] = 30, 10
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=522, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('GiverBeatsTarget', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Buy [CI91,2 Flasks] for [QC521].
+[G40,50 Elwynn Forest] Buy [CI92,2 Vials] for [QC522].
+]], 'Author')
+local giverTarget = EfficientQuests.GetHints('GiverBeatsTarget')
+assert(#giverTarget == 2 and giverTarget[1].questID == 521,
+  'a turn-in distance outranks a strictly nearer objective and level')
+print('ok - giver proximity outranks a nearer objective')
+
+C_QuestLog.IsOnQuest = function(id) return id == 531 or id == 532 end
+C_QuestLog.IsComplete = function() return false end
+LibQuestieDB.Support = nil
+LibQuestieDB.Quest.Get = function(id, key) if key == 'questLevel' then return levels[id] end end
+levels[531], levels[532] = 25, 10
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=531, mapID=1, x=0.41, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+  {questID=532, mapID=1, x=0.9, y=0.5, isQuestStart=false, inProgress=true, numObjectives=1},
+} end
+EfficientQuests_RegisterGuide('TargetBeatsLevel', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC531].
+[G40,50 Elwynn Forest] Use a net for [QC532].
+]], 'Author')
+local targetLevel = EfficientQuests.GetHints('TargetBeatsLevel')
+assert(#targetLevel == 2 and targetLevel[1].questID == 531,
+  'a nearer objective outranks a strictly closer quest level')
+print('ok - target proximity outranks level proximity')
+
+-- The three locality tiers order candidates only when their distance
+-- signal is equal; all three candidates share quest 533's start band.
+C_QuestLog.IsOnQuest = function() return false end
+levels[533] = 10
+C_QuestLog.GetQuestsOnMap = function() return {
+  {questID=533, mapID=1, x=0.9, y=0.5, isQuestStart=true, inProgress=false, numObjectives=0},
+} end
+EfficientQuests_RegisterGuide('TierOrder', [[
+[N Elwynn Forest]
+[G40,50 Elwynn Forest] Use a torch for [QC533].
+Use a net for [QC533].
+[G40,50 Far Unknown Hamlet] Use a rope for [QC533].
+]], 'Author')
+local tierOrder = EfficientQuests.GetHints('TierOrder')
+assert(#tierOrder == 3, 'all three locality evidence classes remain visible')
+assert(tierOrder[1].text:find('torch', 1, true),
+  'a confirmed advice zone orders first among equal distance signals')
+assert(tierOrder[2].text:find('net', 1, true) and tierOrder[2].uncertain,
+  'quest-activity support orders between confirmed and unresolved locality')
+assert(tierOrder[3].text:find('rope', 1, true) and tierOrder[3].uncertain,
+  'unresolved locality orders last among equal distance signals')
+print('ok - locality tiers order equal distance signals')
+
+-- A chapter title that merely contains the zone name is an inference about
+-- the chapter's setting, not a confirmed source fact; only an exact match
+-- confirms. Unlocated advice without quest-activity support stays withheld.
+C_QuestLog.GetQuestsOnMap = function() return {} end
+EfficientQuests_RegisterGuide('ChapterEvidence', [[
+[N 6-9 Elwynn Forest]
+Use a torch for [QC533].
+[G40,50 Elwynn Forest] Use a net for [QC533].
+]], 'Author')
+local chapterEvidence = EfficientQuests.GetHints('ChapterEvidence')
+assert(#chapterEvidence == 1 and chapterEvidence[1].text:find('net', 1, true),
+  'a chapter title containing the zone name does not confirm locality')
+EfficientQuests_RegisterGuide('ChapterExact', [[
+[N Elwynn Forest]
+Use a torch for [QC533].
+]], 'Author')
+local chapterExact = EfficientQuests.GetHints('ChapterExact')
+assert(#chapterExact == 1 and chapterExact[1].text:find('torch', 1, true),
+  'an exact chapter-title zone match remains confirmed')
+print('ok - chapter titles confirm locality only on exact zone-name equality')

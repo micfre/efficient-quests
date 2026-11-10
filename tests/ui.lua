@@ -71,9 +71,7 @@ local function click(name)
   assert(frame.shown ~= false and frame.scripts.OnClick, 'widget cannot be clicked: '..name)
   frame.scripts.OnClick(frame)
 end
-for line in io.lines('EfficientQuests/EfficientQuests.toc') do
-  if line:match('%.lua$') then assert(loadfile('EfficientQuests/' .. line))('EfficientQuests', {}) end
-end
+dofile('tests/addon.lua')()
 local entity = {Get=function() end}
 LibQuestieDB = {RequireContract=function(n) return n == 1 end,
   Quest=entity, Npc=entity, Item=entity, Object=entity}
@@ -101,12 +99,24 @@ click('EfficientQuestsHint1')
 assert(widgets.EfficientQuestsDetail1.text:find('Author',1,true), 'expanded advice shows source attribution')
 click('EfficientQuestsDismiss1')
 assert(not widgets.EfficientQuestsHint1.text:find('Apple',1,true), 'dismissed hint disappears')
+click('EfficientQuestsDismiss1')
+assert(not widgets.EfficientQuestsHint1.text:find('Bread',1,true), 'second dismissed hint disappears')
 SlashCmdList.EFFICIENTQUESTS('')
 assert(widgets.EfficientQuestsSettings:IsShown(), 'settings open without FlareUI')
 click('EfficientQuestsCategoryDismissed')
+assert(widgets.EfficientQuestsDismissedLabel1.text:find('Apple',1,true),
+  'the dismissed-hints view names each dismissed hint')
+assert(widgets.EfficientQuestsDismissedLabel2.text:find('Bread',1,true),
+  'every dismissed hint has its own restore control')
+click('EfficientQuestsRestoreHint1')
+assert(widgets.EfficientQuestsHint1.text:find('Apple',1,true), 'restoring one hint returns it immediately')
+assert(not widgets.EfficientQuestsHint1.text:find('Bread',1,true)
+  and not widgets.EfficientQuestsHint2.text:find('Bread',1,true),
+  'restoring one hint leaves the other dismissal intact')
 click('EfficientQuestsRestore')
-assert(widgets.EfficientQuestsHint1.text:find('Apple',1,true), 'restoring dismissed hints makes them available again')
-print('ok - compact standalone hints, deliberate expansion, dismissal and restore')
+assert(widgets.EfficientQuestsHint2.text:find('Bread',1,true),
+  'restore all returns every remaining dismissed hint')
+print('ok - compact standalone hints, deliberate expansion, per-hint dismissal and restore')
 LibQuestieDB = nil
 event('PLAYER_ENTERING_WORLD')
 assert(widgets.EfficientQuestsStatus.text:find('QuestieDB',1,true), 'provider failure is visible')

@@ -11,7 +11,7 @@ lua5.1 tests/ui.lua
 python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
-The Lua tests load the addon files and simulate the game, QuestieDB, and FlareUI. They cover guide extraction, setup status, player context, local relevance and ranking, supply and consumption observations, flight-path observations, and interface actions. The Python tests exercise the local guide adaptation tool.
+The Lua tests load the addon files and simulate the game, QuestieDB, and FlareUI. Each suite loads the addon through the shared `tests/addon.lua` loader, which runs the files in the TOC's order, and every suite remains individually runnable. They cover guide extraction, setup status, player context, local relevance and ranking, supply and consumption observations, flight-path observations, and interface actions. The Python tests exercise the local guide adaptation tool.
 
 ## Extraction audit
 

@@ -8,6 +8,11 @@ local professions = {mining=true, skinning=true, herbalism=true, enchanting=true
   engineering=true, blacksmithing=true, cooking=true, fishing=true, tailoring=true,
   leatherworking=true, alchemy=true, ['first aid']=true}
 
+-- Travel-opportunity wording shared by the usefulness screen and the kind
+-- classifier; both must recognize the same phrases.
+local travelWords = {'flight path', 'flightpath', 'flight master', 'flight point',
+  'gryphon point', 'wind rider point'}
+
 local function trim(s) return (s:gsub('^%s+', ''):gsub('%s+$', '')) end
 local function compare(left, operator, right)
   if operator == '<' then return left < right end
@@ -176,12 +181,13 @@ local function useful(line)
   -- Practical wording is prose, not tag metadata, and a retention "keep"
   -- takes an object: a bare "keep" before punctuation is a fortress name.
   local words = s:gsub('%b[]', '')
+  local travel = false
+  for _, phrase in ipairs(travelWords) do
+    if words:find(phrase, 1, true) then travel = true; break end
+  end
   return words:find('buy', 1, true) or words:find('%f[%a]keep[!%s]')
       or words:find('save', 1, true) or words:find('sell', 1, true)
-      or words:find('stock up', 1, true) or words:find('flight path', 1, true)
-      or words:find('flightpath', 1, true) or words:find('flight master', 1, true)
-      or words:find('flight point', 1, true) or words:find('gryphon point', 1, true)
-      or words:find('wind rider point', 1, true)
+      or words:find('stock up', 1, true) or travel
       or words:find('needed for', 1, true) or words:find('quest items', 1, true)
       or (words:find('escort quest', 1, true) and words:find('group', 1, true)
           and words:find('turn', 1, true))
@@ -304,9 +310,9 @@ end
 
 local function adviceKind(excerpt, item)
   local s = excerpt:lower()
-  if s:find('flight path', 1, true) or s:find('flightpath', 1, true)
-      or s:find('flight master', 1, true) or s:find('flight point', 1, true)
-      or s:find('gryphon point', 1, true) or s:find('wind rider point', 1, true) then return 'flight' end
+  for _, phrase in ipairs(travelWords) do
+    if s:find(phrase, 1, true) then return 'flight' end
+  end
   if item or s:match('keep[%s!]+%d') or s:match('save[%s!]+%d') then return 'supply' end
   if s:find('escort quest', 1, true) and s:find('group', 1, true) and s:find('turn', 1, true) then return 'technique' end
   if s:gsub('questitem', 'quest item'):find('quest item', 1, true) and s:find('spawn', 1, true) then return 'technique' end
@@ -345,6 +351,24 @@ local function learningStates(line, context)
     states[#states + 1] = state
   end
   return states
+end
+
+-- A guide can state outright that the purchased items are consumed by the
+-- referenced quest ("Buy [CI42,3 Apples] for [QC201]; all 3 Apples are
+-- consumed by that quest."). Guide.lua owns this prose format: it is
+-- parsed once here into an explicit record so no later stage re-derives
+-- serialized text to compare against it.
+local function consumptionAssertion(excerpt)
+  local normalized = excerpt:gsub('%s+', ' ')
+  local leading = normalized:match('^%s*%[G[^%]]+%]%s*')
+  if leading then normalized = normalized:sub(#leading + 1) end
+  normalized = normalized:gsub('[%.!]%s*$', '')
+  local itemID, quantity, name, questID, statedQuantity, statedName =
+    normalized:match('^[Bb]uy%s+%[CI(%d+)%s*,%s*(%d+)%s+([^%]]+)%]%s+for%s+%[QC(%d+)%]%s*;%s*all%s+(%d+)%s+([^;]+)%s+are%s+consumed%s+by%s+that%s+quest%s*$')
+  if not itemID then return nil end
+  return {itemID=tonumber(itemID), quantity=tonumber(quantity), itemName=trim(name),
+    questID=tonumber(questID), statedQuantity=tonumber(statedQuantity),
+    statedItemName=trim(statedName)}
 end
 
 function EQ.ExtractGuide(packageName, context)
@@ -431,6 +455,7 @@ function EQ.ExtractGuide(packageName, context)
                 itemSourceName=itemName,
                 kind=kind,
                 learningState=learning,
+                consumption=consumptionAssertion(excerpt),
                 location=loc, conditions=unknown, uncertain=#unknown > 0,
                 sourceOrder=#result + 1,
               }
