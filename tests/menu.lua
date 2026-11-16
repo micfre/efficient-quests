@@ -279,3 +279,15 @@ assert(not menu:IsShown(), 'a click on the close button must hide the menu')
 EfficientQuests.Menu.Open()
 assert(menu:IsShown(), 'Open must bring the hidden menu back')
 print('ok - the close button hides the menu and Open brings it back')
+
+-- A quest the data store holds nothing for -- a data snapshot can lag
+-- behind the game -- still lists, under its id in plain words, and the
+-- menu keeps working.
+store.skip(999999)
+EfficientQuests.Menu.Open()
+local unknownTexts = textsOf(menu)
+assert(unknownTexts['Quest 999999'],
+  'a quest missing from the data must list under its id in plain words')
+assert(unknownTexts['Stonetalon Standstill'],
+  'the known quests must stay listed beside the unknown one')
+print('ok - a quest missing from the data lists under its id')
