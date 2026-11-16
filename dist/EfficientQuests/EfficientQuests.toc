@@ -36,6 +36,11 @@ DataStore.lua
 # the quest state callbacks to the character stores.
 RoutePlanner.lua
 
+# The step model turns a route entry into a step -- plain data for the
+# step window -- and answers the step of one quest for the Follow mode
+# controller. It holds no frames; the window renders what it answers.
+StepModel.lua
+
 # The QuestieDB fallback appends its lookups after the data store's own,
 # so the store always wins and QuestieDB answers only what the store
 # lacks. It loads last of the lookup modules, and its missing-data
