@@ -26,5 +26,9 @@ DungeonGuides.lua
 # exposes the data snapshot identity for the status command.
 DataStore.lua
 
+# The options panel is a window of our own; it opens from the step window
+# and from the /eq command, so it builds itself only on first open.
+Options.lua
+
 # Interface.lua is the old window module. It stays in this folder as a
 # frozen reference for the new step window and is never loaded.
