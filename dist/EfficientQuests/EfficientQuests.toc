@@ -66,6 +66,12 @@ Menu.lua
 # action. It loads after every module it asks.
 StepWindow.lua
 
+# The look adapter restyles the step window after the FlareUI tracker and
+# docks it below that frame. It is the only module that may touch
+# FlareUI, so it loads after the step window it restyles, and it listens
+# for the window's own changed signal to re-apply the look.
+LookAdapter.lua
+
 # The TomTom bridge keeps one TomTom waypoint on the place of the step the
 # window stands on. It listens for the window's WindowChanged callback, so
 # it loads after the step window it follows.
