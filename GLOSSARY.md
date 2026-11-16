@@ -11,6 +11,7 @@ This glossary defines the domain terms of the Efficient Quests addon. The specif
 - Leveling guide: the guide that shows one step at a time from the Path.
 - Look adapter: the module that copies the backdrop, the colors, and the fonts of the FlareUI tracker when FlareUI is loaded. Without FlareUI, it gives the window a flat look.
 - Near hand-in first: the rule that puts a finished quest at the front of the route while its hand-in point is close to the player.
+- Own quest: a quest in the log that the Path itself does not do. It stays on the route until the player hands it in.
 - Path: the fixed order of quests from level 1 to level 60 that the addon uses as its default route.
 - Quest state reader: the module that reads the quest log, the completed quests, the objective counts, the level, the race, the class, and the faction. It is the only module that talks to the quest functions of the game.
 - QuestieDB fallback: the fallback in which the quest state reader asks QuestieDB for the name and the coordinates of a quest or an NPC that the data store lacks. It never replaces data that the store already has.

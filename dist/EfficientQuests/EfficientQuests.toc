@@ -31,6 +31,11 @@ DungeonGuides.lua
 # exposes the data snapshot identity for the status command.
 DataStore.lua
 
+# The route planner walks the Path from the data store and the quest state
+# and answers the route the step model and the window show. It also wires
+# the quest state callbacks to the character stores.
+RoutePlanner.lua
+
 # The options panel is a window of our own; it opens from the step window
 # and from the /eq command, so it builds itself only on first open.
 Options.lua
