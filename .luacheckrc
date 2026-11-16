@@ -31,6 +31,8 @@ globals = {
   "GetQuestsCompleted",
   "WOW_PROJECT_ID",
   "WOW_PROJECT_CAMELOT",
+  -- The optional TomTom addon puts its table in a global when it loads.
+  "TomTom",
   -- The library manager of the embedded libraries.
   "LibStub",
 }
