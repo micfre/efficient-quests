@@ -640,12 +640,13 @@ assert(not texts['Next steps'],
   'the next-steps list must leave the screen while following')
 click(rowOfText(win, 'Pick up Bone chips'))
 texts = textsOf(win)
-assert(EfficientQuests.followMode.GetFollowState().active == false,
-  'a click on the step must leave Follow mode')
+assert(EfficientQuests.followMode.GetFollowState().active == true
+    and EfficientQuests.followMode.GetFollowState().questID == nil,
+  'a click on the step must clear the pick while Follow mode stays on')
 assert(texts['Pick up Wolf pelts'] and texts['Step 1 / 7'],
   'the click must return the window to the route')
-assert(followCheck.checked == false,
-  'the Follow tick must show the mode off after the return')
+assert(followCheck.checked == true,
+  'the Follow tick must stay on after the return: only the tick turns the mode off')
 print('ok - the Follow toggle, the followed step, and the click back to the route')
 
 -- Hide and show: the X control takes the window off the screen, the show
