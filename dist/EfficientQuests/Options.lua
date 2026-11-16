@@ -16,6 +16,14 @@ local WIDTH = 320
 -- up trailing digits from a drag.
 local STEP = 0.05
 
+local function snap(value)
+  return math.floor(value / STEP + 0.5) * STEP
+end
+
+local function percent(value)
+  return string.format("%d%%", math.floor(value * 100 + 0.5))
+end
+
 local panel
 local checks, sliders
 
@@ -91,8 +99,9 @@ local function build()
   end
 
   -- A slider with its value written out as a percentage beside it, the
-  -- range rows of the FlareUI options in miniature.
-  local function sliderRow(labelText, low, high)
+  -- range rows of the FlareUI options in miniature. The value snaps to
+  -- the step as it moves and lands in the saved table at once.
+  local function sliderRow(labelText, low, high, apply)
     local rowFrame = row(labelText)
     local value = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     value:SetPoint("RIGHT", rowFrame, "RIGHT", -8, 0)
@@ -104,6 +113,12 @@ local function build()
     slider:SetMinMaxValues(low, high)
     slider:SetValueStep(STEP)
     slider:SetObeyStepOnDrag(true)
+    slider:SetScript("OnValueChanged", function(_, moved)
+      moved = snap(moved)
+      slider:SetValue(moved)
+      value:SetText(percent(moved))
+      apply(moved)
+    end)
     return { control = slider, value = value }
   end
 
@@ -112,8 +127,8 @@ local function build()
     locked = checkRow("Lock window", function(on) EfficientQuestsDB.locked = on end),
   }
   sliders = {
-    scale = sliderRow("Scale", 0.5, 1.5),
-    opacity = sliderRow("Opacity", 0.2, 1),
+    scale = sliderRow("Scale", 0.5, 1.5, function(v) EfficientQuestsDB.scale = v end),
+    opacity = sliderRow("Opacity", 0.2, 1, function(v) EfficientQuestsDB.opacity = v end),
   }
 end
 
@@ -125,10 +140,10 @@ local function refresh()
   checks.locked:SetChecked(EfficientQuestsDB.locked)
   local scale = sliders.scale
   scale.control:SetValue(EfficientQuestsDB.scale)
-  scale.value:SetText(string.format("%d%%", math.floor(EfficientQuestsDB.scale * 100 + 0.5)))
+  scale.value:SetText(percent(EfficientQuestsDB.scale))
   local opacity = sliders.opacity
   opacity.control:SetValue(EfficientQuestsDB.opacity)
-  opacity.value:SetText(string.format("%d%%", math.floor(EfficientQuestsDB.opacity * 100 + 0.5)))
+  opacity.value:SetText(percent(EfficientQuestsDB.opacity))
 end
 
 EQ.Options = {}

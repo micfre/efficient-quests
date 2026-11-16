@@ -191,6 +191,29 @@ assert(EfficientQuestsDB.locked == false,
   'a second click must unlock the window again')
 print('ok - the window lock persists to the saved table on click')
 
+-- A drag on a slider, the way the client reports it: OnValueChanged with
+-- the new position. The value must land in the saved table as it moves,
+-- snapped to the step the slider promises, and the row must write the new
+-- percentage out.
+local function drag(slider, value)
+  slider.value = value
+  local handler = slider.scripts.OnValueChanged
+  if handler then handler(slider, value) end
+end
+
+local scaleRow, scaleSlider = rowByLabel('Scale'), control(rowByLabel('Scale'), 'Slider')
+drag(scaleSlider, 0.75)
+assert(EfficientQuestsDB.scale == 0.75,
+  'dragging the scale slider to 0.75 must save 0.75')
+assert(showsText(scaleRow, '75%'), 'the scale row must write out the new 75%')
+local opacityRow = rowByLabel('Opacity')
+local opacitySlider = control(opacityRow, 'Slider')
+drag(opacitySlider, 0.5)
+assert(EfficientQuestsDB.opacity == 0.5,
+  'dragging the opacity slider to 0.5 must save 0.5')
+assert(showsText(opacityRow, '50%'), 'the opacity row must write out the new 50%')
+print('ok - the sliders persist to the saved table as they move')
+
 -- A saved session: the player changed the options earlier, and the panel
 -- must show those values, not the defaults, every time it opens.
 EfficientQuestsDB.waypoints = false
