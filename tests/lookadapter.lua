@@ -546,7 +546,17 @@ print('ok - the look follows the world across refreshes')
 -- The real copied data through the shared seam, with FlareUI present:
 -- the whole addon loads the way the game loads it -- the look adapter
 -- last, after the step window it restyles -- and the window comes up
--- docked under the tracker with its look.
+-- docked under the tracker with its look. The whole addon includes the
+-- TomTom bridge now, so the sentinel gives way to a quiet fake here: the
+-- bridge may set its one waypoint, while the hand-loaded scenarios above
+-- keep the promise that the look adapter itself never calls TomTom.
+TomTom = {
+  IsCrazyArrowEmpty = function() return true end,
+  AddWaypoint = function(_, map, x, y, opts)
+    return { map, x, y, title = opts and opts.title, from = opts and opts.from }
+  end,
+  RemoveWaypoint = function() end,
+}
 frames = {}
 EfficientQuestsDB, EfficientQuestsCharacter = {}, {}
 local realTracker = flareTracker()
