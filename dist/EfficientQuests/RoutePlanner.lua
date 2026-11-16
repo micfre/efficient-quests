@@ -14,7 +14,9 @@
 --       first, whatever the order of the Path
 --   { kind = "do" or "turnin", questID = number, own = true }
 --       a quest from the log that the Path itself does not do; it stays
---       on the route until the player hands it in
+--       on the route until the player hands it in, also when the data
+--       store knows no facts for it (story 20): the step model then
+--       builds its step from the live log
 --   { kind = "levelup", level = number }
 --       the "Level up to N" step: always the last entry, present when the
 --       next quests of the Path need a higher level than the player has
@@ -240,10 +242,11 @@ local function build()
     -- Quests in the log that the walk did not place: the Path either does
     -- them before the join point or not at all. They stay on the route
     -- until the player hands them in, at the end and marked as the own
-    -- work of the player.
+    -- work of the player -- also the ones the data store knows no facts
+    -- for (story 20): what the log holds, the route keeps.
     local own = {}
     for id in pairs(log) do
-        if quests[id] and not carried[id] and not emitted["a:" .. id]
+        if not carried[id] and not emitted["a:" .. id]
             and not emitted["d:" .. id] and not emitted["t:" .. id]
             and not store.isSkipped(id) and not store.isAbandoned(id) then
             own[#own + 1] = id

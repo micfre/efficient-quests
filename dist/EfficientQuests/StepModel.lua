@@ -59,15 +59,19 @@
 --                   of the route planner documents. The hunts block is
 --                   built against the route the planner answers right
 --                   now; an entry from an older route still finds its
---                   place on it by kind and quest id.
+--                   place on it by kind and quest id. A work or hand-in
+--                   entry of a quest the data knows no facts for gets
+--                   its step from the live log alone.
 --   GetStepForQuest(questID)  the step of one quest, for the Follow
 --                   mode controller (#34): the quest the player picked.
 --                   A quest in the log gets its work step, or its
 --                   hand-in step once every goal is done -- never a
 --                   pick-up step, so a quest just accepted never counts
---                   as a pick-up. A quest the player does not have gets
---                   its pick-up step. A quest handed in or missing from
---                   the data answers nil.
+--                   as a pick-up; a log quest the data knows no facts
+--                   for gets its step from the live log alone. A quest
+--                   the player does not have gets its pick-up step. A
+--                   quest handed in, or one that is neither in the log
+--                   nor in the data, answers nil.
 
 local _, ns = ...
 local reader = EfficientQuests.questState
@@ -102,9 +106,11 @@ local function yards(a, b)
 end
 
 -- The name of an objective target at index i of the quest's data targets:
--- the target's own name, else the npc or object name from the tables.
+-- the target's own name, else the npc or object name from the tables. A
+-- quest without data facts answers nothing.
 local function targetName(q, index)
-    local t = q[26] and q[26][index]
+    local targets = q and q[26]
+    local t = targets and targets[index]
     if type(t) ~= "table" then return nil end
     if t[1] then return t[1] end
     if t[2] and t[2][1] then
@@ -130,7 +136,7 @@ local function logGoal(q, name, index, objective)
     if not text:find("%a") then
         text = targetName(q, index) or name
     end
-    local t = q[26] and q[26][index]
+    local t = q and q[26] and q[26][index]
     return {
         kind = "objective",
         done = objective.finished == true or have >= need,
@@ -144,7 +150,8 @@ end
 
 -- The goal lines of one quest's work: the live objectives of the log when
 -- the quest is taken and the log reports them, else the data targets with
--- their counts. Answers whether any goal line came out.
+-- their counts. Answers whether any goal line came out. A quest without
+-- data facts answers its live objectives or nothing.
 local function goalLines(q, entry, name, lines)
     local counted = false
     if entry and type(entry.objectives) == "table" then
@@ -154,7 +161,7 @@ local function goalLines(q, entry, name, lines)
         end
     end
     if counted then return true end
-    if type(q[26]) ~= "table" then return false end
+    if type(q) ~= "table" or type(q[26]) ~= "table" then return false end
     for index, t in ipairs(q[26]) do
         local need = (t[4] and t[4] > 0) and t[4] or 1
         local done = (entry and entry.complete) or false
@@ -325,6 +332,42 @@ local function huntsOf(questID)
     return hunts
 end
 
+-- The step of a quest the data store knows no facts for, built from the
+-- live log alone (story 20): the title from the log through the reader's
+-- QuestName, the goals from the live objectives, and no place, no
+-- rewards, and no waypoint candidates -- the data knows none.
+local function logStep(entry, logEntry)
+    local name = reader.QuestName(entry.questID) or ("Quest " .. entry.questID)
+    if entry.kind == "turnin" then
+        return {
+            kind = "turnin", questID = entry.questID,
+            own = entry.own, near = entry.near,
+            headline = "Hand in " .. name,
+            lines = {
+                { kind = "turnin", done = logEntry.complete == true,
+                    text = "Turn in " .. name },
+            },
+            point = nil, points = {},
+        }
+    end
+    local lines = {
+        { kind = "quest", done = logEntry.complete == true, text = name },
+    }
+    local hasGoals = goalLines(nil, logEntry, name, lines)
+    if not hasGoals then
+        lines[#lines + 1] = {
+            kind = "info", done = false,
+            text = "See the quest log for what to do.",
+        }
+    end
+    return {
+        kind = "do", questID = entry.questID, own = entry.own,
+        headline = hasGoals and ("Do " .. name) or ("Go to " .. name),
+        lines = lines,
+        point = nil, points = {},
+    }
+end
+
 --- The step of one route entry, in the shape the header of this module
 --- documents.
 function model.GetStep(entry)
@@ -341,7 +384,16 @@ function model.GetStep(entry)
         }
     end
     local q = ns.quests[entry.questID]
-    if not q then return nil end
+    if not q then
+        -- A quest the data knows no facts for: only the log can still
+        -- serve it -- the own work of story 20. Everything else, above
+        -- all a pick-up, has nothing to show.
+        local logEntry = reader.GetQuest(entry.questID)
+        if logEntry and (entry.kind == "do" or entry.kind == "turnin") then
+            return logStep(entry, logEntry)
+        end
+        return nil
+    end
     local name = reader.QuestName(entry.questID) or q[1]
     local rewards = rewardsOf(q)
     if entry.kind == "pickup" then
@@ -408,15 +460,16 @@ end
 
 --- The step of one quest, for the Follow mode controller (#34), in the
 --- shape the header of this module documents: a quest in the log never
---- gets a pick-up step, a quest handed in or unknown answers nil.
+--- gets a pick-up step -- the data serves it, or the live log does when
+--- the data knows no facts for it -- and a quest handed in or unknown
+--- answers nil.
 function model.GetStepForQuest(questID)
-    local q = ns.quests[questID]
-    if not q then return nil end
     local logEntry = reader.GetQuest(questID)
     if logEntry then
         local kind = logEntry.complete and "turnin" or "do"
         return model.GetStep({ kind = kind, questID = questID })
     end
+    if not ns.quests[questID] then return nil end
     if reader.IsCompleted(questID) then return nil end
     return model.GetStep({ kind = "pickup", questID = questID })
 end
