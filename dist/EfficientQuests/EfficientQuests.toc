@@ -61,5 +61,7 @@ Options.lua
 # anchor of Menu.Open. Without an anchor it sits at a fixed screen spot.
 Menu.lua
 
-# Interface.lua is the old window module. It stays in this folder as a
-# frozen reference for the new step window and is never loaded.
+# The step window is the addon's face: it renders the step the model
+# builds, pages the route, follows the picked quest, and offers the skip
+# action. It loads last, after every module it asks.
+StepWindow.lua

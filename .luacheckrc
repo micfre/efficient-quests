@@ -18,12 +18,11 @@ globals = {
   "DEFAULT_CHAT_FRAME",
   "UIParent",
   "GameTooltip",
-  "WorldMapFrame",
-  "QuestMapFrame_OpenToQuestDetails",
   "C_Map",
   "C_QuestLog",
   "C_SuperTrack",
   "C_Timer",
+  "GetScreenHeight",
   "UnitLevel",
   "UnitRace",
   "UnitClass",
@@ -51,13 +50,4 @@ exclude_files = {
   "dist/EfficientQuests/QuestData.lua",
   "dist/EfficientQuests/PathData.lua",
   "dist/EfficientQuests/DungeonGuides.lua",
-}
-
-files = {
-  ["dist/EfficientQuests/Interface.lua"] = {
-    -- The old window module stays in the folder as an unloaded reference
-    -- for the new step window. Nobody restyles a reference, so its long
-    -- lines are not a defect.
-    max_line_length = false,
-  },
 }
