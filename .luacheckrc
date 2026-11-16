@@ -43,6 +43,13 @@ exclude_files = {
   "dist/EfficientQuests/Libs/LibStub/LibStub.lua",
   "dist/EfficientQuests/Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua",
   "dist/EfficientQuests/Libs/HereBeDragons/HereBeDragons-2.0.lua",
+  -- The generated Trailwright tables are verbatim copies of generated
+  -- data; see THIRD_PARTY.md. Generated data has long lines and its own
+  -- layout, so luacheck does not check it. The suites load every byte of
+  -- it, so a broken file cannot slip in unnoticed.
+  "dist/EfficientQuests/QuestData.lua",
+  "dist/EfficientQuests/PathData.lua",
+  "dist/EfficientQuests/DungeonGuides.lua",
 }
 
 files = {

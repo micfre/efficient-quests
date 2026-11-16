@@ -11,8 +11,12 @@ The directory `prior_art/` holds local reference copies of most sources. Git doe
 - Source: the Trailwright addon, https://trailwrightguides.com. The local reference copy is `prior_art/Trailwright/`.
 - License: GPL-3.0-or-later, as its manifest and its own third-party file state.
 - Version: 0.1.81-beta, from its manifest, and 1.51.0, from its README. The two numbers do not agree. The record keeps both.
-- Status: not copied yet. Later tickets port the quest engine and copy the generated quest tables from this one-time snapshot. There are no ongoing merges. The copied data carries the credits of the Trailwright third-party file, which include its QuestieDB origin.
-- Copied on: nothing copied yet.
+- Status: copied. The generated data tables were copied verbatim from this one-time snapshot. There are no ongoing merges, and the data cannot be regenerated: the Trailwright generators are not in the local copy. What was copied on 2026-11-16:
+  - `QuestData.lua` ships verbatim as `dist/EfficientQuests/QuestData.lua`: the quest table (38 fields per quest, about 23,500 quests) and the name, spawn, service, and tip tables around it.
+  - `PathData.lua` ships verbatim as `dist/EfficientQuests/PathData.lua`: the Path, version 15, one event line per start area from level 1 to level 60.
+  - `DungeonGuide.lua`, lines 13 to 1046 (the `GUIDES` stop lists and their comments, nothing else), ships verbatim as `dist/EfficientQuests/DungeonGuides.lua`: the dungeon guide stops with their approach and mechanics texts. The texts are Trailwright's own words, written for the Classic versions of the dungeons; WoW Forever can differ.
+- The copied data carries the credits of the Trailwright third-party file, which include its QuestieDB origin.
+- Copied on: 2026-11-16.
 
 ## Embedded libraries
 
