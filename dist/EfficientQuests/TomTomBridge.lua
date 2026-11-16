@@ -50,11 +50,10 @@
 
 local reader = EfficientQuests.questState
 local window = EfficientQuests.StepWindow
+local geo = EfficientQuests.geo
 
 local bridge = {}
 EfficientQuests.TomTomBridge = bridge
-
-local HBD = LibStub("HereBeDragons-2.0")
 
 local uid -- the uid of our own waypoint; the only one this module removes
 
@@ -79,17 +78,8 @@ end
 -- A well-formed candidate point of the step model: { uiMapID, x, y } in
 -- percent.
 local function validPoint(point)
-    return type(point) == "table" and type(point[1]) == "number"
-        and type(point[2]) == "number" and type(point[3]) == "number"
-end
-
--- The world position of one candidate point, in yards, or nil when the
--- maps know the place no better than that.
-local function worldOf(point)
-    local x, y, instance = HBD:GetWorldCoordinatesFromZone(
-        point[2] / 100, point[3] / 100, point[1])
-    if not x then return nil end
-    return { x, y, instance }
+    return type(point) == "table" and type(geo.uiMapID(point)) == "number"
+        and type(geo.x(point)) == "number" and type(geo.y(point)) == "number"
 end
 
 -- The candidate the player stands closest to, in true yards on the
@@ -100,10 +90,9 @@ local function nearestOf(points, here)
     local best, bestYards = points[1], math.huge
     for _, point in ipairs(points) do
         if validPoint(point) then
-            local place = worldOf(point)
-            if place and place[3] == here[3] then
-                local dx, dy = place[1] - here[1], place[2] - here[2]
-                local yards = math.sqrt(dx * dx + dy * dy)
+            local place = geo.worldOf(point)
+            if place and geo.sameContinent(place, here) then
+                local yards = geo.yards(place, here)
                 if yards < bestYards then best, bestYards = point, yards end
             end
         end
@@ -127,15 +116,16 @@ end
 -- second marker beside the first.
 local function placeWaypoint(point, title)
     removeOurs()
-    uid = TomTom:AddWaypoint(point[1], point[2] / 100, point[3] / 100, {
-        title = title,
-        from = "Efficient Quests",
-        -- One session only: a persisted step waypoint would outlive the
-        -- addon's control and break the removal stories -- the marker of
-        -- a step that ended, a quest the player skipped, or a window the
-        -- player hid must not come back at the next login.
-        persistent = false,
-    })
+    uid = TomTom:AddWaypoint(geo.uiMapID(point), geo.x(point) / 100,
+        geo.y(point) / 100, {
+            title = title,
+            from = "Efficient Quests",
+            -- One session only: a persisted step waypoint would outlive the
+            -- addon's control and break the removal stories -- the marker of
+            -- a step that ended, a quest the player skipped, or a window the
+            -- player hid must not come back at the next login.
+            persistent = false,
+        })
 end
 
 -- Whether the standing waypoint already sits on this exact place, so a

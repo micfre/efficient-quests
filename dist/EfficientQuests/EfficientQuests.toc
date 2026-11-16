@@ -31,6 +31,11 @@ DungeonGuides.lua
 # exposes the data snapshot identity for the status command.
 DataStore.lua
 
+# The geo helper owns the world walk and the yard distances through the
+# embedded HereBeDragons; the route planner, the step model, and the
+# TomTom bridge ask it.
+Geo.lua
+
 # The route planner walks the Path from the data store and the quest state
 # and answers the route the step model and the window show. It also wires
 # the quest state callbacks to the character stores.

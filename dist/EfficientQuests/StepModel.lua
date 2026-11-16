@@ -76,6 +76,7 @@
 local _, ns = ...
 local reader = EfficientQuests.questState
 local planner = EfficientQuests.routePlanner
+local geo = EfficientQuests.geo
 
 local model = {}
 EfficientQuests.stepModel = model
@@ -85,25 +86,6 @@ EfficientQuests.stepModel = model
 -- at most, counting the step itself (Trailwright's group cap of four).
 local HUNTS_YARDS = 700
 local HUNTS_MAX = 4
-
-local HBD = LibStub("HereBeDragons-2.0")
-
--- The world position of a data point { map, x%, y% } in yards, through the
--- embedded HereBeDragons, cached per point because the data never moves.
-local worldCache = {}
-local function worldOf(point)
-    if worldCache[point] == nil then
-        local x, y, instance = HBD:GetWorldCoordinatesFromZone(
-            point[2] / 100, point[3] / 100, point[1])
-        worldCache[point] = x and { x, y, instance } or false
-    end
-    return worldCache[point] or nil
-end
-
-local function yards(a, b)
-    local dx, dy = a[1] - b[1], a[2] - b[2]
-    return math.sqrt(dx * dx + dy * dy)
-end
 
 -- The name of an objective target at index i of the quest's data targets:
 -- the target's own name, else the npc or object name from the tables. A
@@ -306,9 +288,9 @@ local function huntsOf(questID)
                 if #points == 0 and (q[9] or q[8]) then
                     points = { q[9] or q[8] }
                 end
-                local place = points[1] and worldOf(points[1])
-                if place and place[3] == here[3] then
-                    local distance = yards(here, place)
+                local place = points[1] and geo.worldOf(points[1])
+                if place and geo.sameContinent(place, here) then
+                    local distance = geo.yards(here, place)
                     if distance <= HUNTS_YARDS then
                         local name = reader.QuestName(entry.questID) or q[1]
                         local lines = {

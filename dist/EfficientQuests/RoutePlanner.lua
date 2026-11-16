@@ -42,6 +42,7 @@
 local _, ns = ...
 local reader = EfficientQuests.questState
 local store = EfficientQuests.characterStore
+local geo = EfficientQuests.geo
 
 local planner = {}
 EfficientQuests.routePlanner = planner
@@ -55,25 +56,6 @@ local WINDOW = 90
 -- A finished quest whose hand-in is within this many yards of the player,
 -- on the same continent, comes first (Trailwright's HERE_YARDS).
 local HERE_YARDS = 300
-
-local HBD = LibStub("HereBeDragons-2.0")
-
--- The world position of a data point { map, x%, y% } in yards, through the
--- embedded HereBeDragons, cached per point because the data never moves.
-local worldCache = {}
-local function worldOf(point)
-    if worldCache[point] == nil then
-        local x, y, instance = HBD:GetWorldCoordinatesFromZone(
-            point[2] / 100, point[3] / 100, point[1])
-        worldCache[point] = x and { x, y, instance } or false
-    end
-    return worldCache[point] or nil
-end
-
-local function yards(a, b)
-    local dx, dy = a[1] - b[1], a[2] - b[2]
-    return math.sqrt(dx * dx + dy * dy)
-end
 
 -- The start area of a character, by race: the key of its Path line. A
 -- Skyborne picks its own Path by faction; an unknown race falls back to
@@ -164,8 +146,9 @@ local function build()
         for id, entry in pairs(log) do
             if entry.complete and not store.isSkipped(id) and not store.isAbandoned(id) then
                 local q = quests[id]
-                local spot = q and q[9] and worldOf(q[9])
-                local distance = spot and spot[3] == here[3] and yards(here, spot)
+                local spot = q and q[9] and geo.worldOf(q[9])
+                local distance = spot and geo.sameContinent(spot, here)
+                    and geo.yards(here, spot)
                 if distance and distance <= HERE_YARDS then near[#near + 1] = { id, distance } end
             end
         end
