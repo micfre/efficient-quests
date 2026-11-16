@@ -19,9 +19,12 @@ Widget.__index = Widget
 local frames = {}
 
 local function widget(kind, name, parent)
+  -- Font strings and textures are visible the moment they are created, the
+  -- way the game shows them; frames stay hidden until they are shown.
+  local shown = kind == 'FontString' or kind == 'Texture'
   local self = setmetatable({
     kind = kind, name = name, parent = parent,
-    children = {}, scripts = {}, points = {}, shown = false,
+    children = {}, scripts = {}, points = {}, shown = shown,
   }, Widget)
   if parent and parent.children then table.insert(parent.children, self) end
   table.insert(frames, self)
@@ -121,3 +124,30 @@ for _, point in ipairs(menu.points) do
 end
 assert(beside, 'with an anchor the menu must sit beside the anchor window')
 print('ok - Menu.Open anchors the menu beside the window it is given')
+
+-- A walk over everything the menu shows, the way a player's eye travels it.
+-- Hidden rows -- a quest that left the list -- show nothing, so the walk
+-- skips them.
+local function textsOf(frame)
+  local seen = {}
+  local function walk(node)
+    for _, child in ipairs(node.children or {}) do
+      if child.shown and child.kind == 'FontString' and child.text then
+        seen[child.text] = true
+      end
+      walk(child)
+    end
+  end
+  walk(frame)
+  return seen
+end
+
+-- A fresh character has skipped nothing, and the menu says so in plain
+-- words instead of showing an empty gap under the section label.
+EfficientQuests.Menu.Open()
+local emptyTexts = textsOf(menu)
+assert(emptyTexts['Skipped quests'],
+  'the menu must label the section the skipped quests belong to')
+assert(emptyTexts['You have not skipped any quests.'],
+  'with nothing skipped the menu must say so in plain words')
+print('ok - the menu says in plain words when nothing is skipped')
