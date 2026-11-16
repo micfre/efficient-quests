@@ -16,31 +16,31 @@ The directory `prior_art/` holds local reference copies of most sources. Git doe
 
 ## Embedded libraries
 
-The addon plans to embed three small libraries. None of them is copied yet.
+The addon embeds three small libraries. Each one is a verbatim copy and ships inside the addon folder under `dist/EfficientQuests/Libs/`.
 
 ### LibStub
 
 - Source: `LibStub.lua` as shipped inside the Trailwright reference copy.
 - License: public domain, as the library file states.
 - Version: 2, the library minor version.
-- Status: not copied yet.
-- Copied on: nothing copied yet.
+- Status: copied. The verbatim copy ships at `dist/EfficientQuests/Libs/LibStub/LibStub.lua`.
+- Copied on: 2026-11-16.
 
 ### CallbackHandler-1.0
 
 - Source: `CallbackHandler-1.0.lua` as shipped inside the Trailwright reference copy.
 - License: BSD-style, as the Trailwright third-party file states.
 - Version: 8, the library minor version.
-- Status: not copied yet.
-- Copied on: nothing copied yet.
+- Status: copied. The verbatim copy ships at `dist/EfficientQuests/Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua`.
+- Copied on: 2026-11-16.
 
 ### HereBeDragons-2.0
 
 - Source: `HereBeDragons-2.0.lua` as shipped inside the Trailwright reference copy.
-- License: BSD, as the HereBeDragons manifest in the reference copies states.
-- Version: 35, the library minor version.
-- Status: not copied yet. The pins library of HereBeDragons is not embedded, because pins draw on maps.
-- Copied on: nothing copied yet.
+- License: BSD, as the HereBeDragons manifest in the reference copies states (`X-License: BSD` in `prior_art/TomTom/libs/HereBeDragons/HereBeDragons.toc`). The copied file itself carries no license text, so this entry is the record of the license.
+- Version: 35, the library minor version. The copy is a Forever-aware build: it knows the Camelot project id of the Forever client.
+- Status: copied. The verbatim copy ships at `dist/EfficientQuests/Libs/HereBeDragons/HereBeDragons-2.0.lua`. The pins library of HereBeDragons is not embedded, because pins draw on maps.
+- Copied on: 2026-11-16.
 
 ## Runtime integrations
 
