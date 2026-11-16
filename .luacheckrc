@@ -24,6 +24,7 @@ globals = {
   "C_QuestLog",
   "C_SuperTrack",
   "C_Timer",
+  "GetScreenHeight",
   "UnitLevel",
   "UnitRace",
   "UnitClass",
