@@ -11,11 +11,13 @@ globals = {
   "EfficientQuestsDB",
   "EfficientQuestsCharacter",
   -- The slash-command registration of the client.
+  "SLASH_EQ1",
   "SLASH_EFFICIENTQUESTS1",
   "SlashCmdList",
   -- Game services that the addon reads.
   "CreateFrame",
   "DEFAULT_CHAT_FRAME",
+  "GetAddOnMetadata",
   "UIParent",
   "GameTooltip",
   "C_Map",
@@ -36,6 +38,8 @@ globals = {
   "GetQuestsCompleted",
   "WOW_PROJECT_ID",
   "WOW_PROJECT_CAMELOT",
+  -- The optional TomTom addon puts its table in a global when it loads.
+  "TomTom",
   -- The library manager of the embedded libraries.
   "LibStub",
 }

@@ -771,7 +771,18 @@ print('ok - a FlareUI presence changes nothing')
 
 -- The real copied data through the shared seam: the whole addon loads the
 -- way the game loads it, and the window comes up shown, on the first step
--- of the real route.
+-- of the real route. The whole addon includes the TomTom bridge now, so
+-- the sentinel gives way to a quiet fake here: the bridge may look at
+-- TomTom and set its one waypoint, while the scenarios above -- which
+-- load no bridge -- keep the promise that the window itself never calls
+-- TomTom.
+TomTom = {
+  IsCrazyArrowEmpty = function() return true end,
+  AddWaypoint = function(_, map, x, y, opts)
+    return { map, x, y, title = opts and opts.title, from = opts and opts.from }
+  end,
+  RemoveWaypoint = function() end,
+}
 frames = {}
 EfficientQuestsDB, EfficientQuestsCharacter = {}, {}
 dofile('tests/addon.lua')()
