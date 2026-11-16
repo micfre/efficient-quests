@@ -31,6 +31,11 @@ DungeonGuides.lua
 # exposes the data snapshot identity for the status command.
 DataStore.lua
 
+# The route planner walks the Path from the data store and the quest state
+# and answers the route the step model and the window show. It also wires
+# the quest state callbacks to the character stores.
+RoutePlanner.lua
+
 # The QuestieDB fallback appends its lookups after the data store's own,
 # so the store always wins and QuestieDB answers only what the store
 # lacks. It loads last of the lookup modules, and its missing-data
