@@ -13,6 +13,21 @@ Libs/LibStub/LibStub.lua
 Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
 Libs/HereBeDragons/HereBeDragons-2.0.lua
 Core.lua
+CharacterStore.lua
+
+# The generated data tables copied verbatim from Trailwright (see
+# THIRD_PARTY.md): the quest data, the Path, and the dungeon guide stops.
+# They are plain data, so they load before any code that reads them.
+QuestData.lua
+PathData.lua
+DungeonGuides.lua
+
+# The data store checks the shape of the tables above at load time and
+# exposes the data snapshot identity for the status command.
+DataStore.lua
+
+# The options panel is a window of our own; it opens from the step window
+# and from the /eq command, so it builds itself only on first open.
 Options.lua
 
 # Interface.lua is the old window module. It stays in this folder as a
