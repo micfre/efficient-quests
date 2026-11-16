@@ -12,7 +12,7 @@ jobs:
         uses: actions/checkout@v4
       - name: Run the Lua suites in Docker
         run: |
-          for suite in runtime saveddata manifest; do
+          for suite in runtime saveddata queststate manifest; do
             docker run --rm -v "$PWD:/w" -w /w nickblah/lua:5.1 lua "tests/$suite.lua"
           done
       - name: Run luacheck on the addon code

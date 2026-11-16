@@ -3,15 +3,19 @@
 -- promise that keys from the old plugin era are not migrated. The addon
 -- loads through the shared seam as on the Forever client, and the suite
 -- reads the two tables the game would hand back.
-local messages, handlers = {}, {}
+local messages, frames = {}, {}
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, message) table.insert(messages, message) end }
 SlashCmdList = {}
+-- Several frames exist once the addon loads (the libraries make their
+-- own), so each frame keeps its own scripts and the suite delivers an
+-- event only to the frames that registered for it, as the game does.
 function CreateFrame()
-  return {
-    RegisterEvent = function() end,
-    UnregisterAllEvents = function() end,
-    SetScript = function(_, name, handler) handlers[name] = handler end,
-  }
+  local frame = { events = {}, scripts = {} }
+  function frame:RegisterEvent(event) frame.events[event] = true end
+  function frame:UnregisterAllEvents() frame.events = {} end
+  function frame:SetScript(name, handler) frame.scripts[name] = handler end
+  table.insert(frames, frame)
+  return frame
 end
 function CreateVector2D() return {} end
 -- The player is not in the world while the addon files load; the suite
@@ -24,10 +28,22 @@ C_Map = { GetMapInfo = function() return nil end, GetMapChildrenInfo = function(
 -- The Forever client identifies itself with the Camelot project id.
 WOW_PROJECT_ID, WOW_PROJECT_CAMELOT = 5, 5
 
+local function fire(event, ...)
+  for _, frame in ipairs(frames) do
+    if frame.events[event] and frame.scripts.OnEvent then
+      frame.scripts.OnEvent(frame, event, ...)
+    end
+  end
+end
+
 local function login()
   dofile('tests/addon.lua')()
-  assert(handlers.OnEvent, 'addon must listen for login')
-  handlers.OnEvent(nil, 'PLAYER_LOGIN')
+  local listens = false
+  for _, frame in ipairs(frames) do
+    if frame.events['PLAYER_LOGIN'] and frame.scripts.OnEvent then listens = true end
+  end
+  assert(listens, 'addon must listen for login')
+  fire('PLAYER_LOGIN')
 end
 
 -- A fresh login: the game hands over empty saved tables, and the addon

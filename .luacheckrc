@@ -21,8 +21,18 @@ globals = {
   "WorldMapFrame",
   "QuestMapFrame_OpenToQuestDetails",
   "C_Map",
+  "C_QuestLog",
+  "C_Timer",
+  "UnitLevel",
+  "UnitRace",
+  "UnitClass",
+  "UnitFactionGroup",
+  "IsInInstance",
+  "GetQuestsCompleted",
   "WOW_PROJECT_ID",
   "WOW_PROJECT_CAMELOT",
+  -- The library manager of the embedded libraries.
+  "LibStub",
 }
 
 exclude_files = {
