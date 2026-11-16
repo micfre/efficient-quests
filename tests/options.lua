@@ -37,6 +37,21 @@ C_Map = { GetMapInfo = function() return nil end, GetMapChildrenInfo = function(
 WOW_PROJECT_ID, WOW_PROJECT_CAMELOT = 5, 5
 UIParent = {}
 
+-- Registration spies: the options panel is a window of our own, so both
+-- the client's options windows and the FlareUI panel must never hear from
+-- it. Both Blizzard registration surfaces count their calls, and any
+-- reach at all into the FlareUI global counts, because FlareUI keeps its
+-- settings registry to itself: there is no honest way in, and the panel
+-- must not look for one.
+local blizzardRegistrations = 0
+function InterfaceOptions_AddCategory() blizzardRegistrations = blizzardRegistrations + 1 end
+Settings = { RegisterAddOnCategory = function() blizzardRegistrations = blizzardRegistrations + 1 end }
+local flareTouches = 0
+FlareUI = setmetatable({}, {
+  __index = function() flareTouches = flareTouches + 1 return nil end,
+  __newindex = function() flareTouches = flareTouches + 1 end,
+})
+
 function Widget:SetSize(width, height) self.width, self.height = width, height end
 function Widget:SetWidth(width) self.width = width end
 function Widget:SetHeight(height) self.height = height end
@@ -234,3 +249,12 @@ assert(control(rowByLabel('Opacity'), 'Slider'):GetValue() == 0.5,
 assert(showsText(rowByLabel('Opacity'), '50%'),
   'the opacity row must write out 50%')
 print('ok - the panel shows saved values from the account-wide store on open')
+
+-- After the whole session -- load, login, open, every click and drag --
+-- the registration spies must still be untouched. The panel is a window
+-- of our own: the client's options and the FlareUI panel never hear of it.
+assert(blizzardRegistrations == 0,
+  'the panel must not register with the client options windows')
+assert(flareTouches == 0,
+  'the panel must not reach into FlareUI or its settings registry')
+print('ok - the panel registers itself nowhere')
