@@ -65,3 +65,9 @@ Menu.lua
 # builds, pages the route, follows the picked quest, and offers the skip
 # action. It loads last, after every module it asks.
 StepWindow.lua
+
+# The look adapter restyles the step window after the FlareUI tracker and
+# docks it below that frame. It is the only module that may touch
+# FlareUI, so it loads after the step window it restyles, and it listens
+# for the window's own changed signal to re-apply the look.
+LookAdapter.lua
