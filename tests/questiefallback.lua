@@ -98,3 +98,105 @@ assert(spot ~= nil and spot[1] == 1429 and spot[2] == 48.9 and spot[3] == 36.4,
 assert(#messages == 0,
   'a question the store answers must not produce a chat message')
 print('ok - the data store answers names and positions from its own tables')
+
+-- Scenario two: QuestieDB is loaded and agrees to its contract. The ids
+-- the copied tables hold must never reach it -- the store answered first
+-- -- and the ids the tables lack must come back from QuestieDB instead.
+-- NPC coordinates arrive keyed by AreaID, not by the client's UiMapID,
+-- so the fake ships the bridge the real addon sends: the area map as Lua
+-- source text, with an override layered on top.
+plantLibQuestieDB(
+  { [91001] = 'A quest only QuestieDB knows' },
+  { [91002] = 'A mover only QuestieDB knows' },
+  { [91002] = { [14] = { { 34.5, 67.8 } }, [12] = { { 10, 20 } } } },
+  'return { [12] = 1420, [14] = 1433 }',
+  'return { [12] = 0 }')
+reader = loadAddon()
+assert(reader.QuestName(6) == 'Bounty on Garrick Padfoot',
+  'the store must still answer the quest name it holds')
+assert(reader.NpcName(6) == 'Kobold Vermin',
+  'the store must still answer the npc name it holds')
+assert(calls.questName == 0 and calls.npcName == 0,
+  'a question the store answers must never reach QuestieDB')
+assert(reader.QuestName(91001) == 'A quest only QuestieDB knows',
+  'a quest the store lacks must come back from QuestieDB')
+assert(calls.questName == 1, 'the fallback must ask QuestieDB exactly once')
+assert(reader.NpcName(91002) == 'A mover only QuestieDB knows',
+  'an npc the store lacks must come back from QuestieDB')
+assert(calls.npcName == 1, 'the fallback must ask for the npc name once')
+local where = reader.NpcPosition(91002)
+assert(where ~= nil and where[1] == 1433 and where[2] == 34.5 and where[3] == 67.8,
+  'npc coordinates must arrive as { uiMapID, x, y } in percent, with the'
+    .. ' AreaID turned into the UiMapID of the bridge')
+assert(calls.npcSpawns == 1, 'the fallback must ask for the spawns once')
+assert(#messages == 0,
+  'answers from the fallback must not produce a chat message')
+print('ok - the store wins and QuestieDB answers only what the store lacks')
+
+-- Data that stays missing after the fallback ran: QuestieDB knows the id
+-- neither. The player gets one clear line per missing id -- the shape of
+-- the data store loader's messages -- and never a second line for the
+-- same id, no matter how often the question repeats. The answer itself
+-- stays nil.
+plantLibQuestieDB(
+  { [91004] = nil },
+  { [91005] = nil },
+  { [91006] = { [14] = { { 50, 50 } } } },
+  'return { }',
+  nil)
+reader = loadAddon()
+assert(reader.QuestName(91004) == nil, 'an id nobody knows must answer nil')
+assert(reader.NpcName(91005) == nil, 'an npc nobody knows must answer nil')
+assert(reader.NpcPosition(91006) == nil,
+  'an npc whose area the bridge does not know must answer nil')
+assert(#messages == 3, 'three missing ids must produce three messages, got ' .. #messages)
+assert(messages[1]:find('^Efficient Quests: no name data for quest 91004%.', 1),
+  'the message must say which addon speaks and which quest lacks data: ' .. messages[1])
+assert(messages[2]:find('^Efficient Quests: no name data for NPC 91005%.', 1),
+  'the message must name the npc whose name is missing: ' .. messages[2])
+assert(messages[3]:find('^Efficient Quests: no position data for NPC 91006%.', 1),
+  'the message must name the npc whose position is missing: ' .. messages[3])
+reader.QuestName(91004)
+reader.NpcName(91005)
+reader.NpcPosition(91006)
+assert(#messages == 3,
+  'a repeated question for the same missing id must not repeat the message')
+reader.QuestName(91007)
+assert(#messages == 4, 'a different missing id must get its own single message')
+print('ok - data still missing after the fallback gets one message per id')
+
+-- A QuestieDB that does not agree to the contract is as good as absent:
+-- nothing may reach its entities -- the fake errors the moment anything
+-- does -- and the addon keeps running on its own data.
+plantLibQuestieDB({}, {}, {})
+LibQuestieDB.RequireContract = function() return false, 'contract mismatch' end
+LibQuestieDB.Quest.Get = function() error('an incompatible QuestieDB must not be read') end
+LibQuestieDB.Npc.Get = function() error('an incompatible QuestieDB must not be read') end
+reader = loadAddon()
+assert(reader.QuestName(6) == 'Bounty on Garrick Padfoot',
+  'the store must keep answering when QuestieDB refuses its contract')
+assert(reader.QuestName(91001) == nil,
+  'a question the store cannot answer must stay unanswered without a usable QuestieDB')
+assert(reader.NpcName(91005) == nil and reader.NpcPosition(91006) == nil,
+  'npc questions must stay unanswered without a usable QuestieDB')
+print('ok - an incompatible QuestieDB is never read and nothing breaks')
+
+-- Without QuestieDB at all, nothing changes and nothing breaks: the store
+-- answers what it holds, the rest stays unanswered, and one message per
+-- missing id still explains why.
+LibQuestieDB = nil
+reader = loadAddon()
+assert(reader.QuestName(6) == 'Bounty on Garrick Padfoot',
+  'the store must answer its own quest name without QuestieDB')
+assert(reader.NpcName(6) == 'Kobold Vermin',
+  'the store must answer its own npc name without QuestieDB')
+local plain = reader.NpcPosition(6)
+assert(plain ~= nil and plain[1] == 1429 and plain[2] == 48.9 and plain[3] == 36.4,
+  'the store must answer its own npc position without QuestieDB')
+assert(reader.QuestName(91001) == nil and reader.NpcName(91005) == nil,
+  'questions the store cannot answer must stay nil, with no error')
+assert(reader.NpcPosition(91005) == nil,
+  'an npc without any position data must answer nil, with no error')
+assert(#messages == 3,
+  'without QuestieDB the missing ids still get one message each, got ' .. #messages)
+print('ok - without QuestieDB the addon works on its own data alone')
