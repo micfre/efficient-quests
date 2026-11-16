@@ -18,6 +18,7 @@ This glossary defines the domain terms of the Efficient Quests addon. The specif
 - Route: the ordered list of steps that the player follows.
 - Route entry: one item of the route. The step model turns it into a step.
 - Route planner: the module that builds the route from the data store and the quest state. It is a port of the Path walker of Trailwright.
+- Run: one visit to a dungeon. The dungeon guide remembers which stops are done. A visit that starts more than two hours after the last one is a new run.
 - Skip list: the quests that the player chose to leave out. It belongs to one character.
 - Step: one unit of the leveling guide, such as "Pick up a quest" or "Hand in a quest".
 - Step model: the module that turns a route entry into a step with a headline, goal lines, tips, and a place text.

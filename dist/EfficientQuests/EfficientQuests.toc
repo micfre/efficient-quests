@@ -65,3 +65,8 @@ Menu.lua
 # builds, pages the route, follows the picked quest, and offers the skip
 # action. It loads last, after every module it asks.
 StepWindow.lua
+
+# The dungeon guide takes the display over from the step window while the
+# player is inside a dungeon the data knows, and hands it back on exit, so
+# it loads after the step window it hands over with.
+DungeonGuide.lua
