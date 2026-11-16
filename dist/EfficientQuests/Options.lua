@@ -45,6 +45,9 @@ local function build()
   panel = CreateFrame("Frame", "EfficientQuestsOptionsPanel", UIParent)
   panel:SetSize(WIDTH, 220)
   panel:SetPoint("CENTER")
+  -- Above the step window and the chat, the way a panel the player asked
+  -- for belongs.
+  panel:SetFrameStrata("HIGH")
   applyBackdrop(panel)
 
   -- The title band, with a muted bronze rule under it the way the FlareUI
@@ -67,9 +70,7 @@ local function build()
   local closeLabel = close:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
   closeLabel:SetAllPoints(close)
   closeLabel:SetText("X")
-  close:SetScript("OnClick", function() panel:Hide() end)
-
-  local anchor -- each row hangs below the one above it
+  close:SetScript("OnClick", function() panel:Hide() end)  local anchor -- each row hangs below the one above it
   local function row(labelText)
     local rowFrame = CreateFrame("Frame", nil, panel)
     rowFrame:SetSize(WIDTH - 20, 30)
@@ -96,12 +97,12 @@ local function build()
   local function checkRow(labelText, apply)
     local rowFrame = row(labelText)
     local check = CreateFrame("CheckButton", nil, rowFrame)
-    check:SetSize(28, 28)
+    check:SetSize(30, 29)
     check:SetPoint("RIGHT", rowFrame, "RIGHT", -8, 0)
     check:SetNormalAtlas("checkbox-minimal")
     check:SetPushedAtlas("checkbox-minimal")
     local tick = check:CreateTexture(nil, "ARTWORK")
-    tick:SetAtlas("checkmark-minimal")
+    tick:SetAtlas("checkmark-minimal", true)
     tick:SetPoint("CENTER")
     check:SetCheckedTexture(tick)
     check:SetScript("OnClick", function(self) apply(self:GetChecked()) end)

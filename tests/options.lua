@@ -103,6 +103,7 @@ function Widget:SetObeyStepOnDrag(obey) self.obeyStepOnDrag = obey end
 function Widget:SetOrientation(orientation) self.orientation = orientation end
 function Widget:SetAlpha(alpha) self.alpha = alpha end
 function Widget:SetScale(scale) self.scale = scale end
+function Widget:SetFrameStrata(strata) self.strata = strata end
 
 -- The saved tables are fresh, the way the game hands them over on a first
 -- login. The suite fires PLAYER_LOGIN itself once the addon files are in.
