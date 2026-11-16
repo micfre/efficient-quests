@@ -19,12 +19,11 @@ Widget.__index = Widget
 local frames = {}
 
 local function widget(kind, name, parent)
-  -- Font strings and textures are visible the moment they are created, the
-  -- way the game shows them; frames stay hidden until they are shown.
-  local shown = kind == 'FontString' or kind == 'Texture'
+  -- Everything the client creates starts out shown, frames included; only
+  -- an explicit Hide takes a widget off the screen.
   local self = setmetatable({
     kind = kind, name = name, parent = parent,
-    children = {}, scripts = {}, points = {}, shown = shown,
+    children = {}, scripts = {}, points = {}, shown = true,
   }, Widget)
   if parent and parent.children then table.insert(parent.children, self) end
   table.insert(frames, self)
@@ -126,16 +125,16 @@ assert(beside, 'with an anchor the menu must sit beside the anchor window')
 print('ok - Menu.Open anchors the menu beside the window it is given')
 
 -- A walk over everything the menu shows, the way a player's eye travels it.
--- Hidden rows -- a quest that left the list -- show nothing, so the walk
--- skips them.
+-- A hidden frame hides its children with it, so the walk skips whole
+-- hidden subtrees -- a quest that left the list shows nothing.
 local function textsOf(frame)
   local seen = {}
   local function walk(node)
     for _, child in ipairs(node.children or {}) do
-      if child.shown and child.kind == 'FontString' and child.text then
-        seen[child.text] = true
+      if child.shown then
+        if child.kind == 'FontString' and child.text then seen[child.text] = true end
+        walk(child)
       end
-      walk(child)
     end
   end
   walk(frame)
@@ -151,3 +150,52 @@ assert(emptyTexts['Skipped quests'],
 assert(emptyTexts['You have not skipped any quests.'],
   'with nothing skipped the menu must say so in plain words')
 print('ok - the menu says in plain words when nothing is skipped')
+
+-- The player reads the skipped quests by name, and each row carries its
+-- restore action. Quest 6 is "Bounty on Garrick Padfoot" and quest 25 is
+-- "Stonetalon Standstill" in the data store, so the menu must show those
+-- names, not the ids.
+local store = EfficientQuests.characterStore
+store.skip(6)
+store.skip(25)
+EfficientQuests.Menu.Open()
+local listed = textsOf(menu)
+assert(listed['Bounty on Garrick Padfoot'],
+  'the menu must list a skipped quest by its name from the data store')
+assert(listed['Stonetalon Standstill'],
+  'the menu must list every skipped quest by name')
+assert(listed['Restore'],
+  'every skipped quest row must carry its restore action')
+
+-- A click on a row's restore action takes the quest back into the route:
+-- the store answers not-skipped, the saved table loses the id, and the
+-- open menu drops the row at once. The other row stays.
+local function rowByLabel(label)
+  local found
+  local function walk(node)
+    for _, child in ipairs(node.children or {}) do
+      if child.shown and child.kind == 'Button' and not found then
+        for _, field in ipairs(child.children) do
+          if field.kind == 'FontString' and field.text == label then found = child end
+        end
+      end
+      walk(child)
+    end
+  end
+  walk(menu)
+  return found
+end
+
+local questRow = rowByLabel('Bounty on Garrick Padfoot')
+assert(questRow, 'each skipped quest must sit on a row of its own')
+questRow.scripts.OnClick(questRow, 'LeftButton')
+assert(store.isSkipped(6) == false,
+  'a restore click must reach the skip list store')
+assert(EfficientQuestsCharacter.skipped[6] == nil,
+  'a restore click must take the quest out of the saved table')
+local afterRestore = textsOf(menu)
+assert(not afterRestore['Bounty on Garrick Padfoot'],
+  'the restored quest must leave the open menu at once')
+assert(afterRestore['Stonetalon Standstill'],
+  'the other skipped quest must stay on the list')
+print('ok - skipped quests are listed by name and restored from the menu')

@@ -6,6 +6,7 @@
 -- window's default spot. The menu lists the quests this character has
 -- skipped, each with a restore action, the dungeons the data store knows,
 -- and a link that opens the options panel.
+local _, ns = ...
 local EQ = EfficientQuests
 
 -- The FlareUI palette cues, as the options panel uses them: the bronze
@@ -19,7 +20,20 @@ local ROW = 16 -- one line of the skipped-quest list
 
 local menu
 local questBlock -- holds the rows of the moment under the section label
-local used = {} -- everything the last refresh left in the block
+local pool = {} -- quest rows from earlier refreshes, hidden and reusable
+local usedRows = {} -- the quest rows on screen right now
+local emptyLine -- the plain sentence for an empty list, reused
+
+-- The name of a quest, from the generated quest table of the namespace.
+-- When the data store reported the table broken, or a quest id is not in
+-- it, the id itself stands in, so the menu still opens without an error.
+local function questName(questId)
+  local quest = type(ns.quests) == "table" and ns.quests[questId] or nil
+  if type(quest) == "table" and type(quest[1]) == "string" then
+    return quest[1]
+  end
+  return "Quest " .. questId
+end
 
 -- A flat dark plate with a thin bronze edge, the look the options panel
 -- gives the addon's windows.
@@ -61,21 +75,60 @@ local function build()
   questBlock:SetWidth(WIDTH - 24)
 end
 
--- Bring the skipped-quest list in line with the store. Rows from an
--- earlier refresh hide; with nothing skipped the block holds the plain
--- sentence that says so.
-local function refreshQuests()
-  for _, child in ipairs(used) do child:Hide() end
-  used = {}
-  local ids = EfficientQuests.characterStore.list()
-  if #ids == 0 then
-    local empty = questBlock:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    empty:SetPoint("TOPLEFT", questBlock, "TOPLEFT", 0, 0)
-    empty:SetJustifyH("LEFT")
-    empty:SetText("You have not skipped any quests.")
-    table.insert(used, empty)
+-- One row of the skipped-quest list: the quest's name on the left, its
+-- restore action on the right, and one click anywhere on the row restores
+-- the quest. Rows come out of the pool and go back into it hidden.
+local function takeRow(at)
+  local row = table.remove(pool) or CreateFrame("Button", nil, questBlock)
+  row:SetSize(WIDTH - 24, ROW)
+  row:SetPoint("TOPLEFT", questBlock, "TOPLEFT", 0, -((at - 1) * ROW))
+  if not row.name then
+    row.name = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.name:SetPoint("LEFT", row, "LEFT", 0, 0)
+    row.name:SetJustifyH("LEFT")
+    row.restore = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    row.restore:SetPoint("RIGHT", row, "RIGHT", 0, 0)
+    row.restore:SetJustifyH("RIGHT")
+    -- The gold of a link, the way the client marks words the player can
+    -- act on.
+    row.restore:SetTextColor(1, 0.82, 0.2, 1)
+    row.restore:SetText("Restore")
   end
-  questBlock:SetHeight(#used * ROW)
+  return row
+end
+
+-- Bring the skipped-quest list in line with the store. The rows of the
+-- earlier refresh hide and go back into the pool; the block then holds
+-- either one row per skipped quest or the plain sentence that nothing is
+-- skipped.
+local function refreshQuests()
+  for _, row in ipairs(usedRows) do
+    row:Hide()
+    table.insert(pool, row)
+  end
+  usedRows = {}
+  if emptyLine then emptyLine:Hide() end
+  local ids = EfficientQuests.characterStore.list()
+  for at, questId in ipairs(ids) do
+    local row = takeRow(at)
+    row.name:SetText(questName(questId))
+    row:SetScript("OnClick", function()
+      EfficientQuests.characterStore.restore(questId)
+      refreshQuests()
+    end)
+    row:Show()
+    table.insert(usedRows, row)
+  end
+  if #usedRows == 0 then
+    if not emptyLine then
+      emptyLine = questBlock:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      emptyLine:SetPoint("TOPLEFT", questBlock, "TOPLEFT", 0, 0)
+      emptyLine:SetJustifyH("LEFT")
+      emptyLine:SetText("You have not skipped any quests.")
+    end
+    emptyLine:Show()
+  end
+  questBlock:SetHeight(math.max(#usedRows, 1) * ROW)
 end
 
 EQ.Menu = {}
