@@ -248,3 +248,17 @@ end
 assert(rows == knownDungeons,
   'the menu must list every known dungeon: ' .. knownDungeons .. ' rows')
 print('ok - every known dungeon is listed with its level range')
+
+-- The menu carries a link to the options panel. One click must reach the
+-- panel's own entry point -- the suite stands in for the panel with a
+-- spy, so the click's path stays visible.
+local opensBefore = 0
+local realOpen = EfficientQuests.Options.Open
+EfficientQuests.Options.Open = function() opensBefore = opensBefore + 1 end
+local optionsLink = rowByLabel('Options')
+assert(optionsLink, 'the menu must carry a link labeled Options')
+optionsLink.scripts.OnClick(optionsLink, 'LeftButton')
+EfficientQuests.Options.Open = realOpen
+assert(opensBefore == 1,
+  'one click on the options link must call Options.Open exactly once')
+print('ok - the options link opens the options panel')

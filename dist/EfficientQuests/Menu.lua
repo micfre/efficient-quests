@@ -17,8 +17,9 @@ local ACCENT = { 0.61, 0.48, 0.29 }
 local PLATE = { 0.08, 0.08, 0.09 }
 local WIDTH = 260
 -- The layout runs in fixed steps: a title band, one line per section
--- label, one line per list row, and air at the bottom.
-local HEADER, SECTION, ROW, PAD = 34, 20, 16, 14
+-- label, one line per list row, one taller line for the options link, and
+-- air at the bottom.
+local HEADER, SECTION, ROW, LINK, PAD = 34, 20, 16, 26, 14
 
 local menu
 local questBlock -- holds the rows of the moment under the section label
@@ -153,16 +154,29 @@ local function build()
       dungeonRows[at] = row
     end
   end
+
+  -- The link to the options panel, bottom right under the lists, in the
+  -- gold of a link.
+  local options = CreateFrame("Button", nil, menu)
+  options:SetSize(90, LINK)
+  options:SetPoint("TOPRIGHT", dungeonRows[1] and dungeonRows[#dungeonRows]
+    or questBlock, "BOTTOMRIGHT", 0, -4)
+  local optionsLabel = options:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  optionsLabel:SetPoint("RIGHT", options, "RIGHT", 0, 0)
+  optionsLabel:SetJustifyH("RIGHT")
+  optionsLabel:SetTextColor(1, 0.82, 0.2, 1)
+  optionsLabel:SetText("Options")
+  options:SetScript("OnClick", function() EQ.Options.Open() end)
 end
 
 -- The window is as tall as its content: the bands and rows stack up to
--- the bottom padding.
+-- the options link and the bottom padding.
 local function layout()
   local height = HEADER + SECTION + math.max(#usedRows, 1) * ROW
   if #dungeonRows > 0 then
     height = height + SECTION + #dungeonRows * ROW
   end
-  menu:SetSize(WIDTH, height + PAD)
+  menu:SetSize(WIDTH, height + LINK + PAD)
 end
 
 -- One row of the skipped-quest list: the quest's name on the left, its
