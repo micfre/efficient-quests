@@ -2,15 +2,20 @@
 -- Follow mode switch. The addon loads through the shared seam as on the
 -- Forever client, and the suite drives the store actions and reads both
 -- the answers and the per-character saved table that the game hands back.
-local messages, handlers = {}, {}
+local messages, frames = {}, {}
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, message) table.insert(messages, message) end }
 SlashCmdList = {}
+-- Several frames exist once the addon loads (the libraries and the quest
+-- state reader make their own), so each frame keeps its own scripts and
+-- the suite delivers an event only to the frames that registered for it,
+-- as the game does.
 function CreateFrame()
-  return {
-    RegisterEvent = function() end,
-    UnregisterAllEvents = function() end,
-    SetScript = function(_, name, handler) handlers[name] = handler end,
-  }
+  local frame = { events = {}, scripts = {} }
+  function frame:RegisterEvent(event) frame.events[event] = true end
+  function frame:UnregisterAllEvents() frame.events = {} end
+  function frame:SetScript(name, handler) frame.scripts[name] = handler end
+  table.insert(frames, frame)
+  return frame
 end
 function CreateVector2D() return {} end
 -- The player is not in the world while the addon files load; the suite
@@ -26,9 +31,18 @@ WOW_PROJECT_ID, WOW_PROJECT_CAMELOT = 5, 5
 -- A login loads the addon files again, so the addon table and the store
 -- on it are new every time. Each scenario takes the store it gets back.
 local function login()
+  frames = {}
   dofile('tests/addon.lua')()
-  assert(handlers.OnEvent, 'addon must listen for login')
-  handlers.OnEvent(nil, 'PLAYER_LOGIN')
+  local listens = false
+  for _, frame in ipairs(frames) do
+    if frame.events['PLAYER_LOGIN'] and frame.scripts.OnEvent then listens = true end
+  end
+  assert(listens, 'addon must listen for login')
+  for _, frame in ipairs(frames) do
+    if frame.events['PLAYER_LOGIN'] and frame.scripts.OnEvent then
+      frame.scripts.OnEvent(frame, 'PLAYER_LOGIN')
+    end
+  end
   assert(type(EfficientQuests.characterStore) == 'table',
     'the addon must offer the character store after a login')
   return EfficientQuests.characterStore
