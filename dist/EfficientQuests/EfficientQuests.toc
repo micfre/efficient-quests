@@ -14,5 +14,17 @@ Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
 Libs/HereBeDragons/HereBeDragons-2.0.lua
 Core.lua
 
+# The generated data tables copied verbatim from Trailwright (see
+# THIRD_PARTY.md): the quest data, the Path, and the dungeon guide stops.
+# They are plain data, so they load right after the entry point and before
+# any code that reads them.
+QuestData.lua
+PathData.lua
+DungeonGuides.lua
+
+# The data store checks the shape of the tables above at load time and
+# exposes the data snapshot identity for the status command.
+DataStore.lua
+
 # Interface.lua is the old window module. It stays in this folder as a
 # frozen reference for the new step window and is never loaded.
