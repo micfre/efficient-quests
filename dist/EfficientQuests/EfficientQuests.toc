@@ -41,6 +41,12 @@ RoutePlanner.lua
 # controller. It holds no frames; the window renders what it answers.
 StepModel.lua
 
+# The Follow mode controller listens for the quest the player picks in
+# the quest log -- through the client's super tracking when it is there --
+# and serves the step of that quest through the step model. It loads
+# after the step model it asks; the step window polls it.
+FollowMode.lua
+
 # The QuestieDB fallback appends its lookups after the data store's own,
 # so the store always wins and QuestieDB answers only what the store
 # lacks. It loads last of the lookup modules, and its missing-data

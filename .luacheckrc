@@ -22,6 +22,7 @@ globals = {
   "QuestMapFrame_OpenToQuestDetails",
   "C_Map",
   "C_QuestLog",
+  "C_SuperTrack",
   "C_Timer",
   "UnitLevel",
   "UnitRace",
