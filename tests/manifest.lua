@@ -96,6 +96,9 @@ print('ok - the three libraries are embedded in dependency order')
 assert(listed['Core.lua'], 'the entry point must load')
 assert(listed['Libs/HereBeDragons/HereBeDragons-2.0.lua'] < listed['Core.lua'],
   'the libraries must load before the addon code')
+assert(listed['QuestState.lua'], 'the quest state reader must load')
+assert(listed['Core.lua'] < listed['QuestState.lua'],
+  'the quest state reader hangs off the addon table, so it must load after the entry point')
 assert(not listed['Interface.lua'],
   'the old window module is a frozen reference and must stay out of the load order')
 print('ok - the entry point loads after the libraries and the reference window stays unloaded')
