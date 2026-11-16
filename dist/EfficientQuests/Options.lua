@@ -134,7 +134,15 @@ local function build()
   end
 
   checks = {
-    waypoints = checkRow("Waypoints", function(on) EfficientQuestsDB.waypoints = on end),
+    waypoints = checkRow("Waypoints", function(on)
+      EfficientQuestsDB.waypoints = on
+      -- Tell the TomTom bridge at once, so a waypoint that stands comes
+      -- off the moment the player turns the option off. The guard keeps
+      -- the panel working in setups that load no bridge.
+      if EfficientQuests.TomTomBridge then
+        EfficientQuests.TomTomBridge.Apply()
+      end
+    end),
     locked = checkRow("Lock window", function(on) EfficientQuestsDB.locked = on end),
   }
   sliders = {
