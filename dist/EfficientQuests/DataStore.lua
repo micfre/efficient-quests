@@ -23,6 +23,39 @@ function EfficientQuests.GetDataSnapshot()
     return SNAPSHOT_SOURCE .. ", path data v" .. pathVersion .. ", copied " .. COPY_DATE
 end
 
+-- The display names of the dungeons, in our own words -- the same words
+-- the dungeon window titles itself with and the menu lists. Wings that
+-- the guide finds by name carry theirs in their names list; the key
+-- stands in for anything still unknown. This is the one place that
+-- holds them.
+local DUNGEON_NAMES = {
+    [389] = "Ragefire Chasm", [43] = "Wailing Caverns", [48] = "Blackfathom Deeps",
+    [33] = "Shadowfang Keep", [47] = "Razorfen Kraul", [36] = "The Deadmines",
+    [90] = "Gnomeregan", [129] = "Razorfen Downs", [70] = "Uldaman",
+    [349] = "Maraudon", [209] = "Zul'Farrak", [109] = "The Sunken Temple",
+    [34] = "The Stockade", [289] = "Scholomance", [230] = "Blackrock Depths",
+    [1891] = "Scarlet Monastery: Graveyard", [1892] = "Scarlet Monastery: Library",
+    [1893] = "Scarlet Monastery: Armory", [1894] = "Scarlet Monastery: Cathedral",
+    [3291] = "Stratholme: Main Gate", [3292] = "Stratholme: Service Gate",
+    [2291] = "Lower Blackrock Spire", [2292] = "Upper Blackrock Spire",
+    [4291] = "Dire Maul: East", [4292] = "Dire Maul: West", [4293] = "Dire Maul: North",
+    [2999] = "Ruins of Lordaeron",
+}
+
+--- The display name of a dungeon key: our own words first, then the
+--- guide's own names list, its short key, and the key itself. The
+--- dungeon guide and the menu ask this one place.
+function EfficientQuests.DungeonName(key, guide)
+    if DUNGEON_NAMES[key] then return DUNGEON_NAMES[key] end
+    if type(guide) == "table" then
+        if type(guide.names) == "table" and type(guide.names[1]) == "string" then
+            return guide.names[1]
+        end
+        if type(guide.key) == "string" then return guide.key end
+    end
+    return tostring(key)
+end
+
 -- What the loader watches over: where each table lives in the namespace,
 -- how to name it in a message, and what stops working without it. The
 -- three tables are the three data topics the Trailwright snapshot holds.

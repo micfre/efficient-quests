@@ -61,31 +61,8 @@ self.callbacks = LibStub("CallbackHandler-1.0"):New(self,
 
 local GUIDES = type(ns.DungeonGuides) == "table" and ns.DungeonGuides or {}
 
--- The names of the dungeons, in our own words, the same words the menu
--- lists. Wings that the guide finds by name carry theirs in their names
--- list; the key stands in for anything still unknown.
-local NAMES = {
-    [389] = "Ragefire Chasm", [43] = "Wailing Caverns", [48] = "Blackfathom Deeps",
-    [33] = "Shadowfang Keep", [47] = "Razorfen Kraul", [36] = "The Deadmines",
-    [90] = "Gnomeregan", [129] = "Razorfen Downs", [70] = "Uldaman",
-    [349] = "Maraudon", [209] = "Zul'Farrak", [109] = "The Sunken Temple",
-    [34] = "The Stockade", [289] = "Scholomance", [230] = "Blackrock Depths",
-    [1891] = "Scarlet Monastery: Graveyard", [1892] = "Scarlet Monastery: Library",
-    [1893] = "Scarlet Monastery: Armory", [1894] = "Scarlet Monastery: Cathedral",
-    [3291] = "Stratholme: Main Gate", [3292] = "Stratholme: Service Gate",
-    [2291] = "Lower Blackrock Spire", [2292] = "Upper Blackrock Spire",
-    [4291] = "Dire Maul: East", [4292] = "Dire Maul: West", [4293] = "Dire Maul: North",
-    [2999] = "Ruins of Lordaeron",
-}
-
 local function dungeonName(key)
-    local dungeon = GUIDES[key]
-    if type(dungeon) ~= "table" then return tostring(key) end
-    return NAMES[key]
-        or (type(dungeon.names) == "table" and type(dungeon.names[1]) == "string"
-            and dungeon.names[1])
-        or (type(dungeon.key) == "string" and dungeon.key)
-        or tostring(key)
+    return EfficientQuests.DungeonName(key, GUIDES[key])
 end
 
 -- Dungeons whose wings share one instance id. The game never says which

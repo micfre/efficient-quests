@@ -28,31 +28,11 @@ local usedRows = {} -- the quest rows on screen right now
 local emptyLine -- the plain sentence for an empty list, reused
 local dungeonRows = {} -- one row per known dungeon, built once
 
--- The names of the dungeons, in our own words from the guide texts. The
--- generated guide table carries a short key and a level range per dungeon
--- but no display name; wings that the guide finds by name carry theirs in
--- their names list, and the key stands in for anything still unknown.
-local DUNGEON_NAMES = {
-  [389] = "Ragefire Chasm", [43] = "Wailing Caverns", [48] = "Blackfathom Deeps",
-  [33] = "Shadowfang Keep", [47] = "Razorfen Kraul", [36] = "The Deadmines",
-  [90] = "Gnomeregan", [129] = "Razorfen Downs", [70] = "Uldaman",
-  [349] = "Maraudon", [209] = "Zul'Farrak", [109] = "The Sunken Temple",
-  [34] = "The Stockade", [289] = "Scholomance", [230] = "Blackrock Depths",
-  [1891] = "Scarlet Monastery: Graveyard", [1892] = "Scarlet Monastery: Library",
-  [1893] = "Scarlet Monastery: Armory", [1894] = "Scarlet Monastery: Cathedral",
-  [3291] = "Stratholme: Main Gate", [3292] = "Stratholme: Service Gate",
-  [2291] = "Lower Blackrock Spire", [2292] = "Upper Blackrock Spire",
-  [4291] = "Dire Maul: East", [4292] = "Dire Maul: West", [4293] = "Dire Maul: North",
-  [2999] = "Ruins of Lordaeron",
-}
-
--- The line the player reads for one dungeon: its name and its level
--- range, as the place text of the steps joins its facts with a dot.
+-- The line the player reads for one dungeon: its name -- the one place
+-- that holds them answers, the data store -- and its level range, as the
+-- place text of the steps joins its facts with a dot.
 local function dungeonLabel(instanceId, guide)
-  local name = DUNGEON_NAMES[instanceId]
-    or (type(guide.names) == "table" and type(guide.names[1]) == "string" and guide.names[1])
-    or (type(guide.key) == "string" and guide.key)
-    or tostring(instanceId)
+  local name = EQ.DungeonName(instanceId, guide)
   if type(guide.levels) == "string" then
     return name .. " · " .. guide.levels
   end
