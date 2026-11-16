@@ -6,8 +6,9 @@
 std = "lua51"
 
 globals = {
-  -- The addon namespace and the saved data of each character.
+  -- The addon namespace and its two saved-data tables.
   "EfficientQuests",
+  "EfficientQuestsDB",
   "EfficientQuestsCharacter",
   -- The slash-command registration of the client.
   "SLASH_EFFICIENTQUESTS1",
@@ -20,6 +21,18 @@ globals = {
   "WorldMapFrame",
   "QuestMapFrame_OpenToQuestDetails",
   "C_Map",
+  "WOW_PROJECT_ID",
+  "WOW_PROJECT_CAMELOT",
+}
+
+exclude_files = {
+  -- The embedded libraries are verbatim copies of third-party code; see
+  -- THIRD_PARTY.md for their sources and licenses. Nobody restyles a
+  -- reference, so luacheck does not check them. The test suites still
+  -- load every one of them, so a broken file cannot slip in unnoticed.
+  "dist/EfficientQuests/Libs/LibStub/LibStub.lua",
+  "dist/EfficientQuests/Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua",
+  "dist/EfficientQuests/Libs/HereBeDragons/HereBeDragons-2.0.lua",
 }
 
 files = {

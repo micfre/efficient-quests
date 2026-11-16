@@ -1,112 +1,52 @@
--- The addon is loaded as the game would load the TOC, with only game services
--- substituted. No optional tracker or guide engine is provided.
+-- The entry point of the addon: the addon table exists right after load,
+-- and on login the addon either starts quietly on the Forever client or
+-- says once, clearly, that it supports the Forever client only and runs
+-- nothing. No optional addon is provided: the addon must stand alone.
 local messages, handlers = {}, {}
 DEFAULT_CHAT_FRAME = { AddMessage = function(_, message) table.insert(messages, message) end }
 SlashCmdList = {}
 function CreateFrame()
   return {
     RegisterEvent = function() end,
+    UnregisterAllEvents = function() end,
     SetScript = function(_, name, handler) handlers[name] = handler end,
   }
 end
+function CreateVector2D() return {} end
+-- The player is not in the world while the addon files load; the suite
+-- fires PLAYER_LOGIN itself when a scenario needs it.
+function IsLoggedIn() return false end
+-- An empty world: the map service knows no maps, which is enough for the
+-- libraries to load, and the position questions come later, with the
+-- quest state reader.
+C_Map = { GetMapInfo = function() return nil end, GetMapChildrenInfo = function() return nil end }
 
-local function loadAddon()
-  dofile('tests/addon.lua')()
-  assert(handlers.OnEvent, 'addon must listen for login')
-  handlers.OnEvent(nil, 'PLAYER_LOGIN')
-end
-local function status()
-  messages = {}
-  assert(SlashCmdList.EFFICIENTQUESTS, 'settings/status command must be available')
-  SlashCmdList.EFFICIENTQUESTS('status')
-  return table.concat(messages, ' ')
-end
-loadAddon()
-assert(status():find('QuestieDB', 1, true), 'missing provider should produce actionable status')
-print('ok - missing provider status without optional addons')
-LibQuestieDB = {}
-local message = status()
-assert(message:find('guide', 1, true), 'missing guide should be distinguished from a missing provider')
-assert(message:find('github.com/micfre/efficient-quests/releases', 1, true),
-  'missing guide status should point at the releases page')
-print('ok - missing guide status points at the releases page')
+-- The addon table exists as soon as the files are loaded, before any
+-- event fires, so the later modules have a namespace to hang off.
+dofile('tests/addon.lua')()
+assert(type(EfficientQuests) == 'table', 'the entry point must create the addon table')
+print('ok - the addon table exists right after load')
+assert(handlers.OnEvent, 'addon must listen for login')
 
--- With no guide registered, the setup status names a declared guide
--- plugin that failed to register instead of the generic pointer. The
--- fresh load simulates the session in which the plugin never registered.
-C_AddOns = {
-  GetNumAddOns = function() return 1 end,
-  GetAddOnInfo = function() return 'EfficientQuests_Declared' end,
-  GetAddOnMetadata = function(name, field)
-    if field == 'X-EfficientQuests-Guide' then return '1' end
-  end,
-}
-loadAddon()
-local statusMessage = status()
-assert(statusMessage:find('EfficientQuests_Declared', 1, true) and statusMessage:find('did not register', 1, true),
-  'a declared guide that did not register should be named in the setup status')
-assert(not statusMessage:find('releases', 1, true),
-  'the generic releases pointer must not hide the specific broken plugin')
-print('ok - unregistered declared guide is named in status')
-
-handlers.OnEvent(nil, 'QUEST_TURNED_IN', 105)
-assert(EfficientQuestsCharacter.turnedIn[105],
-  'observed turn-in should be remembered in the character data')
-assert(not EfficientQuestsCharacter.turnedIn[101],
-  'only the quest that the event names is a turn-in')
-print('ok - observed turn-in is recorded in the character data')
-
--- At login the core reconciles addons that declare the guide marker against
--- the guides that actually registered and exposes each mismatch as a warning.
--- Every scenario starts from a fresh load, so each session registers only the
--- guides the scenario needs.
-C_AddOns = {
-  GetNumAddOns = function() return 3 end,
-  GetAddOnInfo = function(index)
-    return ({ 'EfficientQuests_Paired', 'EfficientQuests_Silent', 'Unrelated_Tool' })[index]
-  end,
-  GetAddOnMetadata = function(name, field)
-    if field == 'X-EfficientQuests-Guide' and name ~= 'Unrelated_Tool' then return '1' end
-  end,
-}
-loadAddon()
-EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired]', 'Paired Author')
+-- Another client flavor identifies itself with a project id of its own.
+-- The game hands over the empty saved tables, the way it does for every
+-- addon, and the addon must leave them empty and speak only once.
+WOW_PROJECT_ID, WOW_PROJECT_CAMELOT = 1, 5
+EfficientQuestsDB, EfficientQuestsCharacter = {}, {}
 handlers.OnEvent(nil, 'PLAYER_LOGIN')
-local warnings = EfficientQuests.GetGuideWarnings()
-assert(#warnings == 1, 'a fully matching set apart from one missing guide must warn once')
-assert(warnings[1]:find('EfficientQuests_Silent', 1, true) and warnings[1]:find('did not register', 1, true),
-  'a declared guide that did not register should produce its own warning line')
-print('ok - declared guide that never registers warns at login')
+assert(#messages == 1 and messages[1]:find('Forever client only', 1, true),
+  'a player on another flavor must get exactly one clear message about Forever only')
+assert(next(EfficientQuestsDB) == nil and next(EfficientQuestsCharacter) == nil,
+  'the addon must not write any saved data on a client it does not support')
+print('ok - another client flavor gets one message and no setup at all')
 
-EfficientQuests_RegisterGuide('EfficientQuests_Rogue', '[N Rogue]', 'Rogue Author')
+-- The Forever client identifies itself with the Camelot project id. The
+-- same session then starts silently, the way a supported player expects
+-- it, with the saved-data defaults in place.
+WOW_PROJECT_ID = 5
+messages = {}
 handlers.OnEvent(nil, 'PLAYER_LOGIN')
-warnings = EfficientQuests.GetGuideWarnings()
-assert(#warnings == 2, 'both mismatch kinds must produce their own warning')
-local rogueWarning, silentWarning
-for _, warning in ipairs(warnings) do
-  if warning:find('EfficientQuests_Rogue', 1, true) then rogueWarning = warning end
-  if warning:find('EfficientQuests_Silent', 1, true) then silentWarning = warning end
-end
-assert(silentWarning and silentWarning:find('did not register', 1, true),
-  'the declared-but-unregistered warning must stay distinct')
-assert(rogueWarning and rogueWarning:find('without declaring', 1, true),
-  'a guide that registers without declaring the marker must warn distinctly')
-print('ok - registered guide without the marker warns at login')
-
-loadAddon()
-EfficientQuests_RegisterGuide('EfficientQuests_Paired', '[N Paired again]', 'Paired Author')
-C_AddOns.GetAddOnMetadata = function(name, field)
-  if name == 'EfficientQuests_Paired' and field == 'X-EfficientQuests-Guide' then return '1' end
-end
-handlers.OnEvent(nil, 'PLAYER_LOGIN')
-assert(#EfficientQuests.GetGuideWarnings() == 0,
-  'a matching declared and registered set must produce no warnings')
-print('ok - matching declared and registered set stays silent')
-
-loadAddon()
-EfficientQuests_RegisterGuide('EfficientQuests_Opaque', '[N Opaque]', 'Opaque Author')
-C_AddOns = nil
-handlers.OnEvent(nil, 'PLAYER_LOGIN')
-assert(#EfficientQuests.GetGuideWarnings() == 0,
-  'a missing addon-list service must not fabricate warnings')
-print('ok - absent addon-list service reconciles nothing')
+assert(#messages == 0, 'the Forever client must start without a warning')
+assert(EfficientQuestsDB ~= nil and EfficientQuestsDB.waypoints == true,
+  'the Forever client must start with the saved-data defaults applied')
+print('ok - the Forever client starts silently with the defaults applied')

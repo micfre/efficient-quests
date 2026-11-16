@@ -46,15 +46,54 @@ for line in manifestText:gmatch('[^\n]+') do
   if field then fields[field:lower()] = value end
 end
 
-assert(fields['version'] == '0.2.0', 'the manifest must declare version 0.2.0')
-print('ok - manifest version is 0.2.0')
+assert(fields['interface'] == '16001', 'the addon targets the Forever client: the interface number must be 16001')
+assert(fields['version'] == '0.3.0', 'the manifest must declare version 0.3.0')
+print('ok - manifest declares interface 16001 and version 0.3.0')
 
 local required = splitNames(fields['dependencies'] or fields['requireddeps'])
 local optional = splitNames(fields['optionaldeps'])
-assert(required['QuestieDB'], 'QuestieDB must be declared as a required dependency')
-assert(not optional['QuestieDB'], 'QuestieDB must not stay an optional dependency')
-assert(optional['FlareUI'] and not required['FlareUI'], 'FlareUI must stay an optional dependency')
-print('ok - QuestieDB is required and FlareUI is optional')
+assert(not next(required), 'the addon must work on a plain setup: no addon may be required')
+for _, addon in ipairs({'FlareUI', 'TomTom', 'QuestieDB'}) do
+  assert(optional[addon] and not required[addon], addon .. ' must be an optional dependency')
+end
+print('ok - FlareUI, TomTom, and QuestieDB are optional and nothing is required')
+
+local saved = splitNames(fields['savedvariables'])
+local savedPerCharacter = splitNames(fields['savedvariablespercharacter'])
+assert(saved['EfficientQuestsDB'] and not savedPerCharacter['EfficientQuestsDB'],
+  'EfficientQuestsDB must be the account-wide store and only that')
+assert(savedPerCharacter['EfficientQuestsCharacter'] and not saved['EfficientQuestsCharacter'],
+  'EfficientQuestsCharacter must be the per-character store and only that')
+print('ok - the account-wide and per-character saved stores are declared')
+
+local files = readFileList(manifestText)
+local listed = {}
+for index, file in ipairs(files) do listed[file] = index end
+
+for _, file in ipairs(files) do
+  assert(not file:find('\\', 1, true),
+    'manifest paths must use forward slashes, which the offline loader also reads: ' .. file)
+  assert(not file:find('Pins', 1, true), 'no pins file may ship in the addon folder: ' .. file)
+end
+assert(not io.open('dist/EfficientQuests/Libs/HereBeDragons/HereBeDragons-Pins-2.0.lua'),
+  'the pins library draws on maps and must not sit in the addon folder unlisted')
+print('ok - no pins file is listed or shipped')
+
+assert(listed['Libs/LibStub/LibStub.lua'], 'LibStub must be embedded and loaded')
+assert(listed['Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua'], 'CallbackHandler-1.0 must be embedded and loaded')
+assert(listed['Libs/LibStub/LibStub.lua'] < listed['Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua'],
+  'CallbackHandler-1.0 registers through LibStub, so LibStub must load first')
+assert(listed['Libs/HereBeDragons/HereBeDragons-2.0.lua'], 'HereBeDragons 2.0 must be embedded and loaded')
+assert(listed['Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua'] < listed['Libs/HereBeDragons/HereBeDragons-2.0.lua'],
+  'HereBeDragons needs CallbackHandler-1.0, so CallbackHandler must load first')
+print('ok - the three libraries are embedded in dependency order')
+
+assert(listed['Core.lua'], 'the entry point must load')
+assert(listed['Libs/HereBeDragons/HereBeDragons-2.0.lua'] < listed['Core.lua'],
+  'the libraries must load before the addon code')
+assert(not listed['Interface.lua'],
+  'the old window module is a frozen reference and must stay out of the load order')
+print('ok - the entry point loads after the libraries and the reference window stays unloaded')
 
 for _, addon in ipairs({'Guidelime', 'Questie'}) do
   assert(not required[addon] and not optional[addon],
@@ -63,7 +102,7 @@ end
 print('ok - Guidelime and Questie are not declared')
 
 local shipped = {{path = 'dist/EfficientQuests/EfficientQuests.toc', text = manifestText}}
-for _, file in ipairs(readFileList(manifestText)) do
+for _, file in ipairs(files) do
   local path = 'dist/EfficientQuests/' .. file
   table.insert(shipped, {path = path, text = readAll(path)})
 end

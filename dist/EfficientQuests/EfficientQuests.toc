@@ -1,11 +1,18 @@
 ## Interface: 16001
 ## Title: Efficient Quests
-## Notes: Practical questing advice without a prescribed route.
-## Version: 0.2.0
-## Dependencies: QuestieDB
-## OptionalDeps: FlareUI
+## Notes: A step-by-step leveling guide for the Forever client.
+## Version: 0.3.0
+## OptionalDeps: FlareUI, TomTom, QuestieDB
+## SavedVariables: EfficientQuestsDB
 ## SavedVariablesPerCharacter: EfficientQuestsCharacter
 
-# The old window module Interface.lua stays in this folder as a reference
-# for the new step window. It is not loaded: the modules it needs are gone.
+# The embedded libraries load first, in dependency order: HereBeDragons
+# needs LibStub and CallbackHandler. The pins part of HereBeDragons is
+# not embedded, because pins draw on maps.
+Libs/LibStub/LibStub.lua
+Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
+Libs/HereBeDragons/HereBeDragons-2.0.lua
 Core.lua
+
+# Interface.lua is the old window module. It stays in this folder as a
+# frozen reference for the new step window and is never loaded.
