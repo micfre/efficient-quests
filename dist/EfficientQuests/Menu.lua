@@ -16,13 +16,47 @@ local BORDER = { 0.65, 0.49, 0.27 }
 local ACCENT = { 0.61, 0.48, 0.29 }
 local PLATE = { 0.08, 0.08, 0.09 }
 local WIDTH = 260
-local ROW = 16 -- one line of the skipped-quest list
+-- The layout runs in fixed steps: a title band, one line per section
+-- label, one line per list row, and air at the bottom.
+local HEADER, SECTION, ROW, PAD = 34, 20, 16, 14
 
 local menu
 local questBlock -- holds the rows of the moment under the section label
 local pool = {} -- quest rows from earlier refreshes, hidden and reusable
 local usedRows = {} -- the quest rows on screen right now
 local emptyLine -- the plain sentence for an empty list, reused
+local dungeonRows = {} -- one row per known dungeon, built once
+
+-- The names of the dungeons, in our own words from the guide texts. The
+-- generated guide table carries a short key and a level range per dungeon
+-- but no display name; wings that the guide finds by name carry theirs in
+-- their names list, and the key stands in for anything still unknown.
+local DUNGEON_NAMES = {
+  [389] = "Ragefire Chasm", [43] = "Wailing Caverns", [48] = "Blackfathom Deeps",
+  [33] = "Shadowfang Keep", [47] = "Razorfen Kraul", [36] = "The Deadmines",
+  [90] = "Gnomeregan", [129] = "Razorfen Downs", [70] = "Uldaman",
+  [349] = "Maraudon", [209] = "Zul'Farrak", [109] = "The Sunken Temple",
+  [34] = "The Stockade", [289] = "Scholomance", [230] = "Blackrock Depths",
+  [1891] = "Scarlet Monastery: Graveyard", [1892] = "Scarlet Monastery: Library",
+  [1893] = "Scarlet Monastery: Armory", [1894] = "Scarlet Monastery: Cathedral",
+  [3291] = "Stratholme: Main Gate", [3292] = "Stratholme: Service Gate",
+  [2291] = "Lower Blackrock Spire", [2292] = "Upper Blackrock Spire",
+  [4291] = "Dire Maul: East", [4292] = "Dire Maul: West", [4293] = "Dire Maul: North",
+  [2999] = "Ruins of Lordaeron",
+}
+
+-- The line the player reads for one dungeon: its name and its level
+-- range, as the place text of the steps joins its facts with a dot.
+local function dungeonLabel(instanceId, guide)
+  local name = DUNGEON_NAMES[instanceId]
+    or (type(guide.names) == "table" and type(guide.names[1]) == "string" and guide.names[1])
+    or (type(guide.key) == "string" and guide.key)
+    or tostring(instanceId)
+  if type(guide.levels) == "string" then
+    return name .. " · " .. guide.levels
+  end
+  return name
+end
 
 -- The name of a quest, from the generated quest table of the namespace.
 -- When the data store reported the table broken, or a quest id is not in
@@ -57,6 +91,26 @@ local function sectionLabel(text, below)
   return label
 end
 
+-- The known dungeons in the order a player meets them: by the level their
+-- guide starts at, and by instance id where those agree.
+local function knownDungeons()
+  local ids = {}
+  for instanceId, guide in pairs(ns.DungeonGuides) do
+    table.insert(ids, { id = instanceId, guide = guide })
+  end
+  local function startsAt(entry)
+    local level = type(entry.guide.levels) == "string"
+      and tonumber(entry.guide.levels:match("^%d+")) or nil
+    return level or math.huge
+  end
+  table.sort(ids, function(a, b)
+    local mine, theirs = startsAt(a), startsAt(b)
+    if mine ~= theirs then return mine < theirs end
+    return a.id < b.id
+  end)
+  return ids
+end
+
 local function build()
   menu = CreateFrame("Frame", "EfficientQuestsMenu", UIParent)
   menu:SetSize(WIDTH, 200)
@@ -73,6 +127,42 @@ local function build()
   questBlock = CreateFrame("Frame", nil, menu)
   questBlock:SetPoint("TOPLEFT", questsLabel, "BOTTOMLEFT", 0, -4)
   questBlock:SetWidth(WIDTH - 24)
+
+  -- The dungeon rows hang under the quest block, so they follow wherever
+  -- the skipped-quest list ends. A broken dungeon guide table leaves the
+  -- section out; the data store has said its message already.
+  if type(ns.DungeonGuides) == "table" then
+    local dungeonsLabel = sectionLabel("Dungeon guides", questBlock)
+    local block = CreateFrame("Frame", nil, menu)
+    block:SetPoint("TOPLEFT", dungeonsLabel, "BOTTOMLEFT", 0, -4)
+    block:SetWidth(WIDTH - 24)
+    local anchor = block
+    for at, entry in ipairs(knownDungeons()) do
+      local row = CreateFrame("Frame", nil, block)
+      row:SetSize(WIDTH - 24, ROW)
+      if at == 1 then
+        row:SetPoint("TOPLEFT", block, "TOPLEFT", 0, 0)
+      else
+        row:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, 0)
+      end
+      local label = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+      label:SetPoint("LEFT", row, "LEFT", 0, 0)
+      label:SetJustifyH("LEFT")
+      label:SetText(dungeonLabel(entry.id, entry.guide))
+      anchor = row
+      dungeonRows[at] = row
+    end
+  end
+end
+
+-- The window is as tall as its content: the bands and rows stack up to
+-- the bottom padding.
+local function layout()
+  local height = HEADER + SECTION + math.max(#usedRows, 1) * ROW
+  if #dungeonRows > 0 then
+    height = height + SECTION + #dungeonRows * ROW
+  end
+  menu:SetSize(WIDTH, height + PAD)
 end
 
 -- One row of the skipped-quest list: the quest's name on the left, its
@@ -140,6 +230,7 @@ EQ.Menu = {}
 function EQ.Menu.Open(anchor)
   if not menu then build() end
   refreshQuests()
+  layout()
   menu:ClearAllPoints()
   if anchor then
     menu:SetPoint("TOPLEFT", anchor, "TOPRIGHT", 10, 0)

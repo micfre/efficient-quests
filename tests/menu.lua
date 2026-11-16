@@ -199,3 +199,52 @@ assert(not afterRestore['Bounty on Garrick Padfoot'],
 assert(afterRestore['Stonetalon Standstill'],
   'the other skipped quest must stay on the list')
 print('ok - skipped quests are listed by name and restored from the menu')
+
+-- The menu also names every dungeon the data store holds a guide for. The
+-- count comes from the shipped dungeon guide table itself, so a dungeon
+-- added to the data must reach the menu too. Instance 389 is Ragefire
+-- Chasm and instance 36 is The Deadmines; their guides say so under
+-- Orgrimmar and Moonbrook.
+local guideNamespace = {}
+assert(loadfile('dist/EfficientQuests/DungeonGuides.lua'))('EfficientQuests', guideNamespace)
+local knownDungeons = 0
+for _ in pairs(guideNamespace.DungeonGuides) do knownDungeons = knownDungeons + 1 end
+
+EfficientQuests.Menu.Open()
+local dungeonTexts = textsOf(menu)
+assert(dungeonTexts['Dungeon guides'],
+  'the menu must label the section the dungeons belong to')
+assert(dungeonTexts['Ragefire Chasm · 13-18'],
+  'the menu must list Ragefire Chasm with its level range')
+assert(dungeonTexts['The Deadmines · 17-26'],
+  'the menu must list The Deadmines with its level range')
+
+-- The count comes from the shipped table through the row the literal
+-- names: every dungeon sits on one row of the same list, so the list must
+-- hold exactly as many rows as there are guides.
+local rfcRow, deadminesRow
+local function findRows(node)
+  for _, child in ipairs(node.children or {}) do
+    for _, field in ipairs(child.children or {}) do
+      if field.kind == 'FontString' and field.text == 'Ragefire Chasm · 13-18' then
+        rfcRow = child
+      end
+      if field.kind == 'FontString' and field.text == 'The Deadmines · 17-26' then
+        deadminesRow = child
+      end
+    end
+    findRows(child)
+  end
+end
+findRows(menu)
+assert(rfcRow and deadminesRow, 'each dungeon must sit on a row of its own')
+local dungeonList = rfcRow.parent
+assert(dungeonList == deadminesRow.parent,
+  'every dungeon row must sit in the one dungeon list')
+local rows = 0
+for _, child in ipairs(dungeonList.children) do
+  if child.shown then rows = rows + 1 end
+end
+assert(rows == knownDungeons,
+  'the menu must list every known dungeon: ' .. knownDungeons .. ' rows')
+print('ok - every known dungeon is listed with its level range')
