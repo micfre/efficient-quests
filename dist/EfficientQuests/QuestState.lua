@@ -235,6 +235,16 @@ function reader.GetPlayerWorld()
     return { x, y, instance }
 end
 
+--- Whether the player stands inside an instance right now. This is the
+--- question behind the "no position inside an instance" rule above, asked
+--- on its own so a caller can guard on the instance itself -- the TomTom
+--- bridge does, for the dungeon rule of user story 43 -- instead of
+--- leaning on the position coming back nil.
+function reader.IsInInstance()
+    if not IsInInstance then return false end
+    return IsInInstance() == true
+end
+
 --- The map the player stands on, or nil when the map service knows none.
 function reader.GetPlayerMap()
     if not (C_Map and C_Map.GetBestMapForUnit) then return nil end

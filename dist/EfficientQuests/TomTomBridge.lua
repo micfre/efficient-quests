@@ -22,16 +22,20 @@
 --   another step, no step, or shown = false.
 --
 --   No waypoint without a place. A step whose data knows no coordinates,
---   or a player the reader cannot place, sets nothing. Inside an instance
---   the reader answers no player position at all, so no waypoint ever
---   points into a dungeon (user story 43).
+--   or a player the reader cannot place, sets nothing. The dungeon rule
+--   of user story 43 is its own explicit guard: the bridge asks the
+--   reader's IsInInstance question first and sets nothing inside an
+--   instance, so the rule does not hang on the reader answering no
+--   position there.
 --
 --   No display flags. The bridge passes no map, minimap, arrow, or
 --   clear-distance flags, so the player's own TomTom options decide how
 --   the waypoint appears and when it says the player arrived. The one
 --   thing the bridge does say is persistent = false: a step waypoint
---   lives one session, and without it TomTom's "save new waypoints"
---   setting would keep it across logins.
+--   lives one session, because a persisted one would outlive the
+--   addon's control and break the removal stories -- and without the
+--   flag TomTom's "save new waypoints" setting would keep it across
+--   logins.
 --
 --   The off switch. The account-wide waypoints option turns the bridge
 --   off; the default is on (user story 40). The options panel calls
@@ -126,6 +130,10 @@ local function placeWaypoint(point, title)
     uid = TomTom:AddWaypoint(point[1], point[2] / 100, point[3] / 100, {
         title = title,
         from = "Efficient Quests",
+        -- One session only: a persisted step waypoint would outlive the
+        -- addon's control and break the removal stories -- the marker of
+        -- a step that ended, a quest the player skipped, or a window the
+        -- player hid must not come back at the next login.
         persistent = false,
     })
 end
@@ -138,10 +146,18 @@ local function samePlace(point)
 end
 
 local function sync(shown, step)
+    -- The explicit dungeon guard of user story 43: inside an instance no
+    -- waypoint may point anywhere, whether or not the reader can place
+    -- the player. The guard stands on its own question, not on
+    -- GetPlayerWorld happening to answer nil inside instances.
+    if reader.IsInInstance() then
+        removeOurs()
+        return
+    end
     if tomtomHere() and waypointsOn() and shown == true
         and type(step) == "table" and type(step.points) == "table" then
-        -- No player position, no waypoint: inside an instance the reader
-        -- answers nil, and the bridge must never point into a dungeon.
+        -- No player position, no waypoint: a place the maps cannot place
+        -- is not a place to point at.
         local here = reader.GetPlayerWorld()
         local point = here and nearestOf(step.points, here) or nil
         if validPoint(point) then
