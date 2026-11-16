@@ -107,3 +107,17 @@ end
 assert(fixedToScreen,
   'without an anchor the menu must sit at a fixed spot on the screen')
 print('ok - Menu.Open builds and shows the menu without an anchor')
+
+-- The anchor seam the step window builds on: Open puts the menu's top left
+-- beside the anchor's top right, so the menu never covers the window.
+local stepWindow = CreateFrame('Frame')
+local anchored = EfficientQuests.Menu.Open(stepWindow)
+assert(anchored == menu, 'a second Open must reuse the menu it built before')
+local beside = false
+for _, point in ipairs(menu.points) do
+  if point[1] == 'TOPLEFT' and point[2] == stepWindow and point[3] == 'TOPRIGHT' then
+    beside = true
+  end
+end
+assert(beside, 'with an anchor the menu must sit beside the anchor window')
+print('ok - Menu.Open anchors the menu beside the window it is given')
