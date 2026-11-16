@@ -36,9 +36,19 @@ DataStore.lua
 # the quest state callbacks to the character stores.
 RoutePlanner.lua
 
+# The QuestieDB fallback appends its lookups after the data store's own,
+# so the store always wins and QuestieDB answers only what the store
+# lacks. It loads last of the lookup modules, and its missing-data
+# notices sit at the end of every lookup chain.
+QuestieFallback.lua
+
 # The options panel is a window of our own; it opens from the step window
 # and from the /eq command, so it builds itself only on first open.
 Options.lua
+
+# The menu opens beside the step window, which hands itself over as the
+# anchor of Menu.Open. Without an anchor it sits at a fixed screen spot.
+Menu.lua
 
 # Interface.lua is the old window module. It stays in this folder as a
 # frozen reference for the new step window and is never loaded.
