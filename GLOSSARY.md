@@ -16,6 +16,7 @@ This glossary defines the domain terms of the Efficient Quests addon. The specif
 - Quest state reader: the module that reads the quest log, the completed quests, the objective counts, the level, the race, the class, and the faction. It is the only module that talks to the quest functions of the game.
 - QuestieDB fallback: the fallback in which the quest state reader asks QuestieDB for the name and the coordinates of a quest or an NPC that the data store lacks. It never replaces data that the store already has.
 - Route: the ordered list of steps that the player follows.
+- Route entry: one item of the route. The step model turns it into a step.
 - Route planner: the module that builds the route from the data store and the quest state. It is a port of the Path walker of Trailwright.
 - Skip list: the quests that the player chose to leave out. It belongs to one character.
 - Step: one unit of the leveling guide, such as "Pick up a quest" or "Hand in a quest".
