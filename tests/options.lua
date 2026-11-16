@@ -163,3 +163,24 @@ assert(control(opacity, 'Slider'):GetValue() == 1,
 assert(showsText(scale, '100%') and showsText(opacity, '100%'),
   'both slider rows must write their value out for the player')
 print('ok - the panel shows the saved-data defaults when it opens')
+
+-- A saved session: the player changed the options earlier, and the panel
+-- must show those values, not the defaults, every time it opens.
+EfficientQuestsDB.waypoints = false
+EfficientQuestsDB.locked = true
+EfficientQuestsDB.scale = 0.75
+EfficientQuestsDB.opacity = 0.5
+EfficientQuests.Options.Open()
+assert(control(rowByLabel('Waypoints'), 'CheckButton'):GetChecked() == false,
+  'a saved off waypoint toggle must show as off')
+assert(control(rowByLabel('Lock window'), 'CheckButton'):GetChecked() == true,
+  'a saved on window lock must show as on')
+assert(control(rowByLabel('Scale'), 'Slider'):GetValue() == 0.75,
+  'a saved scale of 0.75 must show on the slider')
+assert(showsText(rowByLabel('Scale'), '75%'),
+  'the scale row must write out 75%')
+assert(control(rowByLabel('Opacity'), 'Slider'):GetValue() == 0.5,
+  'a saved opacity of 0.5 must show on the slider')
+assert(showsText(rowByLabel('Opacity'), '50%'),
+  'the opacity row must write out 50%')
+print('ok - the panel shows saved values from the account-wide store on open')
