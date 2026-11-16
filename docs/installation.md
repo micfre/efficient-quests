@@ -4,6 +4,8 @@ Efficient Quests is one addon folder. The repository ships the built addon at `d
 
 There are no plugins, no releases page, and no extra downloads. The addon does not need guide files or helper addons.
 
+The dungeon guide text is written for the Classic versions of the dungeons. The Forever client can differ.
+
 ## Install the addon
 
 1. Find the `Interface/AddOns` folder of your Forever client installation.
