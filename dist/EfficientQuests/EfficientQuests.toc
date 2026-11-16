@@ -77,6 +77,11 @@ LookAdapter.lua
 # it loads after the step window it follows.
 TomTomBridge.lua
 
+# The dungeon guide takes the display over from the step window while the
+# player is inside a dungeon the data knows, and hands it back on exit, so
+# it loads after the step window it hands over with.
+DungeonGuide.lua
+
 # The slash commands /eq and /efficientquests are the player's way in:
 # they toggle the step window, open the options, and print the status.
 # They load last, after every module they drive.
