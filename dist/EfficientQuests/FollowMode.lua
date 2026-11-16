@@ -33,16 +33,19 @@
 --   SetFollowMode(on)  turns Follow mode on or off and keeps the choice
 --                       in the character store. Turning it on adopts the
 --                       quest the client tracks right now, if any;
---                       turning it off clears the pick.
+--                       turning it off clears the pick. This switch --
+--                       the title-bar toggle of the window (story 27) --
+--                       is the only control that turns the mode off.
 --   SetFollowTarget(questID)  the pick itself, by hand. Nil clears the
 --                       pick. A pick while Follow mode is off is
 --                       ignored, so no step is ever served while the
 --                       mode is off.
---   ReturnToRoute()    the click on the step (user story 30): it turns
---                       Follow mode off -- the story says the click
---                       leaves Follow mode, so the next pick in the log
---                       does not restart the following; the window's
---                       toggle turns it back on -- and clears the pick.
+--   ReturnToRoute()    the click on the step (user story 30): it clears
+--                       the pick, so the window returns to the route,
+--                       but leaves Follow mode itself on. Turning the
+--                       mode off is the toggle's work alone, so a later
+--                       pick in the log follows again without another
+--                       click on the toggle.
 --
 --   RegisterCallback(owner, "FollowChanged", fn)  the
 --   CallbackHandler-1.0 subscription. FollowChanged fires with the same
@@ -128,13 +131,12 @@ function follow.SetFollowMode(on)
 end
 
 --- The click on the step (user story 30): the return to the route. It
---- turns Follow mode off -- the story says the click leaves Follow mode
---- quickly, so the next pick in the log does not restart the following;
---- the window's toggle turns it back on -- and clears the pick. The
---- choice reaches the character store, like every other switch.
+--- clears the pick -- the window shows the route again -- but leaves
+--- Follow mode itself on: the title-bar toggle (story 27) is the only
+--- control that turns the mode off and keeps that choice, so a later
+--- pick in the log follows again without another click on the toggle.
 function follow.ReturnToRoute()
     picked = nil
-    store.setFollowMode(false)
     changed()
 end
 

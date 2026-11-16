@@ -21,8 +21,10 @@
 -- controller on and off. While the mode is on and a quest is picked, the
 -- window shows the step of that quest instead of the route's step, the
 -- place line says "Following", and a click on the step headline returns
--- to the route (user story 30). With the mode on but nothing picked, the
--- window shows the route again, the way the Follow mode controller
+-- to the route (user story 30): the pick clears, the mode itself stays
+-- on -- the tick is the only control that turns it off -- and a later
+-- pick in the log follows again. With the mode on but nothing picked,
+-- the window shows the route again, the way the Follow mode controller
 -- documents its state.
 --
 -- The look. Flat by default: a dark plate with a thin bronze edge, the
@@ -541,7 +543,8 @@ local function build()
             end
             return
         end
-        if follow.GetFollowState().active then
+        local state = follow.GetFollowState()
+        if state.active and state.questID then
             follow.ReturnToRoute()
         end
     end)
