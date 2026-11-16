@@ -258,3 +258,17 @@ assert(blizzardRegistrations == 0,
 assert(flareTouches == 0,
   'the panel must not reach into FlareUI or its settings registry')
 print('ok - the panel registers itself nowhere')
+
+-- A window needs a way off the screen. The header carries a close button,
+-- the way the FlareUI options window does, and one click on it must hide
+-- the panel; the next Open brings it back.
+local closeButton
+for _, child in ipairs(panel.children) do
+  if child.kind == 'Button' then closeButton = child end
+end
+assert(closeButton, 'the panel must carry a close button in its header')
+closeButton.scripts.OnClick(closeButton, 'LeftButton')
+assert(not panel:IsShown(), 'a click on the close button must hide the panel')
+EfficientQuests.Options.Open()
+assert(panel:IsShown(), 'Open must bring the hidden panel back')
+print('ok - the close button hides the panel and Open brings it back')

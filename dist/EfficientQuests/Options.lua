@@ -59,6 +59,16 @@ local function build()
   rule:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -28)
   rule:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -28)
 
+  -- The close button, top right in the band, the way every FlareUI window
+  -- carries one.
+  local close = CreateFrame("Button", nil, panel)
+  close:SetSize(20, 20)
+  close:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -8, -8)
+  local closeLabel = close:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  closeLabel:SetAllPoints(close)
+  closeLabel:SetText("X")
+  close:SetScript("OnClick", function() panel:Hide() end)
+
   local anchor -- each row hangs below the one above it
   local function row(labelText)
     local rowFrame = CreateFrame("Frame", nil, panel)
