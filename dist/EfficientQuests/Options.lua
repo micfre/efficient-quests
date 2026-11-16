@@ -74,7 +74,8 @@ local function build()
 
   -- A checkbox the way the FlareUI options draw theirs: Blizzard's minimal
   -- box with the gold checkmark on top, sitting at the row's right edge.
-  local function checkRow(labelText)
+  -- The click hands the new state straight to the saved table.
+  local function checkRow(labelText, apply)
     local rowFrame = row(labelText)
     local check = CreateFrame("CheckButton", nil, rowFrame)
     check:SetSize(28, 28)
@@ -85,6 +86,7 @@ local function build()
     tick:SetAtlas("checkmark-minimal")
     tick:SetPoint("CENTER")
     check:SetCheckedTexture(tick)
+    check:SetScript("OnClick", function(self) apply(self:GetChecked()) end)
     return check
   end
 
@@ -106,8 +108,8 @@ local function build()
   end
 
   checks = {
-    waypoints = checkRow("Waypoints"),
-    locked = checkRow("Lock window"),
+    waypoints = checkRow("Waypoints", function(on) EfficientQuestsDB.waypoints = on end),
+    locked = checkRow("Lock window", function(on) EfficientQuestsDB.locked = on end),
   }
   sliders = {
     scale = sliderRow("Scale", 0.5, 1.5),

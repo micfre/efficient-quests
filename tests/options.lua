@@ -164,6 +164,33 @@ assert(showsText(scale, '100%') and showsText(opacity, '100%'),
   'both slider rows must write their value out for the player')
 print('ok - the panel shows the saved-data defaults when it opens')
 
+-- A click on a checkbox, the way the client does it: the box flips first,
+-- then its OnClick runs. Whatever the player ticks must land in the saved
+-- table at once, because nothing else confirms it.
+local function click(check)
+  check:SetChecked(not check:GetChecked())
+  local handler = check.scripts.OnClick
+  if handler then handler(check, 'LeftButton') end
+end
+
+local waypointsCheck = control(rowByLabel('Waypoints'), 'CheckButton')
+click(waypointsCheck)
+assert(EfficientQuestsDB.waypoints == false,
+  'one click on the on waypoint toggle must turn the option off in the saved table')
+click(waypointsCheck)
+assert(EfficientQuestsDB.waypoints == true,
+  'a second click must turn the waypoint option back on')
+print('ok - the waypoint toggle persists to the saved table on click')
+
+local lockCheck = control(rowByLabel('Lock window'), 'CheckButton')
+click(lockCheck)
+assert(EfficientQuestsDB.locked == true,
+  'one click on the off lock toggle must lock the window in the saved table')
+click(lockCheck)
+assert(EfficientQuestsDB.locked == false,
+  'a second click must unlock the window again')
+print('ok - the window lock persists to the saved table on click')
+
 -- A saved session: the player changed the options earlier, and the panel
 -- must show those values, not the defaults, every time it opens.
 EfficientQuestsDB.waypoints = false
