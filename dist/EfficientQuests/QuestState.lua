@@ -41,13 +41,13 @@
 -- A later module registers lookup functions, and the reader runs them in
 -- registration order until one answers:
 --
---   reader:RegisterLookup("questName", function(questID) ... end)
---   reader:RegisterLookup("npcName", function(npcID) ... end)
---   reader:RegisterLookup("npcPosition", function(npcID) ... end)
+--   reader.RegisterLookup("questName", function(questID) ... end)
+--   reader.RegisterLookup("npcName", function(npcID) ... end)
+--   reader.RegisterLookup("npcPosition", function(npcID) ... end)
 --       -> { uiMapID, x, y } in percent coordinates, or nil
 --
--- The questions reader:QuestName(questID), reader:NpcName(npcID), and
--- reader:NpcPosition(npcID) go through that chain. The data store
+-- The questions reader.QuestName(questID), reader.NpcName(npcID), and
+-- reader.NpcPosition(npcID) go through that chain. The data store
 -- registers first, so a later QuestieDB fallback only sees what the store
 -- left unanswered. QuestName answers from the live quest log first.
 
@@ -63,7 +63,7 @@ local function fire(name, payload)
 end
 
 -- The last-read state. The log is refreshed when the game says the quest
--- log changed; the player facts are read live, with the level anounced by
+-- log changed; the player facts are read live, with the level announced by
 -- PLAYER_LEVEL_UP kept while UnitLevel still answers the old one.
 local state = {
     level = nil, levelFromEvent = nil,
