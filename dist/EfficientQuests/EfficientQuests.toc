@@ -63,7 +63,12 @@ Menu.lua
 
 # The step window is the addon's face: it renders the step the model
 # builds, pages the route, follows the picked quest, and offers the skip
-# action. It loads last, after every module it asks.
+# action. It loads after every module it asks.
+StepWindow.lua
+
+# The step window is the addon's face: it renders the step the model
+# builds, pages the route, follows the picked quest, and offers the skip
+# action. It loads after every module it asks.
 StepWindow.lua
 
 # The look adapter restyles the step window after the FlareUI tracker and
@@ -71,3 +76,8 @@ StepWindow.lua
 # FlareUI, so it loads after the step window it restyles, and it listens
 # for the window's own changed signal to re-apply the look.
 LookAdapter.lua
+
+# The slash commands /eq and /efficientquests are the player's way in:
+# they toggle the step window, open the options, and print the status.
+# They load last, after every module they drive.
+Commands.lua

@@ -11,11 +11,13 @@ globals = {
   "EfficientQuestsDB",
   "EfficientQuestsCharacter",
   -- The slash-command registration of the client.
+  "SLASH_EQ1",
   "SLASH_EFFICIENTQUESTS1",
   "SlashCmdList",
   -- Game services that the addon reads.
   "CreateFrame",
   "DEFAULT_CHAT_FRAME",
+  "GetAddOnMetadata",
   "UIParent",
   "GameTooltip",
   "C_Map",
