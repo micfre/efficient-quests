@@ -124,6 +124,16 @@ local function build()
   title:SetJustifyH("LEFT")
   title:SetText("Efficient Quests")
 
+  -- The close button, top right in the band, the way every window of the
+  -- addon carries one.
+  local close = CreateFrame("Button", nil, menu)
+  close:SetSize(20, 20)
+  close:SetPoint("TOPRIGHT", menu, "TOPRIGHT", -8, -6)
+  local closeLabel = close:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  closeLabel:SetAllPoints(close)
+  closeLabel:SetText("X")
+  close:SetScript("OnClick", function() menu:Hide() end)
+
   local questsLabel = sectionLabel("Skipped quests", title)
   questBlock = CreateFrame("Frame", nil, menu)
   questBlock:SetPoint("TOPLEFT", questsLabel, "BOTTOMLEFT", 0, -4)

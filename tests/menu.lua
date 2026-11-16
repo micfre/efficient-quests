@@ -262,3 +262,20 @@ EfficientQuests.Options.Open = realOpen
 assert(opensBefore == 1,
   'one click on the options link must call Options.Open exactly once')
 print('ok - the options link opens the options panel')
+
+-- A menu needs a way off the screen. The header carries a close button,
+-- one click hides the menu, and the next Open brings it back.
+local closeButton
+for _, child in ipairs(menu.children) do
+  if child.kind == 'Button' then
+    for _, field in ipairs(child.children) do
+      if field.kind == 'FontString' and field.text == 'X' then closeButton = child end
+    end
+  end
+end
+assert(closeButton, 'the menu must carry a close button in its header')
+closeButton.scripts.OnClick(closeButton, 'LeftButton')
+assert(not menu:IsShown(), 'a click on the close button must hide the menu')
+EfficientQuests.Menu.Open()
+assert(menu:IsShown(), 'Open must bring the hidden menu back')
+print('ok - the close button hides the menu and Open brings it back')
