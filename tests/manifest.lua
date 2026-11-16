@@ -4,9 +4,14 @@
 -- surface an installer receives, and no game services are needed.
 
 local function readAll(path)
-  local text = ''
-  for line in io.lines(path) do text = text .. line .. '\n' end
-  return text
+  -- Buffer the lines and join them once: the quest data file is megabytes
+  -- long, and growing one string line by line would copy it over and over.
+  local parts = {}
+  for line in io.lines(path) do
+    parts[#parts + 1] = line
+    parts[#parts + 1] = '\n'
+  end
+  return table.concat(parts)
 end
 
 local function readFileList(text)
@@ -94,6 +99,20 @@ assert(listed['Libs/HereBeDragons/HereBeDragons-2.0.lua'] < listed['Core.lua'],
 assert(not listed['Interface.lua'],
   'the old window module is a frozen reference and must stay out of the load order')
 print('ok - the entry point loads after the libraries and the reference window stays unloaded')
+
+-- The copied data tables ship as data files and load after the entry
+-- point, so every table is in place before any addon code reads it.
+for _, data in ipairs({'QuestData.lua', 'PathData.lua', 'DungeonGuides.lua'}) do
+  assert(listed[data], 'the copied data table must ship and load: ' .. data)
+  assert(listed['Libs/HereBeDragons/HereBeDragons-2.0.lua'] < listed[data],
+    'the data files load after the libraries: ' .. data)
+end
+assert(listed['DataStore.lua'], 'the data store module must load')
+for _, data in ipairs({'QuestData.lua', 'PathData.lua', 'DungeonGuides.lua'}) do
+  assert(listed[data] < listed['DataStore.lua'],
+    'the data store checks the tables after every data file has loaded: ' .. data)
+end
+print('ok - the data files and the data store load in order')
 
 for _, addon in ipairs({'Guidelime', 'Questie'}) do
   assert(not required[addon] and not optional[addon],
