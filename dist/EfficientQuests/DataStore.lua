@@ -86,3 +86,48 @@ for _, setting in ipairs(TABLES) do
         report(setting, "malformed")
     end
 end
+
+-- The store answers first on the reader's query seam: it registers one
+-- lookup per kind, reading the copied tables directly, before any later
+-- fallback (the QuestieDB module) appends its own -- the reader runs the
+-- chain in registration order, so the store always wins. A missing or
+-- malformed table answers nothing here -- the loader said its one message
+-- above -- and the question falls through to the fallback instead of
+-- raising. The reader itself loads first by the manifest; if even that
+-- file is gone, the install is broken, and the store keeps quiet, the
+-- same promise the loader makes about the tables.
+local reader = EfficientQuests.questState
+
+if reader then
+    -- The quest table maps ids to entries whose first field is the name.
+    reader.RegisterLookup("questName", function(questID)
+        local quest = type(ns.quests) == "table" and ns.quests[questID] or nil
+        if type(quest) == "table" and type(quest[1]) == "string" then
+            return quest[1]
+        end
+        return nil
+    end)
+
+    -- The extra name table is the correction layer: it wins over the base
+    -- one, the way the Trailwright code reads them.
+    reader.RegisterLookup("npcName", function(npcID)
+        local extra = type(ns.npcNamesExtra) == "table" and ns.npcNamesExtra[npcID] or nil
+        if type(extra) == "string" then return extra end
+        local base = type(ns.npcNames) == "table" and ns.npcNames[npcID] or nil
+        if type(base) == "string" then return base end
+        return nil
+    end)
+
+    -- The spawn table lists flat { uiMapID, x, y } triples per npc in
+    -- percent; the first point is the one the Trailwright code used too.
+    reader.RegisterLookup("npcPosition", function(npcID)
+        local spawns = type(ns.npcSpawns) == "table" and ns.npcSpawns[npcID] or nil
+        if type(spawns) == "table"
+            and type(spawns[1]) == "number"
+            and type(spawns[2]) == "number"
+            and type(spawns[3]) == "number" then
+            return { spawns[1], spawns[2], spawns[3] }
+        end
+        return nil
+    end)
+end

@@ -384,11 +384,14 @@ print('ok - the reader answers the position and the map when asked')
 -- lookups, the data store first and a QuestieDB fallback later, and the
 -- questions run the chain until one answers. The reader itself never
 -- touches QuestieDB -- the sentinels at the top of this suite fail the
--- run the moment anything does.
+-- run the moment anything does. The data store registers its own lookups
+-- at load, ahead of anything planted here, so the chain tests ask for ids
+-- that the copied tables do not hold; a real id would let the store
+-- answer before the suite's own fakes run.
 local asked = {}
 reader.RegisterLookup('questName', function(questID)
   table.insert(asked, 'store:' .. questID)
-  if questID == 91 then return 'An old errand (store)' end
+  if questID == 91001 then return 'An old errand (store)' end
   return nil
 end)
 reader.RegisterLookup('questName', function(questID)
@@ -403,28 +406,28 @@ seen = {}
 assert(reader.QuestName(94) == 'From the log',
   'a quest in the log must answer its name from the log first, before any lookup')
 assert(#asked == 0, 'a log title must not run the lookups at all')
-assert(reader.QuestName(91) == 'An old errand (store)',
+assert(reader.QuestName(91001) == 'An old errand (store)',
   'the data store lookup must answer the quest name')
-assert(asked[#asked] == 'store:91',
+assert(asked[#asked] == 'store:91001',
   'a lookup that answers must stop the chain: the fallback never runs')
-assert(reader.QuestName(92) == 'Quest 92 (from QuestieDB)',
+assert(reader.QuestName(91002) == 'Quest 91002 (from QuestieDB)',
   'the later lookup must answer what the store left unanswered')
-assert(asked[#asked - 1] == 'store:92' and asked[#asked] == 'fallback:92',
+assert(asked[#asked - 1] == 'store:91002' and asked[#asked] == 'fallback:91002',
   'the chain must ask the store first, the fallback second')
 asked = {}
 
 reader.RegisterLookup('npcName', function(npcID)
-  if npcID == 823 then return 'Deputy Willem' end
+  if npcID == 91003 then return 'Deputy Willem' end
   return nil
 end)
-assert(reader.NpcName(823) == 'Deputy Willem', 'the npc name lookup must answer')
+assert(reader.NpcName(91003) == 'Deputy Willem', 'the npc name lookup must answer')
 assert(reader.NpcName(999) == nil, 'an unknown npc must answer nil')
 
 reader.RegisterLookup('npcPosition', function(npcID)
-  if npcID == 823 then return { 1429, 48.2, 42.9 } end
+  if npcID == 91003 then return { 1429, 48.2, 42.9 } end
   return nil
 end)
-local spot = reader.NpcPosition(823)
+local spot = reader.NpcPosition(91003)
 assert(spot ~= nil and spot[1] == 1429 and spot[2] == 48.2 and spot[3] == 42.9,
   'the npc position lookup must answer { uiMapID, x, y } in percent')
 assert(reader.NpcPosition(999) == nil, 'an unknown npc position must answer nil')
