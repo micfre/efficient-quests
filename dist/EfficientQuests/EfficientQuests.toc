@@ -65,6 +65,3 @@ Menu.lua
 # builds, pages the route, follows the picked quest, and offers the skip
 # action. It loads last, after every module it asks.
 StepWindow.lua
-
-# Interface.lua is the old window module. It stays in this folder as a
-# frozen reference for the new step window and is never loaded.

@@ -100,8 +100,10 @@ assert(listed['QuestState.lua'], 'the quest state reader must load')
 assert(listed['Core.lua'] < listed['QuestState.lua'],
   'the quest state reader hangs off the addon table, so it must load after the entry point')
 assert(not listed['Interface.lua'],
-  'the old window module is a frozen reference and must stay out of the load order')
-print('ok - the entry point loads after the libraries and the reference window stays unloaded')
+  'the old window module must stay out of the load order')
+assert(not io.open('dist/EfficientQuests/Interface.lua'),
+  'the step window replaced the old window module; the frozen reference must be gone from the folder')
+print('ok - the entry point loads after the libraries and the old window module is gone')
 
 -- The copied data tables ship as data files and load after the entry
 -- point, so every table is in place before any addon code reads it.
