@@ -801,9 +801,16 @@ assert(guide.IsActive() == false, 'leaving a name-found dungeon stops the guide'
 print('ok - a dungeon the data knows only by name resolves and runs')
 
 -- The real copied data through the shared seam: the whole addon loads the
--- way the game loads it, and the guide runs the real Ragefire Chasm.
+-- way the game loads it, and the guide runs the real Ragefire Chasm. The
+-- whole addon includes the TomTom bridge, so the sentinel gives way to a
+-- quiet TomTom that answers the bridge's surface.
 frames = {}
 EfficientQuestsDB, EfficientQuestsCharacter = {}, {}
+TomTom = {
+  IsCrazyArrowEmpty = function() return true end,
+  AddWaypoint = function() return {} end,
+  RemoveWaypoint = function() end,
+}
 dofile('tests/addon.lua')()
 fire('PLAYER_LOGIN')
 player.level = 16
