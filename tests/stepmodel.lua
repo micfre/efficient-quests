@@ -157,6 +157,7 @@ local function loadModel(quests, pathLine, tables)
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
   loadFile('DataStore.lua')
+  loadFile('Geo.lua')
   loadFile('RoutePlanner.lua')
   loadFile('StepModel.lua')
   for _, frame in ipairs(frames) do

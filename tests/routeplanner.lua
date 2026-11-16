@@ -132,6 +132,7 @@ local function loadPlanner(quests, pathLine)
   loadFile('Core.lua')
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
+  loadFile('Geo.lua')
   loadFile('RoutePlanner.lua')
   for _, frame in ipairs(frames) do
     if frame.events['PLAYER_LOGIN'] and frame.scripts.OnEvent then
