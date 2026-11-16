@@ -84,6 +84,7 @@ function Widget:SetMinMaxValues(low, high) self.minValue, self.maxValue = low, h
 function Widget:SetValue(value) self.value = value end
 function Widget:GetValue() return self.value end
 function Widget:SetValueStep(step) self.valueStep = step end
+function Widget:SetObeyStepOnDrag(obey) self.obeyStepOnDrag = obey end
 function Widget:SetOrientation(orientation) self.orientation = orientation end
 function Widget:SetAlpha(alpha) self.alpha = alpha end
 function Widget:SetScale(scale) self.scale = scale end
@@ -109,3 +110,56 @@ assert(type(panel) == 'table' and panel.kind == 'Frame',
   'Options.Open must build the options window and return it')
 assert(panel:IsShown(), 'Options.Open must leave the options window open')
 print('ok - Options.Open builds and shows the options window')
+
+-- The player reads the panel by its row labels and each row's control, so
+-- the suite finds a row by the text it shows and then the control on it.
+local function walk(frame, visit)
+  for _, child in ipairs(frame.children or {}) do
+    visit(child)
+    walk(child, visit)
+  end
+end
+
+local function rowByLabel(label)
+  local found
+  walk(panel, function(child)
+    if child.kind == 'FontString' and child.text == label and not found then
+      found = child.parent
+    end
+  end)
+  return found
+end
+
+local function control(row, kind)
+  for _, child in ipairs(row.children) do
+    if child.kind == kind then return child end
+  end
+end
+
+local function showsText(row, text)
+  for _, child in ipairs(row.children) do
+    if child.kind == 'FontString' and child.text == text then return true end
+  end
+  return false
+end
+
+-- A fresh login has the defaults in the saved table, and the panel must
+-- show exactly those: the waypoint toggle on, the window unlocked, and
+-- both sliders at 1, each with its value written out as a percentage.
+local waypoints = rowByLabel('Waypoints')
+local lock = rowByLabel('Lock window')
+local scale = rowByLabel('Scale')
+local opacity = rowByLabel('Opacity')
+assert(waypoints and lock and scale and opacity,
+  'the panel must hold one row each for waypoints, lock, scale, and opacity')
+assert(control(waypoints, 'CheckButton'):GetChecked() == true,
+  'the waypoint toggle must show its default: on')
+assert(control(lock, 'CheckButton'):GetChecked() == false,
+  'the window lock must show its default: off')
+assert(control(scale, 'Slider'):GetValue() == 1,
+  'the scale slider must show its default: 1')
+assert(control(opacity, 'Slider'):GetValue() == 1,
+  'the opacity slider must show its default: 1')
+assert(showsText(scale, '100%') and showsText(opacity, '100%'),
+  'both slider rows must write their value out for the player')
+print('ok - the panel shows the saved-data defaults when it opens')

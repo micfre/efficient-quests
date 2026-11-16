@@ -12,8 +12,12 @@ local BORDER = { 0.65, 0.49, 0.27 }
 local ACCENT = { 0.61, 0.48, 0.29 }
 local PLATE = { 0.08, 0.08, 0.09 }
 local WIDTH = 320
+-- The sliders move in steps of five percent, so a saved value never picks
+-- up trailing digits from a drag.
+local STEP = 0.05
 
 local panel
+local checks, sliders
 
 -- A flat dark plate with a thin bronze edge, the look the FlareUI options
 -- give their boxes: background and border come from one white texture each,
@@ -46,6 +50,83 @@ local function build()
   rule:SetHeight(1)
   rule:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -28)
   rule:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -28)
+
+  local anchor -- each row hangs below the one above it
+  local function row(labelText)
+    local rowFrame = CreateFrame("Frame", nil, panel)
+    rowFrame:SetSize(WIDTH - 20, 30)
+    if anchor then
+      rowFrame:SetPoint("TOPLEFT", anchor, "BOTTOMLEFT", 0, -4)
+    else
+      rowFrame:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -38)
+    end
+    anchor = rowFrame
+    -- the dark plate the row sits on, with a little air around its label
+    local plate = rowFrame:CreateTexture(nil, "BACKGROUND")
+    plate:SetColorTexture(PLATE[1] + 0.03, PLATE[2] + 0.03, PLATE[3] + 0.03, 0.9)
+    plate:SetAllPoints(rowFrame)
+    local label = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    label:SetPoint("LEFT", rowFrame, "LEFT", 8, 0)
+    label:SetJustifyH("LEFT")
+    label:SetText(labelText)
+    return rowFrame
+  end
+
+  -- A checkbox the way the FlareUI options draw theirs: Blizzard's minimal
+  -- box with the gold checkmark on top, sitting at the row's right edge.
+  local function checkRow(labelText)
+    local rowFrame = row(labelText)
+    local check = CreateFrame("CheckButton", nil, rowFrame)
+    check:SetSize(28, 28)
+    check:SetPoint("RIGHT", rowFrame, "RIGHT", -8, 0)
+    check:SetNormalAtlas("checkbox-minimal")
+    check:SetPushedAtlas("checkbox-minimal")
+    local tick = check:CreateTexture(nil, "ARTWORK")
+    tick:SetAtlas("checkmark-minimal")
+    tick:SetPoint("CENTER")
+    check:SetCheckedTexture(tick)
+    return check
+  end
+
+  -- A slider with its value written out as a percentage beside it, the
+  -- range rows of the FlareUI options in miniature.
+  local function sliderRow(labelText, low, high)
+    local rowFrame = row(labelText)
+    local value = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    value:SetPoint("RIGHT", rowFrame, "RIGHT", -8, 0)
+    value:SetJustifyH("RIGHT")
+    local slider = CreateFrame("Slider", nil, rowFrame)
+    slider:SetOrientation("HORIZONTAL")
+    slider:SetSize(110, 17)
+    slider:SetPoint("RIGHT", rowFrame, "RIGHT", -58, 0)
+    slider:SetMinMaxValues(low, high)
+    slider:SetValueStep(STEP)
+    slider:SetObeyStepOnDrag(true)
+    return { control = slider, value = value }
+  end
+
+  checks = {
+    waypoints = checkRow("Waypoints"),
+    locked = checkRow("Lock window"),
+  }
+  sliders = {
+    scale = sliderRow("Scale", 0.5, 1.5),
+    opacity = sliderRow("Opacity", 0.2, 1),
+  }
+end
+
+-- Bring what the panel shows in line with the saved table. Open calls
+-- this, so a panel that stayed built from an earlier session never shows a
+-- stale value.
+local function refresh()
+  checks.waypoints:SetChecked(EfficientQuestsDB.waypoints)
+  checks.locked:SetChecked(EfficientQuestsDB.locked)
+  local scale = sliders.scale
+  scale.control:SetValue(EfficientQuestsDB.scale)
+  scale.value:SetText(string.format("%d%%", math.floor(EfficientQuestsDB.scale * 100 + 0.5)))
+  local opacity = sliders.opacity
+  opacity.control:SetValue(EfficientQuestsDB.opacity)
+  opacity.value:SetText(string.format("%d%%", math.floor(EfficientQuestsDB.opacity * 100 + 0.5)))
 end
 
 EQ.Options = {}
@@ -55,6 +136,7 @@ EQ.Options = {}
 -- the saved table, and leaves it open on the screen.
 function EQ.Options.Open()
   if not panel then build() end
+  refresh()
   panel:Show()
   return panel
 end
