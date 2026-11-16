@@ -44,10 +44,11 @@ end
 -- The saved choice wins while its plugin is registered. A choice whose
 -- guide folder disappeared leaves a note and falls back to the same rule:
 -- the only installed guide is selected automatically, several wait for an
--- explicit pick in Settings.
-local function selectedGuide()
+-- explicit pick in Settings. The caller may pass a guide list it already
+-- built so one refresh does not rebuild and re-sort it repeatedly.
+local function selectedGuide(list)
   local data = savedCharacterData()
-  local list = EQ.GetGuideList()
+  list = list or EQ.GetGuideList()
   staleGuide = nil
   if data.guide then
     for _, entry in ipairs(list) do
@@ -73,6 +74,44 @@ local function button(parent, name, label, width, height, click)
   b:SetSize(width, height)
   b:SetText(label)
   b:SetScript('OnClick', click)
+  return b
+end
+
+-- A clickable line of text with no button backdrop. Its label is white
+-- (see applyHintFont) instead of the amber a panel button would print.
+local function textButton(parent, name, width, height, click)
+  local b = CreateFrame('Button', name, parent)
+  b:SetSize(width, height)
+  local label = b:CreateFontString(nil, 'OVERLAY', 'GameFontHighlight')
+  label:SetJustifyH('LEFT'); label:SetJustifyV('MIDDLE'); label:SetWordWrap(true)
+  b:SetFontString(label)
+  b:SetScript('OnClick', click)
+  return b
+end
+
+-- A small square button that shows one icon and names itself in a tooltip.
+local ICON_GEAR = 'Interface\\Icons\\INV_Misc_Gear_01'
+local ICON_CLOSE = 'Interface\\Buttons\\UI-GroupLoot-Pass-Up'
+local function iconButton(parent, name, icon, size, tip, click, crop)
+  local b = CreateFrame('Button', name, parent)
+  b:SetSize(size, size)
+  b:SetNormalTexture(icon)
+  local face = crop and b.GetNormalTexture and b:GetNormalTexture()
+  if face and face.SetTexCoord then face:SetTexCoord(0.08, 0.92, 0.08, 0.92) end
+  b:SetHighlightTexture('Interface\\Buttons\\ButtonHilight-Square', 'ADD')
+  b:SetScript('OnClick', click)
+  b:SetScript('OnEnter', function(self)
+    if GameTooltip and GameTooltip.SetOwner and GameTooltip.SetText then
+      GameTooltip:SetOwner(self, 'ANCHOR_LEFT')
+      GameTooltip:SetText(tip)
+      if GameTooltip.Show then GameTooltip:Show() end
+    end
+  end)
+  b:SetScript('OnLeave', function(self)
+    if GameTooltip and GameTooltip.Hide and (not GameTooltip.IsOwned or GameTooltip:IsOwned(self)) then
+      GameTooltip:Hide()
+    end
+  end)
   return b
 end
 
@@ -121,14 +160,14 @@ end
 
 local function makeRow(index)
   local row = {}
-  row.hint = button(body, 'EfficientQuestsHint'..index, '', 232, 36, function()
+  row.hint = textButton(body, 'EfficientQuestsHint'..index, 232, 22, function()
     local hint = shownHints[index]
     if not hint then return end
     expanded[hint.id] = not expanded[hint.id]
     EQ.RefreshInterface()
   end)
   row.detail = text(body, 'EfficientQuestsDetail'..index)
-  row.dismiss = button(body, 'EfficientQuestsDismiss'..index, L.dismiss, 66, 22, function()
+  row.dismiss = iconButton(body, 'EfficientQuestsDismiss'..index, ICON_CLOSE, 20, L.dismiss, function()
     local hint = shownHints[index]
     if not hint then return end
     savedCharacterData().dismissed[hint.id] = true
@@ -181,11 +220,11 @@ local function makeGuideRow(index)
   return row
 end
 
-local function refreshSettings()
+local function refreshSettings(list)
   if not settings then return end
   local data = savedCharacterData()
-  local list = EQ.GetGuideList()
-  local chosen = selectedGuide()
+  list = list or EQ.GetGuideList()
+  local chosen = selectedGuide(list)
   modeButton:SetText(L.display .. ': ' .. (data.display.mode == 'flare' and L.integrated or L.standalone))
   widthLabel:SetText(L.width .. ': ' .. data.display.width)
   spacingLabel:SetText(L.spacing .. ': ' .. data.display.spacing)
@@ -318,13 +357,24 @@ local function applyFont(target, source)
   end
 end
 
+-- Hint text is white and two points smaller than the surrounding text.
+-- applyFont restores the original size first, so the shrink never compounds.
+local HINT_FONT_SHRINK = 2
+local function applyHintFont(label, source)
+  applyFont(label, source)
+  if not label or not label.GetFont or not label.SetFont then return end
+  local path, size, flags = label:GetFont()
+  if path and size then label:SetFont(path, size - HINT_FONT_SHRINK, flags or '') end
+  if label.SetTextColor then label:SetTextColor(1, 1, 1, 1) end
+end
+
 local function applyTrackerFonts(tracker)
   local heading, content = trackerFonts(tracker)
   applyFont(title, heading)
   applyFont(status, content)
   for _, row in ipairs(rows) do
     local label = row.hint.GetFontString and row.hint:GetFontString()
-    applyFont(label, content)
+    applyHintFont(label, content)
     applyFont(row.detail, content)
   end
 end
@@ -384,12 +434,16 @@ function EQ.RefreshInterface()
   if not frame then return end
   closeItemTooltip()
   local data = savedCharacterData()
+  -- One context snapshot and one guide list per refresh: both feed several
+  -- consumers below, and rebuilding them per row multiplied the cost.
+  local context = EQ.GetContext()
+  local guideList = EQ.GetGuideList()
   local tracker = trackerFor(data.display)
   local width = effectiveWidth(tracker, data.display.width)
   frame:SetWidth(width)
   copyTrackerAppearance(tracker)
-  local guide = selectedGuide()
-  local hints, problem = EQ.GetHints(guide)
+  local guide = selectedGuide(guideList)
+  local hints, problem = EQ.GetHints(guide, context)
   hints = hints or {}
   local available = {}
   for _, hint in ipairs(hints) do
@@ -423,23 +477,24 @@ function EQ.RefreshInterface()
   for i=1,count do
     local hint, row = available[page * 3 + i], rows[i] or makeRow(i)
     local _, contentFont = trackerFonts(tracker)
-    applyFont(row.hint.GetFontString and row.hint:GetFontString(), contentFont)
+    applyHintFont(row.hint.GetFontString and row.hint:GetFontString(), contentFont)
     applyFont(row.detail, contentFont)
     shownHints[i] = hint
     row.hint:ClearAllPoints(); row.hint:SetPoint('TOPLEFT', body, 'TOPLEFT', 0, y)
-    local hintWidth = math.max(120, width - 92)
+    -- The body is width - 16 wide; the 20-point dismiss icon and a 4-point gap sit at its right edge.
+    local hintWidth = math.max(120, width - 40)
     row.hint:SetWidth(hintWidth); row.hint:SetText(hint.text or '')
     local hintFont = row.hint:GetFontString()
     if hintFont then
-      hintFont:SetWidth(hintWidth - 16)
+      hintFont:SetWidth(hintWidth - 8)
       hintFont:SetWordWrap(true)
       hintFont:SetJustifyH('LEFT')
     end
-    local hintHeight = math.max(36, (hintFont and hintFont:GetStringHeight() or 0) + 12)
+    local hintHeight = math.max(22, (hintFont and hintFont:GetStringHeight() or 0) + 8)
     row.hint:SetHeight(hintHeight)
-    row.dismiss:ClearAllPoints(); row.dismiss:SetPoint('TOPRIGHT', body, 'TOPRIGHT', 0, y)
+    row.dismiss:ClearAllPoints(); row.dismiss:SetPoint('TOPRIGHT', body, 'TOPRIGHT', 0, y - 1)
     row.hint:Show(); row.dismiss:Show()
-    y = y - hintHeight - 2
+    y = y - hintHeight - 4
     local open = expanded[hint.id] == true
     row.detail:SetText(open and details(hint) or '')
     row.detail:ClearAllPoints(); row.detail:SetPoint('TOPLEFT', body, 'TOPLEFT', 4, y)
@@ -452,7 +507,6 @@ function EQ.RefreshInterface()
     row.map:ClearAllPoints(); row.map:SetPoint('LEFT', row.item, 'RIGHT', 3, 0)
     showOrHide(row.quest, open and hint.questID ~= nil and QuestMapFrame_OpenToQuestDetails ~= nil)
     showOrHide(row.item, open and hint.verifiedItemID ~= nil and GameTooltip ~= nil)
-    local context = EQ.GetContext()
     local localMap = hint.location and context.zoneID and context.zoneName and hint.location.zone and
       hint.location.zone:lower() == context.zoneName:lower() and WorldMapFrame and WorldMapFrame.SetMapID
     showOrHide(row.map, open and localMap)
@@ -473,7 +527,7 @@ function EQ.RefreshInterface()
   frame:SetHeight(46 + (statusText and 28 or (#available > 0 and viewportHeight or 0)))
   applyTrackerFonts(tracker)
   placeWindow(tracker, data.display)
-  refreshSettings()
+  refreshSettings(guideList)
 end
 
 function EQ.ShowSettings()
@@ -508,8 +562,8 @@ local function build()
   background = frame:CreateTexture(nil, 'BACKGROUND')
   background:SetAllPoints(frame); background:SetColorTexture(0.06, 0.06, 0.08, 0.88)
   title = text(frame, nil, 'GameFontNormal'); title:SetPoint('TOPLEFT', frame, 'TOPLEFT', 8, -8); title:SetText(L.title)
-  local configure = button(frame, 'EfficientQuestsOpenSettings', L.settings, 68, 22, EQ.ShowSettings)
-  configure:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -4, -4)
+  local configure = iconButton(frame, 'EfficientQuestsOpenSettings', ICON_GEAR, 20, L.settings, EQ.ShowSettings, true)
+  configure:SetPoint('TOPRIGHT', frame, 'TOPRIGHT', -6, -5)
   more = button(frame, 'EfficientQuestsMore', L.more, 50, 22, function()
     local guide = selectedGuide()
     local hints = EQ.GetHints(guide) or {}

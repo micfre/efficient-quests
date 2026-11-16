@@ -43,8 +43,15 @@ function Widget:CreateFontString(name)
   if name then widgets[name] = child; _G[name] = child end
   return child
 end
+function Widget:SetNormalTexture(path)
+  self.normalPath = path
+  self.normalTexture = self.normalTexture or setmetatable({scripts={},events={},shown=true}, {__index=Widget})
+end
+function Widget:GetNormalTexture() return self.normalTexture end
+function Widget:SetTexCoord(...) self.texCoord = {...} end
+function Widget:SetFontString(fontString) self.assignedFontString = fontString end
 function Widget:CreateTexture() return setmetatable({scripts={},events={},shown=true}, {__index=Widget}) end
-for _, name in ipairs({'SetAllPoints','SetColorTexture','SetJustifyH','SetJustifyV','SetWordWrap','SetMovable','EnableMouse','RegisterForDrag','StartMoving','StopMovingOrSizing','SetClampedToScreen','SetFrameStrata','SetBackdrop','SetBackdropColor','SetNormalFontObject','SetHighlightFontObject','SetScale'}) do Widget[name] = function() end end
+for _, name in ipairs({'SetAllPoints','SetColorTexture','SetJustifyH','SetJustifyV','SetWordWrap','SetMovable','EnableMouse','RegisterForDrag','StartMoving','StopMovingOrSizing','SetClampedToScreen','SetFrameStrata','SetBackdrop','SetBackdropColor','SetNormalFontObject','SetHighlightFontObject','SetScale','SetHighlightTexture'}) do Widget[name] = function() end end
 function Widget:SetTextColor(...) self.color = {...} end
 function Widget:SetPoint(...) self.point = {...} end
 function Widget:GetPoint() return unpack(self.point or {}) end
@@ -56,8 +63,8 @@ function Widget:SetBackdrop(value) self.backdrop = value end
 function Widget:SetBackdropBorderColor(...) self.border = {...} end
 UIParent = setmetatable({width=1000,height=800,shown=true,children={}}, {__index=Widget})
 
-function CreateFrame(kind, name, parent)
-  local frame = setmetatable({kind=kind,parent=parent,scripts={},events={},shown=true}, {__index=Widget})
+function CreateFrame(kind, name, parent, template)
+  local frame = setmetatable({kind=kind,parent=parent,template=template,scripts={},events={},shown=true}, {__index=Widget})
   frames[#frames+1] = frame
   if parent and parent.children then table.insert(parent.children, frame) end
   if name then widgets[name] = frame; _G[name] = frame end
@@ -185,6 +192,26 @@ click('EfficientQuestsRestore')
 assert(widgets.EfficientQuestsHint2.text:find('Bread',1,true),
   'restore all returns every remaining dismissed hint')
 print('ok - compact standalone hints, deliberate expansion, per-hint dismissal and restore')
+
+-- Hint text prints in white, two points smaller than the default button
+-- text, with no button backdrop. Settings and Dismiss are icons, not words.
+local hintLabel = widgets.EfficientQuestsHint1:GetFontString()
+local _, hintSize = hintLabel:GetFont()
+local _, statusSize = widgets.EfficientQuestsStatus:GetFont()
+assert(hintSize == statusSize - 2, 'hint text is two points smaller than the surrounding text')
+local r, g, b = hintLabel:GetTextColor()
+assert(r == 1 and g == 1 and b == 1, 'hint text is white')
+assert(widgets.EfficientQuestsHint1.template == nil, 'hint buttons use no button template, so no backdrop')
+event('QUEST_LOG_UPDATE')
+assert(select(2, hintLabel:GetFont()) == hintSize, 'refreshing never shrinks the hint text again')
+for _, name in ipairs({'EfficientQuestsOpenSettings', 'EfficientQuestsDismiss1'}) do
+  local icon = widgets[name]
+  assert(icon.template == nil and icon.text == nil, name .. ' shows an icon, not a panel button with text')
+  assert(icon.normalPath, name .. ' has an icon texture')
+end
+assert(widgets.EfficientQuestsOpenSettings.normalPath:find('Gear', 1, true), 'Settings is a gear cog')
+assert(widgets.EfficientQuestsDismiss1.normalPath:find('Pass', 1, true), 'Dismiss is an X')
+print('ok - hint text is white and smaller without a backdrop; Settings and Dismiss are icons')
 LibQuestieDB = nil
 event('PLAYER_ENTERING_WORLD')
 assert(widgets.EfficientQuestsStatus.text:find('QuestieDB',1,true), 'provider failure is visible')
@@ -303,6 +330,12 @@ local window = widgets.EfficientQuestsWindow
 assert(window.width == 250 and window.point[2] == tracker and window.point[3] == 'BOTTOMLEFT', 'integrated window attaches below tracker at its width')
 assert(window.backdrop and window.backdrop.bgFile == 'tracker-background', 'integrated window follows tracker backdrop')
 assert(widgets.EfficientQuestsStatus:GetFont() == 'flare-font', 'integrated text matches tracker font')
+do
+  local face, size = widgets.EfficientQuestsHint1:GetFontString():GetFont()
+  local r, g, b = widgets.EfficientQuestsHint1:GetFontString():GetTextColor()
+  assert(face == 'flare-font' and size == 15, 'integrated hint text follows the tracker font, two points smaller')
+  assert(r == 1 and g == 1 and b == 1, 'integrated hint text stays white despite the tracker colour')
+end
 EfficientQuestsCharacter.display.position = {point='CENTER',relativePoint='CENTER',x=12,y=34}
 window.scripts.OnDragStart(window)
 window.scripts.OnDragStop(window)

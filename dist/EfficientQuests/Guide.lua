@@ -238,8 +238,10 @@ local function usefulExcerpt(line)
     local char = line:sub(i, i)
     if char == '[' then insideTag = true elseif char == ']' then insideTag = false end
     local after = line:sub(i + 1, i + 1)
-    local prefix = line:sub(start, i):lower():gsub('%b[]', '')
-    local emphasis = char == '!' and prefix:match('^%s*keep!+$')
+    -- The sentence-so-far is only needed to test a "keep!" emphasis, so it
+    -- is built only then: computing it for every character copies a growing
+    -- string per character and turns each line quadratic.
+    local emphasis = char == '!' and line:sub(start, i):lower():gsub('%b[]', ''):match('^%s*keep!+$')
     if not insideTag and not emphasis and (char == '.' or char == '!' or char == '?')
         and (not after:match('%d') or not line:sub(i - 1, i - 1):match('%d')) then
       pieces[#pieces + 1] = line:sub(start, i)
@@ -321,18 +323,15 @@ local function adviceKind(excerpt, item)
 end
 
 -- LE/SK tags describe the guide step's learning target, not quest completion.
--- Keep the observed state separate so a later lifecycle decision can use it.
-local function learningStates(line, context)
+-- Parsing is context-independent and cached per chapter source; only the
+-- known-ness of a target is read live, so it is applied separately without
+-- mutating the cached states.
+local function learningStates(line)
   local states = {}
   for tag, body in line:gmatch('%[(LE)%s+([^%]]+)%]') do
     local spell, rank, suffix = body:match('^SP(%d+)%s+(%d+)(%-?)$')
     if spell then
-      local state = {kind='spell', id=tonumber(spell), rank=tonumber(rank), suffix=suffix}
-      if type(context.isSpellKnown) == 'function' then
-        local ok, value = pcall(context.isSpellKnown, state.id)
-        if ok and type(value) == 'boolean' then state.known = value end
-      end
-      states[#states + 1] = state
+      states[#states + 1] = {kind='spell', id=tonumber(spell), rank=tonumber(rank), suffix=suffix}
     else
       local name, target, ending = body:match('^(.-)%s+(%d+)(%-?)$')
       states[#states + 1] = {kind='skill-cap', name=name or body,
@@ -341,14 +340,41 @@ local function learningStates(line, context)
   end
   for body in line:gmatch('%[SK%s+([^%]]+)%]') do
     local name, target, ending = body:match('^(.-)%s+(%d+)(%-?)$')
-    local state = {kind='skill', name=name or body, rank=tonumber(target), suffix=ending}
-    local skillRank = name and context.skillRanks and context.skillRanks[name:lower()]
-    if type(skillRank) == 'number' and state.rank then
-      state.known = skillRank >= state.rank
-    elseif name and state.rank == 1 and context.professions and context.professions[name:lower()] then
-      state.known = true
+    states[#states + 1] = {kind='skill', name=name or body, rank=tonumber(target), suffix=ending}
+  end
+  return states
+end
+
+-- The live part of learning states: which targets this character already
+-- has. Copied states keep the cache pristine for the next refresh.
+local function applyLearningContext(states, context)
+  local copied = false
+  for i, state in ipairs(states) do
+    local known
+    if state.kind == 'spell' then
+      if type(context.isSpellKnown) == 'function' then
+        local ok, value = pcall(context.isSpellKnown, state.id)
+        if ok and type(value) == 'boolean' then known = value end
+      end
+    elseif state.kind == 'skill' then
+      local key = string.lower(state.name)
+      local skillRank = context.skillRanks and context.skillRanks[key]
+      if type(skillRank) == 'number' and state.rank then
+        known = skillRank >= state.rank
+      elseif state.rank == 1 and context.professions and context.professions[key] then
+        known = true
+      end
     end
-    states[#states + 1] = state
+    if known ~= nil then
+      local copy = {}
+      for field, value in pairs(state) do copy[field] = value end
+      copy.known = known
+      if not copied then
+        copied = true
+        states = { unpack(states) }
+      end
+      states[i] = copy
+    end
   end
   return states
 end
@@ -371,95 +397,148 @@ local function consumptionAssertion(excerpt)
     statedItemName=trim(statedName)}
 end
 
+-- One context-independent parse per chapter source, cached by the source
+-- string itself: guide text is immutable once registered, so the same string
+-- is always the same parse. Only three things depend on the live context and
+-- stay outside the cache: [A ...]/[GA ...] condition evaluation, learning
+-- known-ness, and record assembly. The cache trades a few MB of live parse
+-- data for not re-parsing thousands of lines on every interface refresh.
+local parseCache = {}
+local EMPTY = {}
+
+local function parseChapter(source)
+  local cached = parseCache[source]
+  if cached then return cached end
+  local title = source:match('%[N%s*([^%]]+)%]')
+  local scope = source:match('%[GA%s+([^%]]+)%]') or ''
+  local steps = {}
+  local lineIndex = 0
+  for line in (source .. '\n'):gmatch('(.-)\r?\n') do
+    lineIndex = lineIndex + 1
+    local x, y, zone = line:match('%[G%s*(%d+%.?%d*)%s*,%s*(%d+%.?%d*)%s*([^%]]*)%]')
+    if x and zone and trim(zone) ~= '' then
+      zone = trim(zone:gsub('^%s*,%s*%d+%.?%d*%s*', ''))
+    else
+      x = nil
+    end
+    local aTags
+    for condition in line:gmatch('%[A%s+([^%]]+)%]') do
+      aTags = aTags or {}
+      aTags[#aTags + 1] = condition
+    end
+    local excerpt, inferred, requirement = usefulExcerpt(line)
+    local learning = excerpt and learningStates(line) or {}
+    -- General class/profession progression is outside the quest-focused
+    -- view. Keep explicitly quest-related learning advice available.
+    if excerpt and #learning > 0 and not excerpt:find('%[QC%d+')
+        and not excerpt:lower():find('quest', 1, true) then excerpt = nil end
+    local text, kind, quests, quest, item, quantity, itemName, consumption, association
+    if excerpt then
+      text = cameraLootNote(excerpt) or readable(excerpt)
+      if requirement then
+        text = requirement.quantity .. ' ' .. requirement.name
+          .. ' needed for '
+          .. (#requirement.quests == 1 and 'this quest' or 'these quests') .. '.'
+      end
+      if text ~= '' then
+        item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
+        local itemTag = excerpt:match('%[CI([^%]]+)%]')
+        itemName = itemTag and itemTag:match('^%d+%s*,%s*%d+%s*(.*)$')
+        if itemName then itemName = trim(itemName) end
+        if itemName == '' or itemName == '-' then itemName = nil end
+        local seen = {}
+        quests = {}
+        for id in excerpt:gmatch('%[QC(%d+)') do
+          local numeric = tonumber(id)
+          if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
+        end
+        quest = #quests == 1 and quests[1] or nil
+        kind = requirement and 'supply'
+          or (inferred and 'technique' or adviceKind(excerpt, item))
+        -- A named flight point tag on the line identifies the travel
+        -- opportunity; keep the name with advice whose prose omits it.
+        if kind == 'flight' then
+          local point = line:match('%[P%s+([^%]]*%S)%]')
+          if point and not text:lower():find(point:lower(), 1, true) then
+            text = point .. ': ' .. text
+          end
+        end
+        consumption = consumptionAssertion(excerpt)
+        if text == '' then text = nil end
+        association = quest and 'quest' or (#quests > 1 and 'quests' or 'zone')
+      end
+    end
+    -- A step matters later only as a position marker or as advice; lines
+    -- that are neither cannot change any later record.
+    if x or text then
+      steps[#steps + 1] = {
+        lineIndex=lineIndex, x=tonumber(x), y=tonumber(y), zone=zone,
+        aTags=aTags, excerpt=excerpt, text=text, kind=kind,
+        quests=quests, quest=quest, inferred=inferred,
+        requirement=requirement, learning=learning,
+        itemID=tonumber(item), quantity=tonumber(quantity), itemName=itemName,
+        consumption=consumption,
+        association=association,
+      }
+    end
+  end
+  cached = { title=title, scope=scope, steps=steps }
+  parseCache[source] = cached
+  return cached
+end
+
 function EQ.ExtractGuide(packageName, context)
   context = context or {}
   local result = {}
   for chapterIndex, args in ipairs(EQ.guides[packageName] or {}) do
     local source, author = args[1], args[2]
     if type(source) == 'string' then
-      local title = source:match('%[N%s*([^%]]+)%]')
-      local scope = source:match('%[GA%s+([^%]]+)%]') or ''
-      local chapterAllowed, chapterUnknown = conditions(scope, context)
-      local location, lineIndex = nil, 0
+      local parse = parseChapter(source)
+      local chapterAllowed, chapterUnknown = conditions(parse.scope, context)
       if chapterAllowed then
-        for line in (source .. '\n'):gmatch('(.-)\r?\n') do
-          lineIndex = lineIndex + 1
-          local x, y, zone = line:match('%[G%s*(%d+%.?%d*)%s*,%s*(%d+%.?%d*)%s*([^%]]*)%]')
-          local lineAllowed, lineUnknown = true, {}
-          for condition in line:gmatch('%[A%s+([^%]]+)%]') do
-            local ok, unknown = conditions(condition, context)
-            if not ok then lineAllowed = false end
-            addUnknown(lineUnknown, unknown)
-          end
-          if lineAllowed and x and zone and trim(zone) ~= '' then
-            zone = zone:gsub('^%s*,%s*%d+%.?%d*%s*', '')
-            location = {x=tonumber(x), y=tonumber(y), zone=trim(zone),
-              conditions=lineUnknown}
-          end
-          local excerpt, inferred, requirement
-          if lineAllowed then excerpt, inferred, requirement = usefulExcerpt(line) end
-          local learning = excerpt and learningStates(line, context) or {}
-          -- General class/profession progression is outside the quest-focused
-          -- view. Keep explicitly quest-related learning advice available.
-          if excerpt and #learning > 0 and not excerpt:find('%[QC%d+')
-              and not excerpt:lower():find('quest', 1, true) then excerpt = nil end
-          if excerpt then
-            local text = cameraLootNote(excerpt) or readable(excerpt)
-            if requirement then
-              text = requirement.quantity .. ' ' .. requirement.name
-                .. ' needed for '
-                .. (#requirement.quests == 1 and 'this quest' or 'these quests') .. '.'
+        local locationStep, locationUnknown
+        for _, step in ipairs(parse.steps) do
+          local lineAllowed, lineUnknown = true, EMPTY
+          if step.aTags then
+            lineUnknown = {}
+            for _, condition in ipairs(step.aTags) do
+              local ok, unknown = conditions(condition, context)
+              if not ok then lineAllowed = false end
+              addUnknown(lineUnknown, unknown)
             end
-            if text ~= '' then
-              local item, quantity = excerpt:match('%[CI(%d+)%s*,%s*(%d+)')
-              local itemTag = excerpt:match('%[CI([^%]]+)%]')
-              local itemName = itemTag and itemTag:match('^%d+%s*,%s*%d+%s*(.*)$')
-              if itemName then itemName = trim(itemName) end
-              if itemName == '' or itemName == '-' then itemName = nil end
-              local quests, seen = {}, {}
-              for id in excerpt:gmatch('%[QC(%d+)') do
-                local numeric = tonumber(id)
-                if not seen[numeric] then quests[#quests + 1] = numeric; seen[numeric] = true end
-              end
-              local quest = #quests == 1 and quests[1] or nil
-              local unknown = {}
-              addUnknown(unknown, chapterUnknown)
-              addUnknown(unknown, lineUnknown)
-              if not x and location then addUnknown(unknown, location.conditions) end
-              for _, state in ipairs(learning) do
-                if state.known == nil then unknown[#unknown + 1] = 'learning state unknown' end
-              end
-              if #quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
-              if requirement then unknown[#unknown + 1] = 'requirement from an objective directive' end
-              if inferred then unknown[#unknown + 1] = 'quest reference inferred from following sentence' end
-              local kind = requirement and 'supply'
-                or (inferred and 'technique' or adviceKind(excerpt, item))
-              -- A named flight point tag on the line identifies the travel
-              -- opportunity; keep the name with advice whose prose omits it.
-              if kind == 'flight' then
-                local point = line:match('%[P%s+([^%]]*%S)%]')
-                if point and not text:lower():find(point:lower(), 1, true) then
-                  text = point .. ': ' .. text
-                end
-              end
-              local loc
-              if location then loc = {x=location.x, y=location.y, zone=location.zone,
-                coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not x} end
-              result[#result + 1] = {
-                id=packageName .. ':' .. chapterIndex .. ':' .. lineIndex,
-                package=packageName, sourceAuthor=author, chapter=title,
-                sourceText=excerpt, text=text, questID=quest, questIDs=quests,
-                inferredQuestIDs=inferred,
-                association=quest and 'quest' or (#quests > 1 and 'quests' or 'zone'),
-                itemID=tonumber(item), quantity=tonumber(quantity),
-                itemSourceName=itemName,
-                kind=kind,
-                learningState=learning,
-                consumption=consumptionAssertion(excerpt),
-                location=loc, conditions=unknown, uncertain=#unknown > 0,
-                sourceOrder=#result + 1,
-              }
+          end
+          if step.zone and lineAllowed then
+            locationStep, locationUnknown = step, lineUnknown
+          end
+          if lineAllowed and step.text then
+            local learning = applyLearningContext(step.learning, context)
+            local unknown = {}
+            addUnknown(unknown, chapterUnknown)
+            addUnknown(unknown, lineUnknown)
+            if not step.x and locationStep then addUnknown(unknown, locationUnknown) end
+            for _, state in ipairs(learning) do
+              if state.known == nil then unknown[#unknown + 1] = 'learning state unknown' end
             end
+            if #step.quests > 1 then unknown[#unknown + 1] = 'multiple quest references' end
+            if step.requirement then unknown[#unknown + 1] = 'requirement from an objective directive' end
+            if step.inferred then unknown[#unknown + 1] = 'quest reference inferred from following sentence' end
+            local loc
+            if locationStep then loc = {x=locationStep.x, y=locationStep.y, zone=locationStep.zone,
+              coordinateSystem='guide-percent', zoneSource='guide-name', inherited=not step.x} end
+            result[#result + 1] = {
+              id=packageName .. ':' .. chapterIndex .. ':' .. step.lineIndex,
+              package=packageName, sourceAuthor=author, chapter=parse.title,
+              sourceText=step.excerpt, text=step.text, questID=step.quest, questIDs=step.quests,
+              inferredQuestIDs=step.inferred,
+              association=step.association,
+              itemID=step.itemID, quantity=step.quantity,
+              itemSourceName=step.itemName,
+              kind=step.kind,
+              learningState=learning,
+              consumption=step.consumption,
+              location=loc, conditions=unknown, uncertain=#unknown > 0,
+              sourceOrder=#result + 1,
+            }
           end
         end
       end

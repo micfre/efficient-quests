@@ -395,3 +395,76 @@ for index = 2, #list do
   assert(list[index - 1].key < list[index].key, 'the guide list is sorted by key')
 end
 print('ok - plugin guide list metadata and chapter append')
+
+-- The chapter parse is cached by source string because guide text is
+-- immutable once registered. A re-extraction must return identical records
+-- while allocating a fraction of the first pass: the interface refresh path
+-- re-extracts on every movement band and game event, and a full re-parse
+-- per refresh showed up in play as stutter and sawtooth memory growth.
+-- Bytes are counted with the collector paused, so the delta is exactly what
+-- the call allocated.
+do
+  local lines = {}
+  for i = 1, 400 do
+    lines[#lines + 1] = string.format(
+      '[G%d,%d Greenfield] Run north along the road to the farm.', i % 90, i % 70)
+    if i % 2 == 0 then
+      lines[#lines + 1] = string.format(
+        '[G%d,%d Greenfield] Buy [CI4%d,2 Item%d] for [QC%d].', i % 90, i % 70,
+        i % 40, i % 40, 500 + i % 30)
+    end
+  end
+  EfficientQuests_RegisterGuide('ParseCache', table.concat(lines, '\n'))
+  local function allocatedBy(extract)
+    collectgarbage('collect'); collectgarbage('collect')
+    local pause = collectgarbage('setpause', 10000000)
+    local before = collectgarbage('count')
+    local records = extract()
+    local delta = collectgarbage('count') - before
+    collectgarbage('setpause', pause)
+    return delta, records
+  end
+  local coldBytes, cold = allocatedBy(function()
+    return EfficientQuests.ExtractGuide('ParseCache', {}) end)
+  local warmBytes, warm = allocatedBy(function()
+    return EfficientQuests.ExtractGuide('ParseCache', {}) end)
+  assert(#cold > 100, 'the cache fixture must produce real advice records')
+  assert(#cold == #warm, 'a cached re-extraction yields the same record count')
+  for i = 1, #cold do
+    assert(cold[i].id == warm[i].id and cold[i].text == warm[i].text
+      and cold[i].sourceText == warm[i].sourceText
+      and cold[i].sourceOrder == warm[i].sourceOrder,
+      'cached records stay identical to the first pass')
+  end
+  assert(warmBytes < coldBytes / 3,
+    string.format('a cached re-extraction must allocate far less (%.0f KB vs %.0f KB)',
+      warmBytes, coldBytes))
+  print(string.format('ok - cached re-extraction is identical and allocates %d%% of the first pass',
+    warmBytes / coldBytes * 100))
+end
+
+-- The cache holds only context-independent work: line conditions and
+-- learning known-ness must still follow the live context, and one
+-- context's answer must not leak into the next call.
+EfficientQuests_RegisterGuide('ParseCacheConditions',
+  '[N Cond]\n[A mining] Buy [CI42,2 Apples] for [QC9].')
+local miner = EfficientQuests.ExtractGuide('ParseCacheConditions', {professions={mining=true}})
+local smith = EfficientQuests.ExtractGuide('ParseCacheConditions', {professions={blacksmithing=true}})
+assert(#miner == 1 and #smith == 1,
+  'line conditions still run over cached parses in every call')
+assert(not miner[1].uncertain, 'a profession the character has confirms the advice')
+assert(smith[1].uncertain and smith[1].conditions[1] == 'mining',
+  'a profession left unobserved keeps the advice uncertain, named as a condition')
+EfficientQuests_RegisterGuide('ParseCacheLearning',
+  '[N Learn]\n[SK Mining 75] Use the pick for the ore in [QC7].')
+local unskilled = EfficientQuests.ExtractGuide('ParseCacheLearning', {})
+local skilled = EfficientQuests.ExtractGuide('ParseCacheLearning', {skillRanks={mining=80}})
+assert(#unskilled == 1 and #skilled == 1, 'learning advice survives both ways')
+assert(unskilled[1].learningState[1].known == nil,
+  'without a rank observation the learning state stays unknown')
+assert(skilled[1].learningState[1].known == true,
+  'an observed rank above the target marks the learning state known')
+local after = EfficientQuests.ExtractGuide('ParseCacheLearning', {})
+assert(after[1].learningState[1].known == nil,
+  'one context must not write its learning answer into the cached parse')
+print('ok - cached parses still evaluate conditions and learning live')

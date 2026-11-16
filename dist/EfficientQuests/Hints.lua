@@ -415,12 +415,14 @@ local function aggregateConsumptions(output, context, provider, distances)
 end
 
 -- Returns ordered advice and, when setup is incomplete, a status code. The
--- package is explicit so independent authors are never silently merged.
-function EfficientQuests.GetHints(packageName)
+-- package is explicit so independent authors are never silently merged. An
+-- already-captured context may be passed so a refresh does not rebuild the
+-- quest-log snapshot several times.
+function EfficientQuests.GetHints(packageName, context)
     local provider, problem = EfficientQuests.GetProvider()
     if not provider then return {}, problem end
     if not packageName or not EfficientQuests.guides[packageName] then return {}, "guide" end
-    local context = EfficientQuests.GetContext()
+    context = context or EfficientQuests.GetContext()
     local candidates = EfficientQuests.ExtractGuide(packageName, context)
     local referencedQuests = {}
     for _, advice in ipairs(candidates) do
