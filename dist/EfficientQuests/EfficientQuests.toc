@@ -1,15 +1,112 @@
 ## Interface: 16001
 ## Title: Efficient Quests
-## Notes: Practical questing advice without a prescribed route.
-## Version: 0.2.0
-## Dependencies: QuestieDB
-## OptionalDeps: FlareUI
+## Notes: A step-by-step leveling guide for the Forever client.
+## Version: 0.3.0
+## OptionalDeps: FlareUI, TomTom, QuestieDB
+## SavedVariables: EfficientQuestsDB
 ## SavedVariablesPerCharacter: EfficientQuestsCharacter
 
+# The embedded libraries load first, in dependency order: HereBeDragons
+# needs LibStub and CallbackHandler. The pins part of HereBeDragons is
+# not embedded, because pins draw on maps.
+Libs/LibStub/LibStub.lua
+Libs/CallbackHandler-1.0/CallbackHandler-1.0.lua
+Libs/HereBeDragons/HereBeDragons-2.0.lua
 Core.lua
-Provider.lua
-Context.lua
-Guide.lua
-Lifecycle.lua
-Hints.lua
-Interface.lua
+
+# The quest state reader loads right after the entry point, before every
+# module that asks it questions or subscribes to its callbacks.
+QuestState.lua
+
+CharacterStore.lua
+
+# The generated data tables copied verbatim from Trailwright (see
+# THIRD_PARTY.md): the quest data, the Path, and the dungeon guide stops.
+# They are plain data, so they load before any code that reads them.
+QuestData.lua
+PathData.lua
+DungeonGuides.lua
+
+# The data store checks the shape of the tables above at load time and
+# exposes the data snapshot identity for the status command.
+DataStore.lua
+
+# The geo helper owns the world walk and the yard distances through the
+# embedded HereBeDragons; the route planner, the step model, and the
+# TomTom bridge ask it.
+Geo.lua
+
+# The optional-addons module answers whether FlareUI, TomTom, or QuestieDB
+# is present, each by the strictest test a consumer acts on. The look
+# adapter, the TomTom bridge, the QuestieDB fallback, and the commands ask
+# it instead of reading those globals themselves.
+OptionalAddons.lua
+
+# The route planner walks the Path from the data store and the quest state
+# and answers the route the step model and the window show. It also wires
+# the quest state callbacks to the character stores.
+RoutePlanner.lua
+
+# The step model turns a route entry into a step -- plain data for the
+# step window -- and answers the step of one quest for the Follow mode
+# controller. It holds no frames; the window renders what it answers.
+StepModel.lua
+
+# The Follow mode controller listens for the quest the player picks in
+# the quest log -- through the client's super tracking when it is there --
+# and serves the step of that quest through the step model. It loads
+# after the step model it asks; the step window polls it.
+FollowMode.lua
+
+# The QuestieDB fallback appends its lookups after the data store's own,
+# so the store always wins and QuestieDB answers only what the store
+# lacks. It loads last of the lookup modules, and its missing-data
+# notices sit at the end of every lookup chain.
+QuestieFallback.lua
+
+# The look module holds the flat palette and the backdrop every window of
+# the addon wears -- the options panel, the menu, the step window, and the
+# dungeon window -- so the windows cannot drift apart. It loads before
+# the first window that wears it.
+Look.lua
+
+# The options panel is a window of our own; it opens from the step window
+# and from the /eq command, so it builds itself only on first open.
+Options.lua
+
+# The menu opens beside the step window, which hands itself over as the
+# anchor of Menu.Open. Without an anchor it sits at a fixed screen spot.
+Menu.lua
+
+# The step window is the addon's face: it renders the step the model
+# builds, pages the route, follows the picked quest, and offers the skip
+# action. It loads after every module it asks.
+StepWindow.lua
+
+# The look adapter restyles the step window after the FlareUI tracker and
+# docks it below that frame. It is the only module that may read FlareUI's
+# look, so it loads after the step window it restyles, and it listens
+# for the window's own changed signal to re-apply the look.
+LookAdapter.lua
+
+# The TomTom bridge keeps one TomTom waypoint on the place of the step the
+# window stands on. It listens for the window's WindowChanged callback, so
+# it loads after the step window it follows.
+TomTomBridge.lua
+
+# The dungeon guide window renders what the dungeon guide resolves: the
+# stops of the running dungeon, with their ticks and their open stop. It
+# builds itself on first start and asks the guide its questions at
+# refresh time, so it loads before the guide that drives it.
+DungeonGuideWindow.lua
+
+# The dungeon guide takes the display over from the step window while the
+# player is inside a dungeon the data knows, and hands it back on exit, so
+# it loads after the step window it hands over with. Its window is its
+# own file above.
+DungeonGuide.lua
+
+# The slash commands /eq and /efficientquests are the player's way in:
+# they toggle the step window, open the options, and print the status.
+# They load last, after every module they drive.
+Commands.lua

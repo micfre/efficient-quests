@@ -1,18 +1,58 @@
 # Efficient Quests
 
-Efficient Quests is an experimental addon for World of Warcraft: Forever. An addon adds features to the game interface.
+Efficient Quests is a step-by-step leveling guide for World of Warcraft: Forever. It is one standalone addon. You install one folder, and it works.
 
-The addon shows practical quest and travel tips. It does not choose your next quest. The first version targets Forever 1.60.1. It needs the QuestieDB addon, which you install separately. Guide plugins are separate addon folders that you download from the [releases page](https://github.com/micfre/efficient-quests/releases). FlareUI is optional. Guidelime and Questie are not needed.
+The addon has a built-in quest engine. The engine is a port of the engine of the Trailwright addon, which is free software. Trailwright itself is not needed and is never installed.
 
-The addon has offline tests. Nobody verified its behavior or appearance in the Forever client. It is not a validated release.
+The addon ships two guides:
+
+- The leveling guide shows one step at a time from the Path. The Path is the fixed order of quests from level 1 to level 60.
+- The dungeon guide shows the stops of a dungeon in order. A stop is one item in a dungeon guide, such as a boss, a rare enemy, a quest spot, or an event. The guide starts by itself when you enter a dungeon that the addon knows.
+
+Both guides show text. The addon does not draw on the map or the minimap.
+
+The dungeon guide text is written for the Classic versions of the dungeons. The Forever client can differ.
+
+## Install
+
+Copy the folder `dist/EfficientQuests` from this repository into the `Interface/AddOns` folder of your Forever client. The [installation guide](docs/installation.md) gives the exact path. There are no plugins and no extra downloads.
+
+## The optional addons
+
+The addon has no required dependencies. Three other addons are optional:
+
+- FlareUI gives the window its look. The window copies the backdrop, the colors, and the fonts of the FlareUI tracker and docks below it. Without FlareUI, the window has a flat look, and you can drag it.
+- TomTom points the way. The addon sets one TomTom waypoint on the place of the current step when it knows the coordinates. Without TomTom, the step shows its text only.
+- QuestieDB adds data. The addon asks QuestieDB for the name or the coordinates of a quest or an NPC that its own data lacks. Without QuestieDB, the addon works on its own data.
+
+## Forever only
+
+The addon runs on the Forever client only. The manifest declares interface number 16001 and version 0.3.0. On any other client, the addon prints one message: "Efficient Quests supports the Forever client only and will not run here."
+
+## How to use
+
+Type `/eq` or `/efficientquests`:
+
+- A bare command shows or hides the step window.
+- `/eq options` opens the options panel. The word `config` works the same.
+- `/eq status` prints the version, the data snapshot, and one word per optional addon: found or missing.
+- `/eq help` lists the commands.
+
+The step window shows the headline of the step, the goal lines with their tick boxes and counts, the tips, and the place text. The window also lists the next steps. The Back and Next buttons page through the route, and the line "Step 3 / 15" says your place in it.
+
+A "Follow" tick in the title bar turns on Follow mode. Follow mode is the mode in which the window shows the step of the quest that you pick in the quest log.
+
+Right-click a step to skip its quest. The menu button in the title bar opens the menu. The menu lists your skipped quests with a restore action, the known dungeons, and a link to the options.
+
+## License
+
+The project is GPL-3.0-or-later. See [LICENSE](LICENSE). The file [THIRD_PARTY.md](THIRD_PARTY.md) records every source of copied code and data, with its license, its version, and the date of the copy.
 
 ## Documents
 
-- [Installation guide](docs/installation.md): how to install the addon, QuestieDB, and guide plugins from the releases page.
-- [Maintainer buildbook](docs/buildbook.md): how a maintainer builds guide plugins and release zips, with the license gate.
-- [MVP specification](docs/specs/efficient-quests-mvp.md): the intended behavior of the first version. Issue [#15](https://github.com/micfre/efficient-quests/issues/15) supersedes it. MVP means minimum viable product, the smallest version that is useful.
-- [Release validation record](docs/validation.md): what the offline tests cover, and the in-client and visual checks that remain.
-- [Local relevance notes](docs/local-relevance-evidence.md): how the addon ties advice to the location of the player.
-- [Consumption notes](docs/consumption-evidence.md): supply requirements and flight-path observations.
-- [Extraction audit](docs/tug-extraction-audit.md): the historical extraction review of the TUG and Bethink guide packages.
-- [Contribution guide](CONTRIBUTING.md): how to run the tests.
+- [Installation guide](docs/installation.md)
+- [Validation record](docs/validation.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Glossary](GLOSSARY.md)
+- [Standalone specification](docs/specs/efficient-quests-standalone.md)
+- [Offline test guide](tests/README.md)
