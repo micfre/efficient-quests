@@ -121,9 +121,10 @@ local function placeWaypoint(point, title)
             title = title,
             from = "Efficient Quests",
             -- One session only: a persisted step waypoint would outlive the
-            -- addon's control and break the removal stories -- the marker of
-            -- a step that ended, a quest the player skipped, or a window the
-            -- player hid must not come back at the next login.
+            -- addon's control -- its uid is lost on relog -- and violate the
+            -- spec's removal rules, and persistent = false is no display
+            -- flag, so TomTom's own options still decide how the waypoint
+            -- appears.
             persistent = false,
         })
 end
