@@ -306,6 +306,16 @@ assert(says('FlareUI found, TomTom found, QuestieDB found'),
   'with every optional addon present, the status must say found for each')
 print('ok - the status says found for each present optional addon')
 
+-- A TomTom without the call methods the bridge needs is as good as none:
+-- the same strictest test the bridge acts on must keep the verdict at
+-- missing, so the status line and the bridge can never disagree.
+TomTom = {}
+messages = {}
+runSlash('/eq status')
+assert(says('TomTom missing'),
+  'a TomTom that answers no call of the bridge contract counts as missing')
+print('ok - a TomTom without its call methods counts as missing')
+
 -- An incompatible QuestieDB is as good as none: the same contract test
 -- the fallback applies (see the QuestieDB fallback suite) must keep the
 -- verdict at missing when the library refuses its contract.
