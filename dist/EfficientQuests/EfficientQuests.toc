@@ -36,6 +36,12 @@ DataStore.lua
 # TomTom bridge ask it.
 Geo.lua
 
+# The optional-addons module answers whether FlareUI, TomTom, or QuestieDB
+# is present, each by the strictest test a consumer acts on. The look
+# adapter, the TomTom bridge, the QuestieDB fallback, and the commands ask
+# it instead of reading those globals themselves.
+OptionalAddons.lua
+
 # The route planner walks the Path from the data store and the quest state
 # and answers the route the step model and the window show. It also wires
 # the quest state callbacks to the character stores.
@@ -72,8 +78,8 @@ Menu.lua
 StepWindow.lua
 
 # The look adapter restyles the step window after the FlareUI tracker and
-# docks it below that frame. It is the only module that may touch
-# FlareUI, so it loads after the step window it restyles, and it listens
+# docks it below that frame. It is the only module that may read FlareUI's
+# look, so it loads after the step window it restyles, and it listens
 # for the window's own changed signal to re-apply the look.
 LookAdapter.lua
 

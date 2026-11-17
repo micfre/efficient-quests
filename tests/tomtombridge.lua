@@ -290,6 +290,7 @@ local function loadBridge(quests, pathLine, tables, savedDB, savedCharacter, noT
   loadFile('CharacterStore.lua')
   loadFile('DataStore.lua')
   loadFile('Geo.lua')
+  loadFile('OptionalAddons.lua')
   loadFile('RoutePlanner.lua')
   loadFile('StepModel.lua')
   loadFile('FollowMode.lua')

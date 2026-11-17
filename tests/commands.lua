@@ -284,12 +284,17 @@ assert(says('Efficient Quests: data snapshot ' .. EfficientQuests.GetDataSnapsho
 print('ok - the status names version, snapshot, and all addons missing')
 
 -- The rich setup: FlareUI, TomTom, and QuestieDB all in the world, as
--- simple fakes the way the seam replaces them. The same command must now
--- say found for each, so the one word per addon is a live answer, not a
--- fixed line.
+-- simple fakes the way the seam replaces them. TomTom answers the calls
+-- the waypoint bridge makes; QuestieDB passes its contract. The same
+-- command must now say found for each, so the one word per addon is a
+-- live answer, not a fixed line.
 FlareUI = {}
 FlareUI_ObjectiveTracker = {}
-TomTom = {}
+TomTom = {
+  IsCrazyArrowEmpty = function() return true end,
+  AddWaypoint = function() end,
+  RemoveWaypoint = function() end,
+}
 LibQuestieDB = {
   RequireContract = function(required) return required == 1 end,
   Quest = { Get = function() end },
@@ -299,13 +304,16 @@ messages = {}
 runSlash('/eq status')
 assert(says('FlareUI found, TomTom found, QuestieDB found'),
   'with every optional addon present, the status must say found for each')
-assert(not says('missing'),
-  'no addon may be called missing while its global is in the world')
 print('ok - the status says found for each present optional addon')
 
 -- An incompatible QuestieDB is as good as none: the same contract test
 -- the fallback applies (see the QuestieDB fallback suite) must keep the
 -- verdict at missing when the library refuses its contract.
+TomTom = {
+  IsCrazyArrowEmpty = function() return true end,
+  AddWaypoint = function() end,
+  RemoveWaypoint = function() end,
+}
 LibQuestieDB = {
   RequireContract = function() return false end,
   Quest = { Get = function() end },

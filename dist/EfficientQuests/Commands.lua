@@ -6,6 +6,7 @@
 -- they own no state and no window of their own.
 
 local EQ = EfficientQuests
+local addons = EfficientQuests.optionalAddons
 
 -- One chat line to the player, the voice every module of the addon uses.
 local function say(text)
@@ -41,46 +42,20 @@ local function addonVersion()
     return FALLBACK_VERSION
 end
 
--- FlareUI is loaded when its global table is there or its tracker frame
--- is: the frame is the part the look adapter reads, and either one says
--- the addon came up.
-local function flareUIPresent()
-    return type(_G.FlareUI) == "table" or _G.FlareUI_ObjectiveTracker ~= nil
-end
-
-local function tomtomPresent()
-    return type(_G.TomTom) == "table"
-end
-
--- A usable QuestieDB passes the same contract test the fallback applies
--- at load time (see QuestieFallback.lua): the global, the contract call,
--- and the two entities the lookups read. Anything less is an absent or
--- incompatible QuestieDB, and the status says so.
-local function questieUsable()
-    local lib = _G.LibQuestieDB
-    if type(lib) ~= "table" then return false end
-    if type(lib.RequireContract) ~= "function" then return false end
-    local called, agreed = pcall(lib.RequireContract, 1)
-    if not called or not agreed then return false end
-    for _, entity in ipairs({ "Quest", "Npc" }) do
-        if type(lib[entity]) ~= "table" or type(lib[entity].Get) ~= "function" then
-            return false
-        end
-    end
-    return true
-end
-
 -- The status (user story 68): three lines a report can be written from --
--- the version, one word per optional addon, and the data snapshot.
+-- the version, one word per optional addon, and the data snapshot. The
+-- addons are the optional-addons module's question, each by its strictest
+-- test: the same answers the look adapter, the bridge, and the fallback
+-- act on, so the status and the behavior can never disagree.
 local function status()
     local function word(present)
         if present then return "found" end
         return "missing"
     end
     say("Efficient Quests: version " .. addonVersion())
-    say("Efficient Quests: FlareUI " .. word(flareUIPresent())
-        .. ", TomTom " .. word(tomtomPresent())
-        .. ", QuestieDB " .. word(questieUsable()))
+    say("Efficient Quests: FlareUI " .. word(addons.FlareUI())
+        .. ", TomTom " .. word(addons.TomTom() ~= nil)
+        .. ", QuestieDB " .. word(addons.QuestieDB() ~= nil))
     say("Efficient Quests: data snapshot " .. EQ.GetDataSnapshot())
 end
 

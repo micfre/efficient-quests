@@ -51,22 +51,12 @@
 local reader = EfficientQuests.questState
 local window = EfficientQuests.StepWindow
 local geo = EfficientQuests.geo
+local addons = EfficientQuests.optionalAddons
 
 local bridge = {}
 EfficientQuests.TomTomBridge = bridge
 
 local uid -- the uid of our own waypoint; the only one this module removes
-
--- The real TomTom answers IsCrazyArrowEmpty, and the two calls the bridge
--- makes are AddWaypoint and RemoveWaypoint -- the surface the TomTom
--- README documents for addons. Anything else on the TomTom table is not
--- ours to call.
-local function tomtomHere()
-    return type(TomTom) == "table"
-        and type(TomTom.IsCrazyArrowEmpty) == "function"
-        and type(TomTom.AddWaypoint) == "function"
-        and type(TomTom.RemoveWaypoint) == "function"
-end
 
 -- The waypoints option, on until the player says otherwise. The saved
 -- table carries the default after login; a missing table says on.
@@ -102,12 +92,15 @@ end
 
 -- Take our own waypoint down. A uid that TomTom already cleared -- the
 -- player's clear-distance can remove it on arrival -- is a no-op there,
--- and a TomTom that is not loaded holds no waypoints of ours anyway.
+-- and a TomTom that is not loaded holds no waypoints of ours anyway. The
+-- presence question is the optional-addons module's: the TomTom table
+-- comes back only when it answers the calls this bridge makes.
 local function removeOurs()
     if not uid then return end
     local mine = uid
     uid = nil
-    if tomtomHere() then TomTom:RemoveWaypoint(mine) end
+    local tomtom = addons.TomTom()
+    if tomtom then tomtom:RemoveWaypoint(mine) end
 end
 
 -- Set one waypoint for the step and keep its uid. The old one comes off
@@ -116,7 +109,7 @@ end
 -- second marker beside the first.
 local function placeWaypoint(point, title)
     removeOurs()
-    uid = TomTom:AddWaypoint(geo.uiMapID(point), geo.x(point) / 100,
+    uid = addons.TomTom():AddWaypoint(geo.uiMapID(point), geo.x(point) / 100,
         geo.y(point) / 100, {
             title = title,
             from = "Efficient Quests",
@@ -145,7 +138,7 @@ local function sync(shown, step)
         removeOurs()
         return
     end
-    if tomtomHere() and waypointsOn() and shown == true
+    if addons.TomTom() and waypointsOn() and shown == true
         and type(step) == "table" and type(step.points) == "table" then
         -- No player position, no waypoint: a place the maps cannot place
         -- is not a place to point at.

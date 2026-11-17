@@ -1,13 +1,14 @@
--- The look adapter of Efficient Quests. It is the only module that looks
--- at FlareUI: when FlareUI is loaded, it reads the backdrop, the colors,
--- and the fonts off the live FlareUI tracker frame, restyles the step
--- window with them, and docks the window below the tracker. The window
--- never copies the tracker's width; it keeps its own. Without FlareUI,
--- the window keeps the flat look the step window builds and drags by the
--- lock option of the saved data. If the tracker frame is missing or has
--- an unexpected shape -- no backdrop, the wrong frame type, no scroll of
--- lines -- the adapter falls back to the flat look without an error,
--- because the look must never break the window (user story 44).
+-- The look adapter of Efficient Quests. It is the only module that reads
+-- the look of FlareUI: when FlareUI is present -- the optional-addons
+-- module answers that -- it reads the backdrop, the colors, and the fonts
+-- off the live FlareUI tracker frame, restyles the step window with them,
+-- and docks the window below the tracker. The window never copies the
+-- tracker's width; it keeps its own. Without FlareUI, the window keeps
+-- the flat look the step window builds and drags by the lock option of
+-- the saved data. If the tracker frame is missing or has an unexpected
+-- shape -- no backdrop, the wrong frame type, no scroll of lines -- the
+-- adapter falls back to the flat look without an error, because the look
+-- must never break the window (user story 44).
 --
 -- Dragging while docked: the tracker owns the place, so drags stay off
 -- for as long as the window is docked, the same word the lock option
@@ -23,6 +24,7 @@
 
 local EQ = EfficientQuests
 local window = EQ.StepWindow
+local addons = EQ.optionalAddons
 
 local adapter = {}
 EQ.lookAdapter = adapter
@@ -229,12 +231,13 @@ local function dock(frame, tracker)
 end
 
 -- Bring the window in line with the live tracker, or leave and restore
--- the flat look.
+-- the flat look. Whether FlareUI is there at all is the optional-addons
+-- module's question; the tracker's shape is this adapter's own look.
 local function applyLook()
     local frame = stepFrame()
     if not frame then return end
     wrapDrag(frame)
-    local tracker = liveTracker()
+    local tracker = addons.FlareUI() and liveTracker() or nil
     if not tracker then
         if docked then
             docked = false
