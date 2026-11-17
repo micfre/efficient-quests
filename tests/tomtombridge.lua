@@ -294,6 +294,7 @@ local function loadBridge(quests, pathLine, tables, savedDB, savedCharacter, noT
   loadFile('RoutePlanner.lua')
   loadFile('StepModel.lua')
   loadFile('FollowMode.lua')
+  loadFile('Look.lua')
   loadFile('Options.lua')
   loadFile('Menu.lua')
   loadFile('StepWindow.lua')
