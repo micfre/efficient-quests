@@ -94,9 +94,16 @@ LookAdapter.lua
 # it loads after the step window it follows.
 TomTomBridge.lua
 
+# The dungeon guide window renders what the dungeon guide resolves: the
+# stops of the running dungeon, with their ticks and their open stop. It
+# builds itself on first start and asks the guide its questions at
+# refresh time, so it loads before the guide that drives it.
+DungeonGuideWindow.lua
+
 # The dungeon guide takes the display over from the step window while the
 # player is inside a dungeon the data knows, and hands it back on exit, so
-# it loads after the step window it hands over with.
+# it loads after the step window it hands over with. Its window is its
+# own file above.
 DungeonGuide.lua
 
 # The slash commands /eq and /efficientquests are the player's way in:
