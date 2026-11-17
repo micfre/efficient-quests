@@ -8,13 +8,8 @@
 -- and a link that opens the options panel.
 local _, ns = ...
 local EQ = EfficientQuests
+local look = EfficientQuests.look
 
--- The FlareUI palette cues, as the options panel uses them: the bronze
--- border, the muted bronze of the section labels, and the near-black of
--- the plates.
-local BORDER = { 0.65, 0.49, 0.27 }
-local ACCENT = { 0.61, 0.48, 0.29 }
-local PLATE = { 0.08, 0.08, 0.09 }
 local WIDTH = 260
 -- The layout runs in fixed steps: a title band, one line per section
 -- label, one line per list row, one taller line for the options link, and
@@ -50,24 +45,12 @@ local function questName(questId)
     return "Quest " .. questId
 end
 
--- A flat dark plate with a thin bronze edge, the look the options panel
--- gives the addon's windows.
-local function applyBackdrop(frame)
-    frame:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        tile = false, tileSize = 0, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    frame:SetBackdropColor(PLATE[1], PLATE[2], PLATE[3], 0.95)
-    frame:SetBackdropBorderColor(BORDER[1], BORDER[2], BORDER[3], 1)
-end
-
+-- One section label, in the muted bronze of the addon's windows.
 local function sectionLabel(text, below)
     local label = menu:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     label:SetPoint("TOPLEFT", below, "BOTTOMLEFT", 0, -6)
     label:SetJustifyH("LEFT")
-    label:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+    label:SetTextColor(look.ACCENT[1], look.ACCENT[2], look.ACCENT[3], 1)
     label:SetText(text)
     return label
 end
@@ -95,7 +78,7 @@ end
 local function build()
     menu = CreateFrame("Frame", "EfficientQuestsMenu", UIParent)
     menu:SetSize(WIDTH, 200)
-    applyBackdrop(menu)
+    look.applyBackdrop(menu)
     -- Above the step window, the way a menu the player asked for belongs.
     menu:SetFrameStrata("HIGH")
 

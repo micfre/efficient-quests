@@ -28,8 +28,8 @@
 -- documents its state.
 --
 -- The look. Flat by default: a dark plate with a thin bronze edge, the
--- look the options panel and the menu give every window of the addon.
--- The FlareUI look is the look adapter's work (ticket #36); this module
+-- look the shared look module gives every window of the addon. The
+-- FlareUI look is the look adapter's work (ticket #36); this module
 -- never reads the FlareUI global. The window keeps its own width, drags
 -- by its background unless the saved data locks it, and remembers its
 -- place in the account-wide saved table. Scale and opacity come from the
@@ -65,6 +65,7 @@
 --              when shown turns false.
 
 local EQ = EfficientQuests
+local look = EfficientQuests.look
 local reader = EfficientQuests.questState
 local planner = EfficientQuests.routePlanner
 local model = EfficientQuests.stepModel
@@ -77,11 +78,8 @@ EfficientQuests.StepWindow = window
 window.callbacks = LibStub("CallbackHandler-1.0"):New(window,
     "RegisterCallback", "UnregisterCallback", "UnregisterAllCallbacks")
 
--- The flat palette and the layout steps, shared with the menu and the
--- options panel. One row of the body is one line of text.
-local BORDER = { 0.65, 0.49, 0.27 }
-local ACCENT = { 0.61, 0.48, 0.29 }
-local PLATE = { 0.08, 0.08, 0.09 }
+-- The layout steps of the body; the palette and the backdrop are the
+-- look module's. One row of the body is one line of text.
 local WIDTH = 280
 local HEADER, LINE, HEADLINE, PLACE, GAP, BAND, PAD = 36, 18, 20, 16, 6, 26, 12
 -- How many steps list below the one on screen.
@@ -159,19 +157,6 @@ local function applySettings()
     end
 end
 
--- A flat dark plate with a thin bronze edge, the look the options panel
--- and the menu give the addon's windows.
-local function applyBackdrop(target)
-    target:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        tile = false, tileSize = 0, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    target:SetBackdropColor(PLATE[1], PLATE[2], PLATE[3], 0.95)
-    target:SetBackdropBorderColor(BORDER[1], BORDER[2], BORDER[3], 1)
-end
-
 -- One row of the body: a tick box, the words, and the count column. The
 -- rows come out of the pool and go back into it hidden, the way the menu
 -- treats its quest rows, and they move between the blocks as the step
@@ -234,7 +219,7 @@ local function setLabelRow(row, text)
     row.tick:SetShown(false)
     row.count:SetText("")
     row.text:SetPoint("LEFT", row, "LEFT", 4, 0)
-    row.text:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+    row.text:SetTextColor(look.ACCENT[1], look.ACCENT[2], look.ACCENT[3], 1)
     row.text:SetText(text)
 end
 
@@ -447,7 +432,7 @@ end
 local function build()
     frame = CreateFrame("Frame", "EfficientQuestsStepWindow", UIParent)
     frame:SetWidth(WIDTH)
-    applyBackdrop(frame)
+    look.applyBackdrop(frame)
     frame:SetMovable(true)
     frame:SetClampedToScreen(true)
     frame:EnableMouse(true)
@@ -552,7 +537,7 @@ local function build()
     placeText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     placeText:SetPoint("TOPLEFT", stepHeadline, "BOTTOMLEFT", 0, -2)
     placeText:SetJustifyH("LEFT")
-    placeText:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+    placeText:SetTextColor(look.ACCENT[1], look.ACCENT[2], look.ACCENT[3], 1)
     placeText:SetText("")
 
     stepBlock = CreateFrame("Frame", nil, frame)

@@ -200,14 +200,9 @@ end
 -- The window
 --------------------------------------------------------------------------------
 
--- The flat palette of the addon's windows, shared with the step window
--- and the menu. One row of the body is one line of text.
-local BORDER = { 0.65, 0.49, 0.27 }
-local ACCENT = { 0.61, 0.48, 0.29 }
-local PLATE = { 0.08, 0.08, 0.09 }
-local NOTE = { 0.85, 0.85, 0.85 }
-local WARN = { 1.00, 0.70, 0.40 }
-local DONE = { 0.45, 0.85, 0.45 }
+-- The palette and the backdrop are the look module's, shared with the
+-- step window and the menu; one row of the body is one line of text.
+local look = EfficientQuests.look
 local WIDTH = 280
 local HEADER, LINE, HEADLINE, PAD = 36, 18, 20, 12
 
@@ -219,17 +214,6 @@ local titleText    -- the dungeon's name
 local levelsText   -- the level range line under it
 local body         -- the rows of the stop list
 local pool, usedRows = {}, {}
-
-local function applyBackdrop(target)
-    target:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        tile = false, tileSize = 0, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    target:SetBackdropColor(PLATE[1], PLATE[2], PLATE[3], 0.95)
-    target:SetBackdropBorderColor(BORDER[1], BORDER[2], BORDER[3], 1)
-end
 
 local function newRow()
     local row = CreateFrame("Button", nil, body)
@@ -295,7 +279,7 @@ end
 local function build()
     frame = CreateFrame("Frame", "EfficientQuestsDungeonGuide", UIParent)
     frame:SetWidth(WIDTH)
-    applyBackdrop(frame)
+    look.applyBackdrop(frame)
     frame:SetClampedToScreen(true)
 
     local hide = CreateFrame("Button", nil, frame)
@@ -313,7 +297,7 @@ local function build()
     levelsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     levelsText:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -HEADER + 4)
     levelsText:SetJustifyH("LEFT")
-    levelsText:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
+    levelsText:SetTextColor(look.ACCENT[1], look.ACCENT[2], look.ACCENT[3], 1)
 
     body = CreateFrame("Frame", "EfficientQuestsDungeonGuideStops", frame)
     body:SetWidth(WIDTH - 24)
@@ -341,15 +325,15 @@ local function refresh()
             local meta = metaOf(stop)
             if meta then
                 rows = rows + 1
-                setDetailRow(takeRow(rows), meta, ACCENT, 24)
+                setDetailRow(takeRow(rows), meta, look.ACCENT, 24)
             end
             for _, line in ipairs(type(stop.approach) == "table" and stop.approach or {}) do
                 rows = rows + 1
-                setDetailRow(takeRow(rows), line, NOTE, 24)
+                setDetailRow(takeRow(rows), line, look.NOTE, 24)
             end
             for _, line in ipairs(type(stop.mechanics) == "table" and stop.mechanics or {}) do
                 rows = rows + 1
-                setDetailRow(takeRow(rows), line, WARN, 24)
+                setDetailRow(takeRow(rows), line, look.WARN, 24)
             end
         end
     end
@@ -357,7 +341,7 @@ local function refresh()
         rows = rows + 1
         setDetailRow(takeRow(rows),
             "Every stop is done. Leave the dungeon to go back to your route.",
-            DONE, 4)
+            look.DONE, 4)
         local left = {}
         for _, each in ipairs(stops) do
             if not stopDone(each) then table.insert(left, each.name) end
@@ -365,7 +349,7 @@ local function refresh()
         if #left > 0 then
             rows = rows + 1
             setDetailRow(takeRow(rows),
-                "Not done (optional): " .. table.concat(left, ", ") .. ".", WARN, 4)
+                "Not done (optional): " .. table.concat(left, ", ") .. ".", look.WARN, 4)
         end
     end
     -- The quests the dungeon helps with (user story 62), named through
@@ -374,11 +358,11 @@ local function refresh()
     local quests = questsOf(stops)
     if #quests > 0 then
         rows = rows + 1
-        setDetailRow(takeRow(rows), "Quests here", ACCENT, 4)
+        setDetailRow(takeRow(rows), "Quests here", look.ACCENT, 4)
         for _, questID in ipairs(quests) do
             rows = rows + 1
             setDetailRow(takeRow(rows), reader.QuestName(questID)
-                or ("Quest " .. questID), NOTE, 20)
+                or ("Quest " .. questID), look.NOTE, 20)
         end
     end
     body:SetHeight(rows * LINE)

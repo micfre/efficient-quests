@@ -5,12 +5,8 @@
 -- panel -- because it opens from the step window and the /eq command.
 -- Everything it shows and changes lives in the account-wide saved table.
 local EQ = EfficientQuests
+local look = EfficientQuests.look
 
--- The FlareUI palette cues: the bronze border (#A67D45), the muted bronze
--- of accents, and the near-black of the plates the option rows sit on.
-local BORDER = { 0.65, 0.49, 0.27 }
-local ACCENT = { 0.61, 0.48, 0.29 }
-local PLATE = { 0.08, 0.08, 0.09 }
 local WIDTH = 320
 -- The sliders move in steps of five percent, so a saved value never picks
 -- up trailing digits from a drag.
@@ -27,20 +23,6 @@ end
 local panel
 local checks, sliders
 
--- A flat dark plate with a thin bronze edge, the look the FlareUI options
--- give their boxes: background and border come from one white texture each,
--- colored by SetBackdropColor and SetBackdropBorderColor.
-local function applyBackdrop(frame)
-    frame:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        tile = false, tileSize = 0, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    frame:SetBackdropColor(PLATE[1], PLATE[2], PLATE[3], 0.95)
-    frame:SetBackdropBorderColor(BORDER[1], BORDER[2], BORDER[3], 1)
-end
-
 local function build()
     panel = CreateFrame("Frame", "EfficientQuestsOptionsPanel", UIParent)
     panel:SetSize(WIDTH, 220)
@@ -48,7 +30,7 @@ local function build()
     -- Above the step window and the chat, the way a panel the player asked
     -- for belongs.
     panel:SetFrameStrata("HIGH")
-    applyBackdrop(panel)
+    look.applyBackdrop(panel)
 
     -- The title band, with a muted bronze rule under it the way the FlareUI
     -- options separate their header from the rows.
@@ -57,7 +39,7 @@ local function build()
     title:SetJustifyH("LEFT")
     title:SetText("Efficient Quests Options")
     local rule = panel:CreateTexture(nil, "ARTWORK")
-    rule:SetColorTexture(ACCENT[1], ACCENT[2], ACCENT[3], 0.6)
+    rule:SetColorTexture(look.ACCENT[1], look.ACCENT[2], look.ACCENT[3], 0.6)
     rule:SetHeight(1)
     rule:SetPoint("TOPLEFT", panel, "TOPLEFT", 10, -28)
     rule:SetPoint("TOPRIGHT", panel, "TOPRIGHT", -10, -28)
@@ -84,7 +66,8 @@ local function build()
         anchor = rowFrame
         -- the dark plate the row sits on, with a little air around its label
         local plate = rowFrame:CreateTexture(nil, "BACKGROUND")
-        plate:SetColorTexture(PLATE[1] + 0.03, PLATE[2] + 0.03, PLATE[3] + 0.03, 0.9)
+        plate:SetColorTexture(look.PLATE[1] + 0.03, look.PLATE[2] + 0.03,
+            look.PLATE[3] + 0.03, 0.9)
         plate:SetAllPoints(rowFrame)
         local label = rowFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         label:SetPoint("LEFT", rowFrame, "LEFT", 8, 0)

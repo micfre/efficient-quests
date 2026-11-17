@@ -64,6 +64,12 @@ FollowMode.lua
 # notices sit at the end of every lookup chain.
 QuestieFallback.lua
 
+# The look module holds the flat palette and the backdrop every window of
+# the addon wears -- the options panel, the menu, the step window, and the
+# dungeon window -- so the windows cannot drift apart. It loads before
+# the first window that wears it.
+Look.lua
+
 # The options panel is a window of our own; it opens from the step window
 # and from the /eq command, so it builds itself only on first open.
 Options.lua
