@@ -62,6 +62,13 @@ local function fire(name, payload)
     reader.callbacks:Fire(name, payload)
 end
 
+-- The change callbacks above, as one list. The modules that must hear
+-- every change of the quest state -- the route planner, the step window,
+-- the Follow mode controller -- subscribe to these names instead of
+-- naming the six again.
+reader.CHANGE_CALLBACKS = { "QuestAccepted", "QuestProgressed",
+    "QuestCompleted", "QuestHandedIn", "QuestAbandoned", "PlayerLevelUp" }
+
 -- The last-read state. The log is refreshed when the game says the quest
 -- log changed; the player facts are read live, with the level announced by
 -- PLAYER_LEVEL_UP kept while UnitLevel still answers the old one.

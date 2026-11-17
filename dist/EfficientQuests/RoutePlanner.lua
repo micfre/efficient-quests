@@ -287,8 +287,7 @@ end
 -- listener and the wiring below each own their subscription, because the
 -- callback handler keys its registry by owner.
 local replans = {}
-for _, callback in ipairs({ "QuestAccepted", "QuestProgressed", "QuestCompleted",
-    "QuestHandedIn", "QuestAbandoned", "PlayerLevelUp" }) do
+for _, callback in ipairs(reader.CHANGE_CALLBACKS) do
     reader.RegisterCallback(replans, callback, function() stale = true end)
 end
 

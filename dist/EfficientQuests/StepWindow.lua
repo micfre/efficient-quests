@@ -644,8 +644,7 @@ end)
 -- route of half a breath ago. A frame later the world has settled, and
 -- one refresh serves every change of one log update.
 local watches = {}
-for _, name in ipairs({ "QuestAccepted", "QuestProgressed", "QuestCompleted",
-    "QuestHandedIn", "QuestAbandoned", "PlayerLevelUp" }) do
+for _, name in ipairs(reader.CHANGE_CALLBACKS) do
     reader.RegisterCallback(watches, name, function()
         C_Timer.After(0, function() window.refresh() end)
     end)

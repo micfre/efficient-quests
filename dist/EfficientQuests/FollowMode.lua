@@ -156,8 +156,7 @@ end)
 -- pick clears, Follow mode itself stays on, and the notification tells
 -- the window to return to the route until the player picks again.
 local watches = {}
-for _, name in ipairs({ "QuestAccepted", "QuestProgressed", "QuestCompleted",
-        "QuestHandedIn", "QuestAbandoned", "PlayerLevelUp" }) do
+for _, name in ipairs(reader.CHANGE_CALLBACKS) do
     reader.RegisterCallback(watches, name, function(what, payload)
         if not picked then return end
         if what == "QuestHandedIn" and payload.questID == picked then
