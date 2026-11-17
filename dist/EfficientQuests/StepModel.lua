@@ -77,6 +77,7 @@ local _, ns = ...
 local reader = EfficientQuests.questState
 local planner = EfficientQuests.routePlanner
 local geo = EfficientQuests.geo
+local fields = EfficientQuests.questFields
 
 local model = {}
 EfficientQuests.stepModel = model
@@ -91,7 +92,7 @@ local HUNTS_MAX = 4
 -- the target's own name, else the npc or object name from the tables. A
 -- quest without data facts answers nothing.
 local function targetName(q, index)
-    local targets = q and q[26]
+    local targets = q and q[fields.targets]
     local t = targets and targets[index]
     if type(t) ~= "table" then return nil end
     if t[1] then return t[1] end
@@ -118,7 +119,7 @@ local function logGoal(q, name, index, objective)
     if not text:find("%a") then
         text = targetName(q, index) or name
     end
-    local t = q and q[26] and q[26][index]
+    local t = q and q[fields.targets] and q[fields.targets][index]
     return {
         kind = "objective",
         done = objective.finished == true or have >= need,
@@ -143,8 +144,8 @@ local function goalLines(q, entry, name, lines)
         end
     end
     if counted then return true end
-    if type(q) ~= "table" or type(q[26]) ~= "table" then return false end
-    for index, t in ipairs(q[26]) do
+    if type(q) ~= "table" or type(q[fields.targets]) ~= "table" then return false end
+    for index, t in ipairs(q[fields.targets]) do
         local need = (t[4] and t[4] > 0) and t[4] or 1
         local done = (entry and entry.complete) or false
         lines[#lines + 1] = {
@@ -193,12 +194,12 @@ end
 -- object spawn table. A finished objective closes its target's spawn.
 local function workPoints(q, logEntry)
     local points = {}
-    if type(q[10]) == "table" then
-        for _, spot in ipairs(q[10]) do points[#points + 1] = spot end
+    if type(q[fields.objectivePoints]) == "table" then
+        for _, spot in ipairs(q[fields.objectivePoints]) do points[#points + 1] = spot end
         return points
     end
-    if type(q[26]) ~= "table" then return points end
-    for index, t in ipairs(q[26]) do
+    if type(q[fields.targets]) ~= "table" then return points end
+    for index, t in ipairs(q[fields.targets]) do
         local objective = logEntry and type(logEntry.objectives) == "table"
             and logEntry.objectives[index]
         if not (objective and objective.finished) then
@@ -217,12 +218,32 @@ local function workPoints(q, logEntry)
     return points
 end
 
+-- The hand-in point first, then the start point: the place a step falls
+-- back to when the data knows no place of its own for it -- the
+-- bring-it-yourself quests -- the way the route counts a work step with
+-- no known place.
+local function fallbackPoint(q)
+    return q[fields.finishPoint] or q[fields.startPoint]
+end
+
+-- The candidate places of a quest's work with the fallback folded in:
+-- its own objective points when the data has them, else the fallback
+-- place as the one candidate.
+local function pointsOf(q, logEntry)
+    local points = workPoints(q, logEntry)
+    if #points > 0 then return points end
+    local spot = fallbackPoint(q)
+    if spot then return { spot } end
+    return points
+end
+
 -- The reward hover data of a quest: the fixed items, the choose-one items,
 -- and the spell it teaches, each by id and -- when the data knows it -- by
 -- name. Nil when the data knows no reward at all; the tooltips themselves
 -- are the window's work (#35).
 local function rewardsOf(q)
-    if type(q[33]) ~= "table" and type(q[34]) ~= "table" and not q[36] then
+    if type(q[fields.rewardItems]) ~= "table"
+        and type(q[fields.rewardChoices]) ~= "table" and not q[fields.rewardSpell] then
         return nil
     end
     local function entries(list)
@@ -235,9 +256,9 @@ local function rewardsOf(q)
         return out
     end
     return {
-        items = entries(q[33]),
-        choices = entries(q[34]),
-        spell = q[36],
+        items = entries(q[fields.rewardItems]),
+        choices = entries(q[fields.rewardChoices]),
+        spell = q[fields.rewardSpell],
     }
 end
 
@@ -284,15 +305,13 @@ local function huntsOf(questID)
             local q = ns.quests[entry.questID]
             if q then
                 local logEntry = reader.GetQuest(entry.questID)
-                local points = workPoints(q, logEntry)
-                if #points == 0 and (q[9] or q[8]) then
-                    points = { q[9] or q[8] }
-                end
+                local points = pointsOf(q, logEntry)
                 local place = points[1] and geo.worldOf(points[1])
                 if place and geo.sameContinent(place, here) then
                     local distance = geo.yards(here, place)
                     if distance <= HUNTS_YARDS then
-                        local name = reader.QuestName(entry.questID) or q[1]
+                        local name = reader.QuestName(entry.questID)
+                            or q[fields.name]
                         local lines = {
                             { kind = "quest",
                                 done = (logEntry and logEntry.complete) or false,
@@ -376,28 +395,29 @@ function model.GetStep(entry)
         end
         return nil
     end
-    local name = reader.QuestName(entry.questID) or q[1]
+    local name = reader.QuestName(entry.questID) or q[fields.name]
     local rewards = rewardsOf(q)
     if entry.kind == "pickup" then
         local lines = {}
-        addTalk(lines, q[19], q[27], q[30])
+        addTalk(lines, q[fields.giverName], q[fields.giverNpc], q[fields.tipPickup])
         lines[#lines + 1] = { kind = "accept", done = false, text = "Accept " .. name }
         return {
             kind = "pickup", questID = entry.questID,
             headline = "Pick up " .. name, lines = lines,
-            place = placeOf(q[8]),
-            point = q[8], points = q[8] and { q[8] } or {},
+            place = placeOf(q[fields.startPoint]),
+            point = q[fields.startPoint],
+            points = q[fields.startPoint] and { q[fields.startPoint] } or {},
             rewards = rewards,
         }
     end
     if entry.kind == "turnin" then
         local logEntry = reader.GetQuest(entry.questID)
         local lines = {}
-        addTalk(lines, q[20], q[28], q[31])
+        addTalk(lines, q[fields.enderName], q[fields.enderNpc], q[fields.tipHandIn])
         lines[#lines + 1] = { kind = "turnin",
             done = (logEntry and logEntry.complete) or false,
             text = "Turn in " .. name }
-        local point = q[9] or q[8]
+        local point = fallbackPoint(q)
         return {
             kind = "turnin", questID = entry.questID,
             own = entry.own, near = entry.near,
@@ -412,10 +432,7 @@ function model.GetStep(entry)
     -- from the hand-in or the start point, the way the route counts a
     -- work step with no known place.
     local logEntry = reader.GetQuest(entry.questID)
-    local points = workPoints(q, logEntry)
-    if #points == 0 and (q[9] or q[8]) then
-        points = { q[9] or q[8] }
-    end
+    local points = pointsOf(q, logEntry)
     local lines = {
         { kind = "quest", done = (logEntry and logEntry.complete) or false, text = name },
     }

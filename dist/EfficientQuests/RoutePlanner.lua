@@ -43,6 +43,7 @@ local _, ns = ...
 local reader = EfficientQuests.questState
 local store = EfficientQuests.characterStore
 local geo = EfficientQuests.geo
+local fields = EfficientQuests.questFields
 
 local planner = {}
 EfficientQuests.routePlanner = planner
@@ -146,7 +147,8 @@ local function build()
         for id, entry in pairs(log) do
             if entry.complete and not store.isSkipped(id) and not store.isAbandoned(id) then
                 local q = quests[id]
-                local spot = q and q[9] and geo.worldOf(q[9])
+                local finish = q and q[fields.finishPoint]
+                local spot = finish and geo.worldOf(finish)
                 local distance = spot and geo.sameContinent(spot, here)
                     and geo.yards(here, spot)
                 if distance and distance <= HERE_YARDS then near[#near + 1] = { id, distance } end

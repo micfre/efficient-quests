@@ -132,6 +132,7 @@ local function loadPlanner(quests, pathLine)
   loadFile('Core.lua')
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
+  loadFile('DataStore.lua')
   loadFile('Geo.lua')
   loadFile('RoutePlanner.lua')
   for _, frame in ipairs(frames) do

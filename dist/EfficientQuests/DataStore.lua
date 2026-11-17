@@ -120,6 +120,29 @@ for _, setting in ipairs(TABLES) do
     end
 end
 
+-- The quests table is positional: the generated layout gives every quest
+-- fact a fixed index, and the code reads those indexes by name through
+-- this table, so a reader never meets a bare number. The name is the only
+-- field the loader itself checks (see the shape note in TABLES above);
+-- the rest belong to the route planner and the step model.
+local QUEST_FIELDS = {
+    name = 1,             -- "Wolf pelts": the quest's own name
+    startPoint = 8,       -- { uiMapID, x, y } in percent: where it is picked up
+    finishPoint = 9,      -- { uiMapID, x, y } in percent: where it is handed in
+    objectivePoints = 10, -- the known places of the work, as point triples
+    giverName = 19,       -- the name on the pick-up's Talk to line
+    enderName = 20,       -- the name on the hand-in's Talk to line
+    targets = 26,         -- one entry per goal: { name, { npc ids }, { object ids }, count, item id }
+    giverNpc = 27,        -- the npc id of the giver, for the hover
+    enderNpc = 28,        -- the npc id of the ender, for the hover
+    tipPickup = 30,       -- the tip under the pick-up's Talk to line
+    tipHandIn = 31,       -- the tip under the hand-in's Talk to line
+    rewardItems = 33,     -- the fixed reward item ids
+    rewardChoices = 34,   -- the choose-one reward item ids
+    rewardSpell = 36,     -- the spell a reward teaches
+}
+EfficientQuests.questFields = QUEST_FIELDS
+
 -- The store answers first on the reader's query seam: it registers one
 -- lookup per kind, reading the copied tables directly, before any later
 -- fallback (the QuestieDB module) appends its own -- the reader runs the
