@@ -31,6 +31,17 @@ DungeonGuides.lua
 # exposes the data snapshot identity for the status command.
 DataStore.lua
 
+# The geo helper owns the world walk and the yard distances through the
+# embedded HereBeDragons; the route planner, the step model, and the
+# TomTom bridge ask it.
+Geo.lua
+
+# The optional-addons module answers whether FlareUI, TomTom, or QuestieDB
+# is present, each by the strictest test a consumer acts on. The look
+# adapter, the TomTom bridge, the QuestieDB fallback, and the commands ask
+# it instead of reading those globals themselves.
+OptionalAddons.lua
+
 # The route planner walks the Path from the data store and the quest state
 # and answers the route the step model and the window show. It also wires
 # the quest state callbacks to the character stores.
@@ -53,6 +64,12 @@ FollowMode.lua
 # notices sit at the end of every lookup chain.
 QuestieFallback.lua
 
+# The look module holds the flat palette and the backdrop every window of
+# the addon wears -- the options panel, the menu, the step window, and the
+# dungeon window -- so the windows cannot drift apart. It loads before
+# the first window that wears it.
+Look.lua
+
 # The options panel is a window of our own; it opens from the step window
 # and from the /eq command, so it builds itself only on first open.
 Options.lua
@@ -67,8 +84,8 @@ Menu.lua
 StepWindow.lua
 
 # The look adapter restyles the step window after the FlareUI tracker and
-# docks it below that frame. It is the only module that may touch
-# FlareUI, so it loads after the step window it restyles, and it listens
+# docks it below that frame. It is the only module that may read FlareUI's
+# look, so it loads after the step window it restyles, and it listens
 # for the window's own changed signal to re-apply the look.
 LookAdapter.lua
 
@@ -77,9 +94,16 @@ LookAdapter.lua
 # it loads after the step window it follows.
 TomTomBridge.lua
 
+# The dungeon guide window renders what the dungeon guide resolves: the
+# stops of the running dungeon, with their ticks and their open stop. It
+# builds itself on first start and asks the guide its questions at
+# refresh time, so it loads before the guide that drives it.
+DungeonGuideWindow.lua
+
 # The dungeon guide takes the display over from the step window while the
 # player is inside a dungeon the data knows, and hands it back on exit, so
-# it loads after the step window it hands over with.
+# it loads after the step window it hands over with. Its window is its
+# own file above.
 DungeonGuide.lua
 
 # The slash commands /eq and /efficientquests are the player's way in:

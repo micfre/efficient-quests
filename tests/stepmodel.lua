@@ -157,6 +157,7 @@ local function loadModel(quests, pathLine, tables)
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
   loadFile('DataStore.lua')
+  loadFile('Geo.lua')
   loadFile('RoutePlanner.lua')
   loadFile('StepModel.lua')
   for _, frame in ipairs(frames) do
@@ -651,6 +652,46 @@ assert(step.kind == 'do' and step.headline == 'Go to Off the path',
 assert(stepModel.GetStepForQuest(999) == nil,
   'a quest missing from the data must answer nil')
 print('ok - the single-quest step follows the log, never a pick-up for a taken quest')
+
+-- A quest the data store knows nothing about: while the log holds it, it
+-- gets its step from the live log alone -- the title from the log, the
+-- goals from the live objectives, no place, and no rewards (story 20).
+-- The route planner carries such a quest as the player's own work; the
+-- window and the follow mode read the same step through the model.
+quests = {
+  [173] = quest { id = 173, name = 'Path work', level = 6, reqLevel = 5 },
+}
+player.level = 6
+stepModel, planner = loadModel(quests, 'a173.6 d173.6 t173.6')
+takeQuest(174, 'Off the books', {
+  { text = 'Raven feather: 2/5', numFulfilled = 2, numRequired = 5, finished = false },
+})
+route = planner.GetRoute()
+local unknown = entryOf(route, 'do', 174)
+assert(unknown ~= nil and unknown.own == true,
+  'a log quest the store does not know must ride the route as own work')
+step = stepModel.GetStep(unknown)
+assert(step ~= nil and step.kind == 'do' and step.questID == 174,
+  'a data-less own quest must still get a step from its route entry')
+assert(step.headline == 'Do Off the books',
+  'the headline must name the quest by its log title, saw ' .. tostring(step.headline))
+assert(step.place == nil and #step.points == 0,
+  'a step from the log alone knows no place')
+local logGoals = linesOfKind(step, 'objective')
+assert(#logGoals == 1 and logGoals[1].text == 'Raven feather'
+    and logGoals[1].count == '2 of 5' and not logGoals[1].done,
+  'the goal lines must come from the live log objectives')
+step = stepModel.GetStepForQuest(174)
+assert(step ~= nil and step.kind == 'do' and step.headline == 'Do Off the books',
+  'the follow mode must get the same step for a data-less log quest')
+finishQuest(174)
+step = stepModel.GetStepForQuest(174)
+assert(step.kind == 'turnin' and step.headline == 'Hand in Off the books',
+  'a finished data-less log quest must get its hand-in step')
+step = stepModel.GetStep(entryOf(planner.GetRoute(), 'turnin', 174))
+assert(step ~= nil and step.kind == 'turnin',
+  'the hand-in entry of a data-less quest must become a step too')
+print('ok - a log quest the store does not know keeps a step from the live log')
 
 -- The real copied data through the shared seam: the whole addon loads the
 -- way the game loads it, and every entry of a planned route must become a

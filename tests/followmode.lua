@@ -148,6 +148,7 @@ local function loadFollow(quests, pathLine, saved)
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
   loadFile('DataStore.lua')
+  loadFile('Geo.lua')
   loadFile('RoutePlanner.lua')
   loadFile('StepModel.lua')
   loadFile('FollowMode.lua')
@@ -410,11 +411,11 @@ assert(heard[#heard].questID == nil,
   'a quest state change with no pick must not serve anything')
 print('ok - the hand-in of the picked quest ends the follow step')
 
--- The return to the route: a click on the step (user story 30) turns
--- Follow mode off and clears the pick -- the story says the click leaves
--- Follow mode, so the next pick in the log does not restart the
--- following; the window's toggle turns it back on -- and the choice
--- reaches the per-character saved table like every other switch.
+-- The return to the route: a click on the step (user story 30) clears
+-- the pick and returns the window to the route, but leaves Follow mode
+-- itself on. The title-bar toggle of story 27 is the one control that
+-- turns the mode off and keeps that choice in the saved table, so a
+-- later pick in the log follows again without another click.
 follow = loadFollow(quests, 'a181.5 d181.5 t181.5 a182.5 d182.5 t182.5')
 listenFollow(follow)
 takeQuest(181, 'Skinning knives', {
@@ -427,18 +428,17 @@ assert(follow.GetFollowState().step ~= nil,
   'the scenario must serve a step before the return')
 follow.ReturnToRoute()
 state = follow.GetFollowState()
-assert(state.active == false and state.questID == nil and state.step == nil,
-  'the return to the route must leave follow mode and clear the pick')
-assert(EfficientQuestsCharacter.followMode == false,
-  'the return to the route must turn the switch off in the saved table')
-assert(heard[#heard].active == false and heard[#heard].step == nil,
+assert(state.active == true and state.questID == nil and state.step == nil,
+  'the return must clear the pick while Follow mode stays on')
+assert(EfficientQuestsCharacter.followMode == true,
+  'the return must not turn the switch off in the saved table; only the toggle does')
+assert(heard[#heard].active == true and heard[#heard].step == nil,
   'the return must notify with the state after it')
-superTracked = 182
-fire('SUPER_TRACKING_CHANGED')
+pickInLog(182)
 state = follow.GetFollowState()
-assert(state.active == false and state.step == nil,
-  'after the return, a pick in the log must not restart the following')
-print('ok - a click on the step returns to the route')
+assert(state.active == true and state.questID == 182 and state.step ~= nil,
+  'after the return, a later pick in the log must follow again')
+print('ok - a click on the step returns to the route and the mode stays on')
 
 -- A client without super tracking: the service itself is missing, and
 -- the controller loads all the same and follows the manual pick hook --
@@ -460,7 +460,7 @@ assert(state.questID == 191 and state.step ~= nil and state.step.kind == 'do'
   'the manual pick hook must serve the step of the picked quest')
 assert(#heard == 2 and heard[2].questID == 191 and heard[2].step ~= nil,
   'the manual pick must notify')
-follow.ReturnToRoute()
+follow.SetFollowMode(false)
 follow.SetFollowTarget(191)
 state = follow.GetFollowState()
 assert(state.active == false and state.questID == nil,

@@ -23,6 +23,39 @@ function EfficientQuests.GetDataSnapshot()
     return SNAPSHOT_SOURCE .. ", path data v" .. pathVersion .. ", copied " .. COPY_DATE
 end
 
+-- The display names of the dungeons, in our own words -- the same words
+-- the dungeon window titles itself with and the menu lists. Wings that
+-- the guide finds by name carry theirs in their names list; the key
+-- stands in for anything still unknown. This is the one place that
+-- holds them.
+local DUNGEON_NAMES = {
+    [389] = "Ragefire Chasm", [43] = "Wailing Caverns", [48] = "Blackfathom Deeps",
+    [33] = "Shadowfang Keep", [47] = "Razorfen Kraul", [36] = "The Deadmines",
+    [90] = "Gnomeregan", [129] = "Razorfen Downs", [70] = "Uldaman",
+    [349] = "Maraudon", [209] = "Zul'Farrak", [109] = "The Sunken Temple",
+    [34] = "The Stockade", [289] = "Scholomance", [230] = "Blackrock Depths",
+    [1891] = "Scarlet Monastery: Graveyard", [1892] = "Scarlet Monastery: Library",
+    [1893] = "Scarlet Monastery: Armory", [1894] = "Scarlet Monastery: Cathedral",
+    [3291] = "Stratholme: Main Gate", [3292] = "Stratholme: Service Gate",
+    [2291] = "Lower Blackrock Spire", [2292] = "Upper Blackrock Spire",
+    [4291] = "Dire Maul: East", [4292] = "Dire Maul: West", [4293] = "Dire Maul: North",
+    [2999] = "Ruins of Lordaeron",
+}
+
+--- The display name of a dungeon key: our own words first, then the
+--- guide's own names list, its short key, and the key itself. The
+--- dungeon guide and the menu ask this one place.
+function EfficientQuests.DungeonName(key, guide)
+    if DUNGEON_NAMES[key] then return DUNGEON_NAMES[key] end
+    if type(guide) == "table" then
+        if type(guide.names) == "table" and type(guide.names[1]) == "string" then
+            return guide.names[1]
+        end
+        if type(guide.key) == "string" then return guide.key end
+    end
+    return tostring(key)
+end
+
 -- What the loader watches over: where each table lives in the namespace,
 -- how to name it in a message, and what stops working without it. The
 -- three tables are the three data topics the Trailwright snapshot holds.
@@ -86,6 +119,29 @@ for _, setting in ipairs(TABLES) do
         report(setting, "malformed")
     end
 end
+
+-- The quests table is positional: the generated layout gives every quest
+-- fact a fixed index, and the code reads those indexes by name through
+-- this table, so a reader never meets a bare number. The name is the only
+-- field the loader itself checks (see the shape note in TABLES above);
+-- the rest belong to the route planner and the step model.
+local QUEST_FIELDS = {
+    name = 1,             -- "Wolf pelts": the quest's own name
+    startPoint = 8,       -- { uiMapID, x, y } in percent: where it is picked up
+    finishPoint = 9,      -- { uiMapID, x, y } in percent: where it is handed in
+    objectivePoints = 10, -- the known places of the work, as point triples
+    giverName = 19,       -- the name on the pick-up's Talk to line
+    enderName = 20,       -- the name on the hand-in's Talk to line
+    targets = 26,         -- one entry per goal: { name, { npc ids }, { object ids }, count, item id }
+    giverNpc = 27,        -- the npc id of the giver, for the hover
+    enderNpc = 28,        -- the npc id of the ender, for the hover
+    tipPickup = 30,       -- the tip under the pick-up's Talk to line
+    tipHandIn = 31,       -- the tip under the hand-in's Talk to line
+    rewardItems = 33,     -- the fixed reward item ids
+    rewardChoices = 34,   -- the choose-one reward item ids
+    rewardSpell = 36,     -- the spell a reward teaches
+}
+EfficientQuests.questFields = QUEST_FIELDS
 
 -- The store answers first on the reader's query seam: it registers one
 -- lookup per kind, reading the copied tables directly, before any later

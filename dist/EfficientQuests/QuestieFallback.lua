@@ -17,25 +17,12 @@
 
 local reader = EfficientQuests.questState
 
--- A usable QuestieDB: the global exists, it accepts the contract this
+-- A usable QuestieDB is the optional-addons module's question, and it is
+-- the strictest one: the global exists, it accepts the contract this
 -- fallback is written against, and the two entities the lookups need
--- answer field reads. Anything else is an absent or incompatible
--- QuestieDB, and the module stays out of the way.
-local function usableLib()
-    local lib = _G.LibQuestieDB
-    if type(lib) ~= "table" then return nil end
-    if type(lib.RequireContract) ~= "function" then return nil end
-    local called, agreed = pcall(lib.RequireContract, 1)
-    if not called or not agreed then return nil end
-    for _, entity in ipairs({ "Quest", "Npc" }) do
-        if type(lib[entity]) ~= "table" or type(lib[entity].Get) ~= "function" then
-            return nil
-        end
-    end
-    return lib
-end
-
-local lib = usableLib()
+-- answer field reads. Anything else is an absent or incompatible QuestieDB,
+-- and the module stays out of the way.
+local lib = EfficientQuests.optionalAddons.QuestieDB()
 
 -- QuestieDB keys NPC spawns by AreaID, a different frame than the
 -- client's UiMapIDs, and ships the bridge between the two as Lua source

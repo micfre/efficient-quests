@@ -289,9 +289,12 @@ local function loadBridge(quests, pathLine, tables, savedDB, savedCharacter, noT
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
   loadFile('DataStore.lua')
+  loadFile('Geo.lua')
+  loadFile('OptionalAddons.lua')
   loadFile('RoutePlanner.lua')
   loadFile('StepModel.lua')
   loadFile('FollowMode.lua')
+  loadFile('Look.lua')
   loadFile('Options.lua')
   loadFile('Menu.lua')
   loadFile('StepWindow.lua')
@@ -573,6 +576,23 @@ stepWindow.Show()
 assert(#added == 9,
   'back in the open world the step must own its waypoint again')
 print('ok - no waypoint inside an instance, and the step still shows')
+
+-- The dungeon guard is explicit, not the accident of a missing position
+-- (user story 43): the position service keeps answering while the
+-- instance flag is set -- the shape of a client whose maps place the
+-- player inside an instance -- and the bridge must still set no
+-- waypoint, whatever place the step knows.
+inInstance = true
+world = { x = 300, y = 600, instance = 7 }
+stepWindow.Hide()
+stepWindow.Show()
+assert(#added == 9 and #removed == 9,
+  'with a position known inside an instance, the explicit dungeon guard must still keep every waypoint away')
+assert(textsOf(windowFrame())['Do Two spots'],
+  'the step itself must keep showing inside the instance')
+foreignSurvives(tomtom)
+inInstance = false
+print('ok - the dungeon guard holds even with a known position')
 
 -- The step ends, and the waypoint ends with it: the last quest of the
 -- route is handed in, the window says the route is clear, and the bridge

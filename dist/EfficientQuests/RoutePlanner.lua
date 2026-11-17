@@ -14,7 +14,9 @@
 --       first, whatever the order of the Path
 --   { kind = "do" or "turnin", questID = number, own = true }
 --       a quest from the log that the Path itself does not do; it stays
---       on the route until the player hands it in
+--       on the route until the player hands it in, also when the data
+--       store knows no facts for it (story 20): the step model then
+--       builds its step from the live log
 --   { kind = "levelup", level = number }
 --       the "Level up to N" step: always the last entry, present when the
 --       next quests of the Path need a higher level than the player has
@@ -40,6 +42,8 @@
 local _, ns = ...
 local reader = EfficientQuests.questState
 local store = EfficientQuests.characterStore
+local geo = EfficientQuests.geo
+local fields = EfficientQuests.questFields
 
 local planner = {}
 EfficientQuests.routePlanner = planner
@@ -53,25 +57,6 @@ local WINDOW = 90
 -- A finished quest whose hand-in is within this many yards of the player,
 -- on the same continent, comes first (Trailwright's HERE_YARDS).
 local HERE_YARDS = 300
-
-local HBD = LibStub("HereBeDragons-2.0")
-
--- The world position of a data point { map, x%, y% } in yards, through the
--- embedded HereBeDragons, cached per point because the data never moves.
-local worldCache = {}
-local function worldOf(point)
-    if worldCache[point] == nil then
-        local x, y, instance = HBD:GetWorldCoordinatesFromZone(
-            point[2] / 100, point[3] / 100, point[1])
-        worldCache[point] = x and { x, y, instance } or false
-    end
-    return worldCache[point] or nil
-end
-
-local function yards(a, b)
-    local dx, dy = a[1] - b[1], a[2] - b[2]
-    return math.sqrt(dx * dx + dy * dy)
-end
 
 -- The start area of a character, by race: the key of its Path line. A
 -- Skyborne picks its own Path by faction; an unknown race falls back to
@@ -162,8 +147,10 @@ local function build()
         for id, entry in pairs(log) do
             if entry.complete and not store.isSkipped(id) and not store.isAbandoned(id) then
                 local q = quests[id]
-                local spot = q and q[9] and worldOf(q[9])
-                local distance = spot and spot[3] == here[3] and yards(here, spot)
+                local finish = q and q[fields.finishPoint]
+                local spot = finish and geo.worldOf(finish)
+                local distance = spot and geo.sameContinent(spot, here)
+                    and geo.yards(here, spot)
                 if distance and distance <= HERE_YARDS then near[#near + 1] = { id, distance } end
             end
         end
@@ -240,10 +227,11 @@ local function build()
     -- Quests in the log that the walk did not place: the Path either does
     -- them before the join point or not at all. They stay on the route
     -- until the player hands them in, at the end and marked as the own
-    -- work of the player.
+    -- work of the player -- also the ones the data store knows no facts
+    -- for (story 20): what the log holds, the route keeps.
     local own = {}
     for id in pairs(log) do
-        if quests[id] and not carried[id] and not emitted["a:" .. id]
+        if not carried[id] and not emitted["a:" .. id]
             and not emitted["d:" .. id] and not emitted["t:" .. id]
             and not store.isSkipped(id) and not store.isAbandoned(id) then
             own[#own + 1] = id
@@ -299,8 +287,7 @@ end
 -- listener and the wiring below each own their subscription, because the
 -- callback handler keys its registry by owner.
 local replans = {}
-for _, callback in ipairs({ "QuestAccepted", "QuestProgressed", "QuestCompleted",
-    "QuestHandedIn", "QuestAbandoned", "PlayerLevelUp" }) do
+for _, callback in ipairs(reader.CHANGE_CALLBACKS) do
     reader.RegisterCallback(replans, callback, function() stale = true end)
 end
 

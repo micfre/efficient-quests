@@ -132,6 +132,8 @@ local function loadPlanner(quests, pathLine)
   loadFile('Core.lua')
   loadFile('QuestState.lua')
   loadFile('CharacterStore.lua')
+  loadFile('DataStore.lua')
+  loadFile('Geo.lua')
   loadFile('RoutePlanner.lua')
   for _, frame in ipairs(frames) do
     if frame.events['PLAYER_LOGIN'] and frame.scripts.OnEvent then
@@ -408,6 +410,29 @@ route = planner.GetRoute()
 assert(not hasQuest(route, 701),
   'a handed-in own quest must leave the route')
 print('ok - a log quest off the Path stays on the route until it is handed in')
+
+-- A log quest the data store knows nothing about stays on the route too
+-- (story 20): the player took it, so the route keeps its work and its
+-- hand-in until the player hands it in, whatever the store knows.
+quests = {
+  [711] = quest { id = 711, name = 'Path work', level = 6, reqLevel = 5 },
+}
+player.level = 6
+planner = loadPlanner(quests, 'a711.6 d711.6 t711.6')
+takeQuest(712, 'Unknown errand')
+route = planner.GetRoute()
+local unknownDo = entryOf(route, 'do', 712)
+assert(unknownDo ~= nil and unknownDo.own == true,
+  'a log quest the store has no data for must stay on the route as own work')
+local unknownTurnin = entryOf(route, 'turnin', 712)
+assert(unknownTurnin ~= nil and unknownTurnin.own == true,
+  'the unknown log quest must keep its hand-in on the route too')
+assert(entryOf(route, 'pickup', 711) ~= nil,
+  'the unknown own work must not take the path quests off the route')
+fire('QUEST_TURNED_IN', 712)
+assert(not hasQuest(planner.GetRoute(), 712),
+  'a handed-in quest the store never knew must leave the route')
+print('ok - a log quest unknown to the store stays on the route until the hand-in')
 
 -- A quest the player just accepted gets no pick-up step: the accept
 -- itself replans, and the route carries the work and the hand-in instead.

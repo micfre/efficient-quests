@@ -22,16 +22,20 @@
 --   another step, no step, or shown = false.
 --
 --   No waypoint without a place. A step whose data knows no coordinates,
---   or a player the reader cannot place, sets nothing. Inside an instance
---   the reader answers no player position at all, so no waypoint ever
---   points into a dungeon (user story 43).
+--   or a player the reader cannot place, sets nothing. The dungeon rule
+--   of user story 43 is its own explicit guard: the bridge asks the
+--   reader's IsInInstance question first and sets nothing inside an
+--   instance, so the rule does not hang on the reader answering no
+--   position there.
 --
 --   No display flags. The bridge passes no map, minimap, arrow, or
 --   clear-distance flags, so the player's own TomTom options decide how
 --   the waypoint appears and when it says the player arrived. The one
 --   thing the bridge does say is persistent = false: a step waypoint
---   lives one session, and without it TomTom's "save new waypoints"
---   setting would keep it across logins.
+--   lives one session, because a persisted one would outlive the
+--   addon's control and break the removal stories -- and without the
+--   flag TomTom's "save new waypoints" setting would keep it across
+--   logins.
 --
 --   The off switch. The account-wide waypoints option turns the bridge
 --   off; the default is on (user story 40). The options panel calls
@@ -46,24 +50,13 @@
 
 local reader = EfficientQuests.questState
 local window = EfficientQuests.StepWindow
+local geo = EfficientQuests.geo
+local addons = EfficientQuests.optionalAddons
 
 local bridge = {}
 EfficientQuests.TomTomBridge = bridge
 
-local HBD = LibStub("HereBeDragons-2.0")
-
 local uid -- the uid of our own waypoint; the only one this module removes
-
--- The real TomTom answers IsCrazyArrowEmpty, and the two calls the bridge
--- makes are AddWaypoint and RemoveWaypoint -- the surface the TomTom
--- README documents for addons. Anything else on the TomTom table is not
--- ours to call.
-local function tomtomHere()
-    return type(TomTom) == "table"
-        and type(TomTom.IsCrazyArrowEmpty) == "function"
-        and type(TomTom.AddWaypoint) == "function"
-        and type(TomTom.RemoveWaypoint) == "function"
-end
 
 -- The waypoints option, on until the player says otherwise. The saved
 -- table carries the default after login; a missing table says on.
@@ -75,17 +68,8 @@ end
 -- A well-formed candidate point of the step model: { uiMapID, x, y } in
 -- percent.
 local function validPoint(point)
-    return type(point) == "table" and type(point[1]) == "number"
-        and type(point[2]) == "number" and type(point[3]) == "number"
-end
-
--- The world position of one candidate point, in yards, or nil when the
--- maps know the place no better than that.
-local function worldOf(point)
-    local x, y, instance = HBD:GetWorldCoordinatesFromZone(
-        point[2] / 100, point[3] / 100, point[1])
-    if not x then return nil end
-    return { x, y, instance }
+    return type(point) == "table" and type(geo.uiMapID(point)) == "number"
+        and type(geo.x(point)) == "number" and type(geo.y(point)) == "number"
 end
 
 -- The candidate the player stands closest to, in true yards on the
@@ -96,10 +80,9 @@ local function nearestOf(points, here)
     local best, bestYards = points[1], math.huge
     for _, point in ipairs(points) do
         if validPoint(point) then
-            local place = worldOf(point)
-            if place and place[3] == here[3] then
-                local dx, dy = place[1] - here[1], place[2] - here[2]
-                local yards = math.sqrt(dx * dx + dy * dy)
+            local place = geo.worldOf(point)
+            if place and geo.sameContinent(place, here) then
+                local yards = geo.yards(place, here)
                 if yards < bestYards then best, bestYards = point, yards end
             end
         end
@@ -109,12 +92,15 @@ end
 
 -- Take our own waypoint down. A uid that TomTom already cleared -- the
 -- player's clear-distance can remove it on arrival -- is a no-op there,
--- and a TomTom that is not loaded holds no waypoints of ours anyway.
+-- and a TomTom that is not loaded holds no waypoints of ours anyway. The
+-- presence question is the optional-addons module's: the TomTom table
+-- comes back only when it answers the calls this bridge makes.
 local function removeOurs()
     if not uid then return end
     local mine = uid
     uid = nil
-    if tomtomHere() then TomTom:RemoveWaypoint(mine) end
+    local tomtom = addons.TomTom()
+    if tomtom then tomtom:RemoveWaypoint(mine) end
 end
 
 -- Set one waypoint for the step and keep its uid. The old one comes off
@@ -123,11 +109,17 @@ end
 -- second marker beside the first.
 local function placeWaypoint(point, title)
     removeOurs()
-    uid = TomTom:AddWaypoint(point[1], point[2] / 100, point[3] / 100, {
-        title = title,
-        from = "Efficient Quests",
-        persistent = false,
-    })
+    uid = addons.TomTom():AddWaypoint(geo.uiMapID(point), geo.x(point) / 100,
+        geo.y(point) / 100, {
+            title = title,
+            from = "Efficient Quests",
+            -- One session only: a persisted step waypoint would outlive the
+            -- addon's control -- its uid is lost on relog -- and violate the
+            -- spec's removal rules, and persistent = false is no display
+            -- flag, so TomTom's own options still decide how the waypoint
+            -- appears.
+            persistent = false,
+        })
 end
 
 -- Whether the standing waypoint already sits on this exact place, so a
@@ -138,10 +130,18 @@ local function samePlace(point)
 end
 
 local function sync(shown, step)
-    if tomtomHere() and waypointsOn() and shown == true
+    -- The explicit dungeon guard of user story 43: inside an instance no
+    -- waypoint may point anywhere, whether or not the reader can place
+    -- the player. The guard stands on its own question, not on
+    -- GetPlayerWorld happening to answer nil inside instances.
+    if reader.IsInInstance() then
+        removeOurs()
+        return
+    end
+    if addons.TomTom() and waypointsOn() and shown == true
         and type(step) == "table" and type(step.points) == "table" then
-        -- No player position, no waypoint: inside an instance the reader
-        -- answers nil, and the bridge must never point into a dungeon.
+        -- No player position, no waypoint: a place the maps cannot place
+        -- is not a place to point at.
         local here = reader.GetPlayerWorld()
         local point = here and nearestOf(step.points, here) or nil
         if validPoint(point) then

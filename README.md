@@ -11,6 +11,8 @@ The addon ships two guides:
 
 Both guides show text. The addon does not draw on the map or the minimap.
 
+The dungeon guide text is written for the Classic versions of the dungeons. The Forever client can differ.
+
 ## Install
 
 Copy the folder `dist/EfficientQuests` from this repository into the `Interface/AddOns` folder of your Forever client. The [installation guide](docs/installation.md) gives the exact path. There are no plugins and no extra downloads.

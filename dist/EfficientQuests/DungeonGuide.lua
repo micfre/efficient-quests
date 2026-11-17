@@ -1,12 +1,13 @@
 -- The dungeon guide of Efficient Quests. While the player is inside a
 -- dungeon that the data store knows, this module takes over the display
--- from the step window and shows the dungeon's stops in order: every stop
--- with its kind, its name, and its optional mark, and the stop that is
--- current expanded with its approach text, its boss mechanics, and the
--- quests it helps with. A stop is done when its boss dies -- seen through
--- the game's boss events or the player's target --, when its quest is
--- complete, or when the player marks it by hand. When the player leaves
--- the dungeon, the step window comes back with the leveling route.
+-- from the step window and its window (see DungeonGuideWindow.lua) shows
+-- the dungeon's stops in order. This module owns the logic: it resolves
+-- which dungeon the player stands in, keeps the run state -- the kills of
+-- this visit -- and answers which stop is done and which is current. A
+-- stop is done when its boss dies -- seen through the game's boss events
+-- or the player's target --, when its quest is complete, or when the
+-- player marks it by hand. When the player leaves the dungeon, the step
+-- window comes back with the leveling route.
 --
 -- The port. The behavior is a port of the dungeon guide of Trailwright
 -- (see THIRD_PARTY.md): the stops-based guide without maps. The boss
@@ -41,9 +42,14 @@
 --   GetActiveGuide()  the running guide, { key = the key the guide is
 --                     kept under in the generated table, guide = that
 --                     table }, or nil outside. The key is an instance
---                     id, a wing id, or a named id.
+--                     id, a wing id, or a named id. The window asks this
+--                     on every refresh.
 --   MarkStop(npcID, how)  the hand mark (user story 60): "done" marks
 --                     the stop done, "undo" clears the mark again.
+--   StopDone(stop)    whether one stop of the running guide is done: the
+--                     window's tick asks, and so does the hand mark.
+--   CurrentIndex(stops)  the first stop still to do, or nil when every
+--                     stop is done: the window's open stop asks.
 --   RegisterCallback(owner, "GuideChanged", fn)  the CallbackHandler
 --                     subscription. GuideChanged fires with one payload
 --                     table, { active, key, guide }, whenever the guide
@@ -52,6 +58,7 @@
 local _, ns = ...
 local reader = EfficientQuests.questState
 local stepWindow = EfficientQuests.StepWindow
+local window = EfficientQuests.dungeonGuideWindow
 
 local self = {}
 EfficientQuests.dungeonGuide = self
@@ -61,31 +68,8 @@ self.callbacks = LibStub("CallbackHandler-1.0"):New(self,
 
 local GUIDES = type(ns.DungeonGuides) == "table" and ns.DungeonGuides or {}
 
--- The names of the dungeons, in our own words, the same words the menu
--- lists. Wings that the guide finds by name carry theirs in their names
--- list; the key stands in for anything still unknown.
-local NAMES = {
-    [389] = "Ragefire Chasm", [43] = "Wailing Caverns", [48] = "Blackfathom Deeps",
-    [33] = "Shadowfang Keep", [47] = "Razorfen Kraul", [36] = "The Deadmines",
-    [90] = "Gnomeregan", [129] = "Razorfen Downs", [70] = "Uldaman",
-    [349] = "Maraudon", [209] = "Zul'Farrak", [109] = "The Sunken Temple",
-    [34] = "The Stockade", [289] = "Scholomance", [230] = "Blackrock Depths",
-    [1891] = "Scarlet Monastery: Graveyard", [1892] = "Scarlet Monastery: Library",
-    [1893] = "Scarlet Monastery: Armory", [1894] = "Scarlet Monastery: Cathedral",
-    [3291] = "Stratholme: Main Gate", [3292] = "Stratholme: Service Gate",
-    [2291] = "Lower Blackrock Spire", [2292] = "Upper Blackrock Spire",
-    [4291] = "Dire Maul: East", [4292] = "Dire Maul: West", [4293] = "Dire Maul: North",
-    [2999] = "Ruins of Lordaeron",
-}
-
 local function dungeonName(key)
-    local dungeon = GUIDES[key]
-    if type(dungeon) ~= "table" then return tostring(key) end
-    return NAMES[key]
-        or (type(dungeon.names) == "table" and type(dungeon.names[1]) == "string"
-            and dungeon.names[1])
-        or (type(dungeon.key) == "string" and dungeon.key)
-        or tostring(key)
+    return EfficientQuests.DungeonName(key, GUIDES[key])
 end
 
 -- Dungeons whose wings share one instance id. The game never says which
@@ -174,6 +158,12 @@ local function stopDone(stop)
     return false
 end
 
+--- Whether one stop of the running guide is done: the window's tick asks,
+--- and so does the hand mark.
+function self.StopDone(stop)
+    return stopDone(stop)
+end
+
 -- Index of the first stop still to do. Optional stops the player went
 -- past -- a later stop is done -- do not count.
 local function currentIndex(stops)
@@ -188,224 +178,10 @@ local function currentIndex(stops)
     return nil
 end
 
--- The quests the stops of a guide ask for, in the order the stops meet
--- them: each stop's own quest, its follow-up, and the quests it helps
--- with, each id once.
-local function questsOf(stops)
-    local ids, seen = {}, {}
-    local function add(id)
-        if type(id) == "number" and not seen[id] then
-            seen[id] = true
-            table.insert(ids, id)
-        end
-    end
-    for _, stop in ipairs(stops) do
-        add(stop.quest)
-        add(stop.follow)
-        for _, id in ipairs(type(stop.quests) == "table" and stop.quests or {}) do
-            add(id)
-        end
-    end
-    return ids
-end
-
--- The meta line of a stop: its title and its level, joined with a dot.
-local function metaOf(stop)
-    local parts = {}
-    if type(stop.title) == "string" then table.insert(parts, stop.title) end
-    if type(stop.level) == "number" then
-        table.insert(parts, "Level " .. stop.level)
-    end
-    return #parts > 0 and table.concat(parts, " · ") or nil
-end
-
---------------------------------------------------------------------------------
--- The window
---------------------------------------------------------------------------------
-
--- The flat palette of the addon's windows, shared with the step window
--- and the menu. One row of the body is one line of text.
-local BORDER = { 0.65, 0.49, 0.27 }
-local ACCENT = { 0.61, 0.48, 0.29 }
-local PLATE = { 0.08, 0.08, 0.09 }
-local NOTE = { 0.85, 0.85, 0.85 }
-local WARN = { 1.00, 0.70, 0.40 }
-local DONE = { 0.45, 0.85, 0.45 }
-local WIDTH = 280
-local HEADER, LINE, HEADLINE, PAD = 36, 18, 20, 12
-
--- The verb of each kind, the word that tells the player what to do there.
-local VERBS = { boss = "Kill", rare = "Rare", spot = "Find", event = "Talk to" }
-
-local frame        -- the window frame, built on first start
-local titleText    -- the dungeon's name
-local levelsText   -- the level range line under it
-local body         -- the rows of the stop list
-local pool, usedRows = {}, {}
-
-local function applyBackdrop(target)
-    target:SetBackdrop({
-        bgFile = "Interface\\Buttons\\WHITE8X8",
-        edgeFile = "Interface\\Buttons\\WHITE8X8",
-        tile = false, tileSize = 0, edgeSize = 1,
-        insets = { left = 1, right = 1, top = 1, bottom = 1 },
-    })
-    target:SetBackdropColor(PLATE[1], PLATE[2], PLATE[3], 0.95)
-    target:SetBackdropBorderColor(BORDER[1], BORDER[2], BORDER[3], 1)
-end
-
-local function newRow()
-    local row = CreateFrame("Button", nil, body)
-    row:SetSize(WIDTH - 24, LINE)
-    row.tick = CreateFrame("CheckButton", nil, row)
-    row.tick:SetSize(13, 13)
-    row.tick:SetPoint("LEFT", row, "LEFT", 3, 0)
-    local mark = row.tick:CreateTexture(nil, "ARTWORK")
-    mark:SetAllPoints(row.tick)
-    mark:SetColorTexture(1, 0.82, 0.2, 1)
-    row.tick:SetCheckedTexture(mark)
-    row.tick:SetEnabled(false)
-    row.text = row:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    row.text:SetPoint("LEFT", row, "LEFT", 24, 0)
-    row.text:SetJustifyH("LEFT")
-    return row
-end
-
-local function takeRow(at)
-    local row = table.remove(pool) or newRow()
-    row:SetPoint("TOPLEFT", body, "TOPLEFT", 0, -((at - 1) * LINE))
-    row:Show()
-    table.insert(usedRows, row)
-    return row
-end
-
--- One stop row: the verb of its kind, its name, and the optional mark.
--- The tick fills when the stop is done, and a right-click is the hand
--- mark: done on the first click, undone on the second.
-local function setStopRow(row, stop)
-    row.tick:SetShown(true)
-    row.tick:SetChecked(stopDone(stop) == true)
-    row.text:SetPoint("LEFT", row, "LEFT", 24, 0)
-    row.text:SetTextColor(1, 1, 1, 1)
-    local words = (VERBS[stop.kind] or "See") .. " " .. stop.name
-    if stop.optional then words = words .. " (optional)" end
-    row.text:SetText(words)
-    row:SetScript("OnClick", function(_, mouseButton)
-        if mouseButton ~= "RightButton" then return end
-        self.MarkStop(stop.npc, stopDone(stop) and "undo" or "done")
-    end)
-end
-
--- One detail line under the open stop: a title or level line in the
--- muted bronze, an approach line, or a mechanics line in the warning
--- color. Detail lines carry no tick box.
-local function setDetailRow(row, text, color, indent)
-    row.tick:SetShown(false)
-    row.text:SetPoint("LEFT", row, "LEFT", indent, 0)
-    row.text:SetTextColor(color[1], color[2], color[3], 1)
-    row.text:SetText(text)
-end
-
-local function releaseRows()
-    for _, row in ipairs(usedRows) do
-        row:Hide()
-        row:SetScript("OnClick", nil)
-        table.insert(pool, row)
-    end
-    usedRows = {}
-end
-
-local function build()
-    frame = CreateFrame("Frame", "EfficientQuestsDungeonGuide", UIParent)
-    frame:SetWidth(WIDTH)
-    applyBackdrop(frame)
-    frame:SetClampedToScreen(true)
-
-    local hide = CreateFrame("Button", nil, frame)
-    hide:SetSize(20, 20)
-    hide:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -8, -8)
-    local hideLabel = hide:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    hideLabel:SetAllPoints(hide)
-    hideLabel:SetText("X")
-    hide:SetScript("OnClick", function() frame:Hide() end)
-
-    titleText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    titleText:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -10)
-    titleText:SetJustifyH("LEFT")
-
-    levelsText = frame:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    levelsText:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -HEADER + 4)
-    levelsText:SetJustifyH("LEFT")
-    levelsText:SetTextColor(ACCENT[1], ACCENT[2], ACCENT[3], 1)
-
-    body = CreateFrame("Frame", "EfficientQuestsDungeonGuideStops", frame)
-    body:SetWidth(WIDTH - 24)
-    body:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -(HEADER + HEADLINE))
-end
-
---- Bring the window in line with the run. Called on start, on every kill,
---- every mark, and every quest state change while the guide runs. A
---- window the player took down with its X stays down: only the next start
---- brings it back.
-local function refresh()
-    if not frame or not frame:IsShown() then return end
-    releaseRows()
-    local dungeon = GUIDES[inside]
-    titleText:SetText(dungeonName(inside))
-    levelsText:SetText(type(dungeon.levels) == "string"
-        and ("Levels " .. dungeon.levels) or "")
-    local stops = dungeon.stops or {}
-    local rows = 0
-    local open = currentIndex(stops)
-    for at, stop in ipairs(stops) do
-        rows = rows + 1
-        setStopRow(takeRow(rows), stop)
-        if at == open then
-            local meta = metaOf(stop)
-            if meta then
-                rows = rows + 1
-                setDetailRow(takeRow(rows), meta, ACCENT, 24)
-            end
-            for _, line in ipairs(type(stop.approach) == "table" and stop.approach or {}) do
-                rows = rows + 1
-                setDetailRow(takeRow(rows), line, NOTE, 24)
-            end
-            for _, line in ipairs(type(stop.mechanics) == "table" and stop.mechanics or {}) do
-                rows = rows + 1
-                setDetailRow(takeRow(rows), line, WARN, 24)
-            end
-        end
-    end
-    if stops[1] and not open then
-        rows = rows + 1
-        setDetailRow(takeRow(rows),
-            "Every stop is done. Leave the dungeon to go back to your route.",
-            DONE, 4)
-        local left = {}
-        for _, each in ipairs(stops) do
-            if not stopDone(each) then table.insert(left, each.name) end
-        end
-        if #left > 0 then
-            rows = rows + 1
-            setDetailRow(takeRow(rows),
-                "Not done (optional): " .. table.concat(left, ", ") .. ".", WARN, 4)
-        end
-    end
-    -- The quests the dungeon helps with (user story 62), named through
-    -- the quest state reader's lookup chain: the data store first, a
-    -- fallback later, the id itself when neither knows the name.
-    local quests = questsOf(stops)
-    if #quests > 0 then
-        rows = rows + 1
-        setDetailRow(takeRow(rows), "Quests here", ACCENT, 4)
-        for _, questID in ipairs(quests) do
-            rows = rows + 1
-            setDetailRow(takeRow(rows), reader.QuestName(questID)
-                or ("Quest " .. questID), NOTE, 20)
-        end
-    end
-    body:SetHeight(rows * LINE)
-    frame:SetHeight(HEADER + HEADLINE + rows * LINE + PAD)
+--- The first stop still to do, or nil when every stop is done: the
+--- window's open stop asks.
+function self.CurrentIndex(stops)
+    return currentIndex(stops)
 end
 
 --------------------------------------------------------------------------------
@@ -447,7 +223,7 @@ local function killed(npc, name)
         end
     end
     if moved then
-        refresh()
+        window.refresh()
         notify()
     end
 end
@@ -472,12 +248,11 @@ local function takeDisplay()
         stepWindow.Hide()
         hidRoute = true
     end
-    if not frame then build() end
-    frame:Show()
+    window.Show()
 end
 
 local function releaseDisplay()
-    if frame then frame:Hide() end
+    window.Hide()
     if hidRoute and stepWindow then
         stepWindow.Show()
     end
@@ -495,7 +270,7 @@ local function start(key)
         .. dungeonName(key)
         .. ". Right-click a stop to mark it; it moves on by itself as bosses die.")
     takeDisplay()
-    refresh()
+    window.refresh()
     notify()
 end
 
@@ -519,7 +294,7 @@ local function check()
         if key == inside then
             if inside then
                 run.seen = time()
-                refresh()
+                window.refresh()
             end
             return
         end
@@ -556,7 +331,7 @@ function self.MarkStop(npcID, how)
             elseif how == "undo" then
                 run.killed[marked.doneBy or marked.npc] = nil
             end
-            refresh()
+            window.refresh()
             notify()
             return
         end
@@ -571,7 +346,7 @@ local watches = {}
 for _, name in ipairs({ "QuestAccepted", "QuestHandedIn" }) do
     reader.RegisterCallback(watches, name, function()
         C_Timer.After(0, function()
-            if inside then refresh() end
+            if inside then window.refresh() end
         end)
     end)
 end

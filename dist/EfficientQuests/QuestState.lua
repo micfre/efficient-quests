@@ -62,6 +62,13 @@ local function fire(name, payload)
     reader.callbacks:Fire(name, payload)
 end
 
+-- The change callbacks above, as one list. The modules that must hear
+-- every change of the quest state -- the route planner, the step window,
+-- the Follow mode controller -- subscribe to these names instead of
+-- naming the six again.
+reader.CHANGE_CALLBACKS = { "QuestAccepted", "QuestProgressed",
+    "QuestCompleted", "QuestHandedIn", "QuestAbandoned", "PlayerLevelUp" }
+
 -- The last-read state. The log is refreshed when the game says the quest
 -- log changed; the player facts are read live, with the level announced by
 -- PLAYER_LEVEL_UP kept while UnitLevel still answers the old one.
@@ -233,6 +240,16 @@ function reader.GetPlayerWorld()
     local ok, x, y, instance = pcall(HBD.GetPlayerWorldPosition, HBD)
     if not ok or not x or not y or not instance then return nil end
     return { x, y, instance }
+end
+
+--- Whether the player stands inside an instance right now. This is the
+--- question behind the "no position inside an instance" rule above, asked
+--- on its own so a caller can guard on the instance itself -- the TomTom
+--- bridge does, for the dungeon rule of user story 43 -- instead of
+--- leaning on the position coming back nil.
+function reader.IsInInstance()
+    if not IsInInstance then return false end
+    return IsInInstance() == true
 end
 
 --- The map the player stands on, or nil when the map service knows none.
